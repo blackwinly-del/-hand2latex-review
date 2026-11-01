@@ -17,5 +17,9 @@
     "changes": [],
     "need_review": false,
     "risk_score": null
+  },
+  "render_result": {
+    "renderable": true,
+    "error": null
   }
 }
