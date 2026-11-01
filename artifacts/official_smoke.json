@@ -1,0 +1,21 @@
+{
+  "image_path": "data/smoke/official_formula.png",
+  "model_call_total_seconds": 29.039,
+  "candidates": [
+    {
+      "engine": "pp_formulanet_l",
+      "latex": "\\zeta_{0}(\\nu)=-\\frac{\\nu\\varrho^{-2\\nu}}{\\pi}\\int_{\\mu}^{\\infty}d\\omega\\int_{C_{+}}d z\\frac{2z^{2}}{(z^{2}+\\omega^{2})^{\\nu+1}}\\check{\\Psi}(\\omega;z)e^{i\\epsilon z}\\quad,",
+      "score": null,
+      "latency_ms": 11171.101,
+      "error": null
+    }
+  ],
+  "refine_result": {
+    "raw_latex": "\\zeta_{0}(\\nu)=-\\frac{\\nu\\varrho^{-2\\nu}}{\\pi}\\int_{\\mu}^{\\infty}d\\omega\\int_{C_{+}}d z\\frac{2z^{2}}{(z^{2}+\\omega^{2})^{\\nu+1}}\\check{\\Psi}(\\omega;z)e^{i\\epsilon z}\\quad,",
+    "final_latex": "\\zeta_{0}(\\nu)=-\\frac{\\nu\\varrho^{-2\\nu}}{\\pi}\\int_{\\mu}^{\\infty}d\\omega\\int_{C_{+}}d z\\frac{2z^{2}}{(z^{2}+\\omega^{2})^{\\nu+1}}\\check{\\Psi}(\\omega;z)e^{i\\epsilon z}\\quad,",
+    "confidence": "medium",
+    "changes": [],
+    "need_review": false,
+    "risk_score": null
+  }
+}
