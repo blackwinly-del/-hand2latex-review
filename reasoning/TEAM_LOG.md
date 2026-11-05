@@ -187,3 +187,195 @@
 - **未解决／未实现事项**：未使用此前 3 个真实样本训练，未保存生产模型，未接入 `refine`，未修改 LaTeX，无生产 `risk_score`；不宣称 MLP 有效或已校准。
 - **学习进度**：教导员已讲解训练五步；小样本损失下降不等于泛化能力或生产有效性。
 - **下一步（计划，未完成）**：由负责人确认后续安排。
+
+## C 模块第十一步：Mock 上下文候选选择
+
+**阶段状态：Mock 流程、测试及只读审核已完成；真实 API 接入与真实上下文选择效果验证均未实施。**
+
+- **本次任务**：仅实施 C 模块的上下文候选选择 Mock 流程及测试，不修改 A/B，不接真实 API。
+- **负责人决定**：用户明确只负责 C，并确认 `choose_with_context(image_path,candidates) -> {selected_index,reason,error}` 接口；先进行模拟测试。
+- **实际创建／修改文件**：新增 `D:\latex\reasoning\context.py`、`D:\latex\tests\test_context.py`；修改 `D:\latex\reasoner.py`；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。
+- **实现结果**：
+  - `_request_context` 为未配置占位；Mock 成功时仅返回已有候选索引和理由，不能自由生成 LaTeX。
+  - `refine` 对规范化冲突调用上下文选择；成功时仅选择已有候选。选择第二候选时，`changes` 记录 `context_candidate_selection` 的 `before`、`after`、`selected_index`、`reason`；`raw_latex` 保留选中候选原文，输入列表不变；选择第一候选不记录该项修改。
+  - 上下文选择失败时保留第一有效候选，结果为 `low + need_review=True`；结构错误即使已完成候选选择仍为 `low + need_review=True`；冲突经选择后不直接升为 `high`。
+- **外部资源**：本阶段无新增外部资源，未调用真实 API。
+- **代码审核及处理**：只读审核无必须修复项；按建议补充负数、浮点数、字符串索引测试，非法输入不调用 API 的测试，以及第二候选含首尾空白时同时记录 `context_candidate_selection` 与 `trim_outer_whitespace` 两条 `changes` 的测试。
+- **实际测试**：首轮完整 `unittest` 71 项全部通过；按审核建议补测后，最终完整 `unittest` 72 项全部通过。
+- **未解决／未实现事项**：当前仅为 Mock 流程；真实 API 未接入，尚无真实上下文选择效果结论。
+- **学习进度**：教导员已讲解候选选择不等于生成或改写。
+- **下一步（计划，未完成）**：由负责人确认后续安排。
+
+## C 模块第十二步：可配置 OpenAI 兼容上下文请求
+
+**阶段状态：真实请求适配层、Mock 测试和只读审核已完成；未提供真实密钥，未调用真实 API，真实服务视觉／JSON 兼容性和选择效果未验证。**
+
+- **本次任务**：实现可配置的 OpenAI 兼容上下文请求适配层，并完成 Mock 测试与只读审核；不修改 A/B。
+- **负责人决定**：原话“直接做支持openAI接口的自由配置”。保持 `choose_with_context` 与 `refine` 公共接口不变，不改 A/B。
+- **实际修改文件**：`D:\latex\reasoning\context.py`、`D:\latex\tests\test_context.py`；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`；`D:\latex\reasoner.py` 本阶段未修改。
+- **实际环境**：在项目 `.venv` 安装 `openai 3.42.1`；测试须使用 `.venv`，系统 Python 未安装该依赖。
+- **配置结果**：`OPENAI_API_KEY`、`OPENAI_MODEL` 必填；`OPENAI_BASE_URL` 可空并使用 SDK 默认；`OPENAI_TIMEOUT_SECONDS` 默认 30 秒，必须为正有限数。key／model 会 `trim`，空白 `base_url` 视为未配置。
+- **实现结果**：
+  - 使用 OpenAI `chat.completions`；原图按 PNG／JPEG／GIF／WebP 扩展名映射为 base64 data URL；发送零基索引及原始 LaTeX 候选，并设置 `response_format=json_object`。
+  - 仅返回已有候选索引和理由，不采用生成公式；严格索引／理由校验沿用。普通异常只公开异常类型和固定失败说明，配置错误保留安全变量名；`refine` 失败回退不变。
+- **外部资源**：OpenAI Python SDK README（https://github.com/openai/openai-python#usage）、客户端源码（https://github.com/openai/openai-python/blob/main/src/openai/_client.py）、Images and vision（https://developers.openai.com/api/docs/guides/images-vision）、Structured Outputs／JSON mode（https://developers.openai.com/api/docs/guides/structured-outputs）、Chat Completions reference（https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create/）。兼容服务不必然支持视觉或 JSON mode。
+- **代码审核及处理**：第一轮无必须修复项；采纳配置规范化、异常防泄漏、MIME 覆盖建议。第二轮无必须修复项，仅建议以后进行受控真实 API 冒烟。
+- **实际测试**：初版完整 `unittest` 76 项通过（7.560s）；审核补测后 79 项首轮出现 1 个 `ERROR`，原因是 Windows `mimetypes` 未识别 `.webp`；改为固定扩展名映射后，最终主 Agent 完整 `unittest` 79 项全部通过（6.037s），审核员使用 `.venv` 复跑 79 项全部通过（6.438s）。
+- **未解决／未实施事项**：真实 API 冒烟与效果评估未做；SDK 真实序列化仅经 Mock 验证；A 端到端联调未做。
+- **学习进度**：已说明 OpenAI 兼容不等于所有服务支持视觉／JSON mode，配置通过环境变量与公共接口分离。
+- **下一步（计划，未完成）**：负责人配置服务后再做受控真实 API 冒烟。
+
+## C 模块第十二步补充：本地 .env 配置文件
+
+**阶段状态：本地配置模板、加载支持、隔离测试及审核已完成；真实配置与真实 API 冒烟未完成。**
+
+- **本次任务**：补充本地 `.env` 配置模板与加载支持，并验证忽略规则、加载路径及环境变量优先级；不读取或输出真实 `.env`。
+- **负责人决定**：用户决定“给个配置文件，我来填”；公共接口不变。
+- **实际创建／修改文件**：修改 `D:\latex\.gitignore`、`D:\latex\reasoning\context.py`、`D:\latex\tests\test_context.py`；创建被忽略的 `D:\latex\.env`；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。
+- **配置及实现结果**：
+  - `.env` 模板包含四个配置键，本记录不记录任何未来秘密。
+  - `.gitignore` 第一行忽略 `.env`，`git check-ignore` 实际命中。
+  - `context.py` 使用项目根路径调用 `load_dotenv(..., override=False)`，系统环境变量优先。
+- **外部资源**：`python-dotenv 1.2.4`，已安装到项目 `D:\latex\.venv`。
+- **代码审核及处理**：审核无必须修复项；建议补充加载路径及 `override=False` 测试，已通过隔离模块和 mock `dotenv.load_dotenv` 实现，测试不读取或修改真实 `.env`。
+- **实际测试**：最终完整 `unittest` 80 项全部通过（4.924s）。
+- **未解决／未实施事项**：真实配置仍待用户填写，真实 API 冒烟仍未执行。
+- **学习进度**：已明确本地配置模板不等于真实配置，隔离 Mock 测试不能替代真实 API 冒烟。
+- **下一步（计划，未完成）**：负责人填写并重启相关进程后再做真实冒烟。
+
+## C 模块第十三步：真实 OpenAI 兼容上下文冒烟
+
+**阶段状态：真实服务成功与失败回退均已实际验证；仅 1 个构造冲突样本，不能外推总体准确率、泛化或校准。**
+
+- **本次任务**：使用真实 OpenAI 兼容服务验证上下文候选选择、失败回退及脱敏结果保存；不修改生产代码或公共接口。
+- **负责人决定**：首次服务返回 400 后，诊断确认 `OPENAI_MODEL` 被传为 `true`，提供商只接受 `deepseek-flash`／`deepseek-v4-pro`；用户选择 `deepseek-flash`，已修改被 Git 忽略的 `D:\latex\.env` 中的模型名。
+- **配置检查**：用户确认已填写 `.env`；主 Agent 仅检查四个变量是否存在，未输出密钥或 `base_url`，本记录亦不包含其值。
+- **实际创建／修改文件**：新建 `D:\latex\artifacts\context_smoke.json`，保存脱敏结果；修改被忽略的 `D:\latex\.env` 模型名；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。本阶段未修改生产代码或公共接口。
+- **构造样本**：使用 `D:\latex\data\handwritten\sample_1.png`；候选 0 的分母 `(x+1)` 为故意错误，候选 1 的分母 `(x-1)` 为用户此前确认的正确忠实转录，期望索引为 1。
+- **真实调用及回退结果**：
+  - 首次真实请求返回 `BadRequestError`，耗时 636.917ms；`refine` 保留错误的首候选，结果为 `low + need_review=True`。
+  - 第二次诊断请求重现 400，仅读取经配置值遮蔽的错误类型和消息；据此完成上述模型配置诊断。
+  - 修正模型后第三次真实请求成功，选择索引 1，理由指出图中是 `(x-1)`，耗时 1442.32ms。
+  - 复用同一真实响应 patch 回 `refine`，未额外发起第四次请求；`refine` 选择正确公式，`confidence=medium`、`need_review=False`、`risk_score=None`，并记录 `context_candidate_selection` 的 `before`／`after`／索引／`reason`。
+- **外部资源**：实际调用了用户配置的 OpenAI 兼容服务；不记录其 `base_url` 或密钥。
+- **代码审核及处理**：本阶段无生产代码改动，未进行新的代码审核。
+- **实际测试**：此前 80 项 `unittest` 通过；本阶段未宣称重新运行。上述结果为真实请求及同一响应回放的实际冒烟结果。
+- **未解决／未实施事项**：只有 1 个构造冲突样本，真实多样本选择效果及 A 端到端联调未完成。
+- **学习进度**：已实际区分“接口连通／单样本成功”和“总体效果已验证”。
+- **下一步（计划，未完成）**：扩大人工确认冲突样本并进行同样本评估。
+
+## C 模块第十四步：冲突基准、真实评估与结构漏报修复
+
+**阶段状态：3 个构造冲突样本的真实评估、失败回归、结构漏报修复及离线回放已完成；真实选择错误本身尚未修复，不能外推总体。**
+
+- **本次任务**：用户授权“你来做吧”，范围仅限 C；建立最小 3 样本构造冲突基准，进行同样本评估、3 次真实 API 调用和失败回归；不修改 A/B 或公共接口。
+- **负责人决定**：用户确认上述授权及范围；保持公共 `refine` 字段不变，仅将复核策略调整为更保守。
+- **实际创建／修改文件**：新建 `D:\latex\artifacts\context_conflict_samples.json`、`D:\latex\reasoning\context_benchmark.py`、`D:\latex\tests\test_context_benchmark.py`、`D:\latex\artifacts\context_benchmark_results.json`、`D:\latex\artifacts\context_benchmark_replay_after_review_fix.json`；修改 `D:\latex\reasoning\evaluate.py`、`D:\latex\tests\test_evaluate.py`、`D:\latex\reasoner.py`；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。
+- **基准数据**：3 个样本均来自人工确认的忠实转录；样本 1 为分母符号冲突，样本 2 表明常规数学写法不等于忠实转录，样本 3 表明结构修补不等于忠实转录。正确索引为 `1/0/1`，构成交错；已通过脚本断言与 `D:\latex\artifacts\handwritten_validation.json` 一致。
+- **实现结果**：
+  - 每个样本仅直接请求一次 `choose_with_context`，同一响应回放至 `refine`；baseline 显式取 `candidates[0]`，不是 `refine` 选择后的 `raw`。
+  - 拒绝重复或无效候选；指标包括 baseline／final exact、错误改写、错误拦截／漏报、误报复核、成功选择准确率及 fallback。
+  - 运行器中的延迟字段明确命名为 `context_latency_ms`；独立 `refine` 延迟未测。
+- **真实 API 评估**：使用 `deepseek-flash`，3 次真实请求均成功返回，`fallback=0`；样本 1、2 选择正确，样本 3 错选结构修补候选 0。原始结果保存于 `D:\latex\artifacts\context_benchmark_results.json`：baseline correct `1/3`，final correct `2/3`，context selection `2/3`，错误改写 `0`，review `0`，missed error `1`，error interception `0`；真实请求延迟 median `2260.118ms`、nearest-rank p95 `2325.435ms`。结果仅来自 3 个构造样本，不能外推总体。
+- **结构漏报修复**：`D:\latex\reasoner.py` 改为任一去重后候选存在结构异常即 `need_review=True`，即使选择了另一候选；不修改 LaTeX。已新增样本 3 真实失败响应的回归测试。
+- **离线回放**：使用保存的 3 个真实 `context_result`，未新增 API 调用；最终选择仍为 `2/3`，review `1/3`，intercepted `1`、missed `0`、`error_interception_rate=1.0`、`false_review_rate=0`。结果保存于 `D:\latex\artifacts\context_benchmark_replay_after_review_fix.json`，明确不是新的真实 API 评估；`source_context_latency` 仅为历史真实请求耗时。原始 artifact 仅追加延迟说明，未修改真实选择结果。
+- **外部资源**：真实评估实际调用了用户配置的 OpenAI 兼容服务，模型为 `deepseek-flash`；离线回放及本次日志记录未调用 API，未读取 `.env`。
+- **代码审核及处理**：首轮审核发现 raw 基线口径错误，已修正；后续审核无必须修复项，按建议补充真实数据离线测试和重复候选校验。漏报修复后增加真实失败响应回归；最终审核无必须修复项，延迟含义建议已通过字段及 artifact 说明处理。
+- **实际测试**：首轮 84 项中 1 项 FAIL，发现 raw 基线口径错误；修正后 84 项全部通过（5.712s）。补真实数据离线测试和重复候选校验后 86 项全部通过（3.371s）；真实漏报修复后 87 项全部通过（5.102s）；最终延迟命名澄清后 87 项全部通过（4.741s）。
+- **未解决／未实施事项**：样本 3 的真实选择错误本身尚未修复；仅有 3 个构造冲突样本，样本量不足；未做新的真实 API 复测、A 联调或 MLP 生产化。
+- **学习进度**：真实基准能够发现 Mock 无法发现的选择漏报；提高错误拦截不等于提高选择准确率。
+- **下一步（计划，未完成）**：扩大自然／构造冲突样本，另行评估提示词或选择策略。
+
+## C 模块第十五步：提示词改进、指标语义与稳定性对照
+
+**阶段状态：提示词与指标语义修改、测试、审核及两组真实对照已完成；选择稳定性、高延迟、自然冲突和 A 联调仍未解决，下一步仅为计划。**
+
+- **本次任务**：用户授权“检查一下，继续完善，我先出去一会”；仅完善 C 模块，不修改 A/B 或公共接口。
+- **负责人决定**：确认上述授权及范围；对照后停止对同一样本继续调参，以避免过拟合。
+- **检查发现**：旧提示未明确禁止结构整洁偏好；`false_review` 将忠实但需结构复核的结果误称为误报。
+- **实际创建／修改文件**：修改 `D:\latex\reasoning\evaluate.py`、`D:\latex\tests\test_evaluate.py`、`D:\latex\tests\test_context_benchmark.py`、`D:\latex\reasoning\context.py`、`D:\latex\tests\test_context.py`；旧 artifact `D:\latex\artifacts\context_benchmark_results.json`、`D:\latex\artifacts\context_benchmark_replay_after_review_fix.json` 仅增加语义注释，历史数值不变；新建 `D:\latex\artifacts\context_benchmark_results_prompt_v2.json`、`D:\latex\artifacts\context_sample_3_prompt_comparison.json`；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。
+- **实现结果**：
+  - 指标改为 `correct_final_review_count`／`correct_final_review_rate`，不再把忠实但需结构复核称为误报。
+  - `context.py` 提取 `_CONTEXT_SYSTEM_PROMPT`；新提示要求只选择图中可见符号，即使数学无效或结构不完整，也不偏爱常规、完整或整洁形式；仍只返回已有候选索引和理由。
+  - `test_context.py` 补全 existing candidate、visibly present、不生成／纠正／简化及零基索引等完整提示词契约断言。
+- **独立新提示真实基准**：执行 3 次真实请求，结果保存至 `D:\latex\artifacts\context_benchmark_results_prompt_v2.json`，未覆盖旧结果。选择正确 `3/3`，fallback `0`，final exact `3/3`；样本 3 忠实原文但为 `low + need_review=True`，`correct_final_review_rate=1/3`；context median `2120.01ms`、nearest-rank p95 `9438.044ms`。仅为单轮 3 样本，不能据此宣称稳定。
+- **代码审核及处理**：审核无必须修复项；建议重复样本 3 和补完整提示词断言，均已采纳。
+- **重复稳定性真实对照**：保持模型、候选和配置一致，旧／新提示交替各执行 3 次真实请求，共 6 次，结果保存至 `D:\latex\artifacts\context_sample_3_prompt_comparison.json`。旧提示 `0/3` 正确，新提示 `2/3` 正确（索引 `1/0/1`）；fallback 均为 `0`，当前安全复核均为 `3/3`。旧提示中位延迟 `2996.302ms`，新提示 `7460.756ms`。新提示有改善但不稳定，且本组更慢；已停止对同一样本继续调参。
+- **外部资源**：上述历史真实基准和对照实际调用了用户配置的 OpenAI 兼容服务；本次日志追加未调用 API、未读取 `.env`，无其他新增外部资源。
+- **实际离线测试**：提示词／指标改动后完整 `unittest` 87 项全部通过（4.785s）；审核员离线复跑 87 项全部通过（4.792s）；补完整提示词契约后最终 87 项全部通过（4.950s）。2 个新 JSON artifact 均已实际解析验证；`git diff --check` 通过，仅有换行警告。这些离线检查与上述真实请求结果分开记录。
+- **未解决／未实施事项**：新提示在样本 3 上仍有 `1/3` 错选，选择稳定性未解决；样本仍少且均为构造冲突；高延迟、自然冲突和 A 联调未完成；无 MLP 生产结论。
+- **学习进度**：单轮 `3/3` 不等于稳定，重复对照能揭示随机性；正确结果复核不等于误报。
+- **下一步（计划，未完成）**：扩大多样化冲突集后再评价提示与延迟，不在同一样本继续调参。
+
+## C 模块第十六步：十样本多样化冲突真实评估
+
+**阶段状态：10 个构造样本的 Mock 离线回归、真实评估、审核及结果保存已完成；未解决事项与下一步计划仍未实施。**
+
+- **本次任务**：用户授权“ok，继续推进”，范围仅限 C；扩大构造冲突样本并进行离线回归和真实评估，不修改 A/B。
+- **负责人决定**：确认上述授权及范围；本阶段未提供需新增记录的公共接口或其他重要技术选择决定。
+- **实际创建／修改文件**：新建 `D:\latex\artifacts\context_conflict_samples_v2.json`、`D:\latex\artifacts\context_benchmark_results_v2.json`；修改 `D:\latex\tests\test_context_benchmark.py`，新增 v2 数据回归、10 次 Mock 离线运行及数据集结构复核说明；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。
+- **v2 构造数据**：从 3 张人工确认底图派生 10 个二选一构造冲突，覆盖分母符号、指数、常数、分子系数、常规化补 `x`、prime、sin 平方、结构补括号、极限目标和 `1/4` 系数；正确索引 0／1 各 5。脚本已验证 ID、图片、真值、唯一性和期望候选，确认 `5/5` 平衡；样本 3 明确为 `low + need_review`。
+- **真实 API 评估**：使用显式 v2 输入和独立输出执行 10 次真实 API 请求，断言结果共 10 条，保存至 `D:\latex\artifacts\context_benchmark_results_v2.json`，未覆盖历史结果。candidate0 baseline exact `5/10`，final exact `10/10`，context selection `10/10`，fallback `0`，错误改写 `0`，review `3/10`，`correct_final_review=3/10`；3 个样本 3 变体均忠实且为 `low + need_review`，5 次实际候选切换均记录 `changes`。
+- **真实请求延迟**：仅测 `choose_with_context`，不含 `refine`；context median `1993.2685ms`，nearest-rank p95 `21363.249ms`。`n=10` 时 p95 就是最大值；离群样本为 `sample_3_faithful_not_structural_repair`，另两个样本 3 变体分别为 `3375.638ms`、`4864.171ms`。离群原因未确定，不归因于结构审查。
+- **结果边界**：结果 artifact 已加入 scope／latency／review 说明。baseline 只是构造对中的候选 0，不是独立无上下文系统；`10/10` 只限这 10 个由 3 张底图派生的二选一构造样本，不能外推 OCR 总体准确率或稳定性。本轮无最终错误，`error_interception_rate=null`，不能宣称拦截有效；`correct_final_review` 不是错误拦截；`renderable_rate=null`。
+- **外部资源**：上述真实评估实际调用了用户配置的 OpenAI 兼容服务；Mock 离线测试及本次日志追加未调用 API、未读取 `.env`，无其他新增外部资源。
+- **代码审核及处理**：审核数值一致，无必须修复项；建议均已采纳，并强调上述样本、baseline、延迟及复核指标限制。
+- **实际离线测试与检查**：完整 `unittest` 首次 88 项全部通过（7.206s）；补直接 v2 离线测试后最终 88 项全部通过（5.048s）。结果 JSON 解析及 10 条断言通过，`git diff --check` 通过，仅有换行警告。这些均为 Mock／离线检查，与上述真实 API 结果分开记录。
+- **未解决／未实施事项**：自然冲突、更多底图、选择稳定性及长尾延迟原因仍未解决；本轮无最终错误，不能评价漏报率；无 MLP 生产结论。
+- **学习进度**：扩大构造样本可提高覆盖面，但仍不等于独立真实分布；小样本 p95 可能只是最大值。
+- **下一步（计划，未完成）**：获得更多人工确认底图／自然冲突后再扩大评估，不在当前样本继续调参。
+
+## C 模块第十七步：基准渲染评估与无 API 离线回放
+
+**阶段状态：基准渲染评估、无 API 离线回放、测试、审核及结果保存已完成；未解决事项与下一步计划仍未实施。**
+
+- **本次任务**：用户“继续干活”，范围仅限 C；为既有基准补充 KaTeX 可渲染评估及保存真实响应的本地回放，不修改 A/B，不读取 `.env`，不调用 API。
+- **负责人决定**：确认上述授权及范围；公共 `refine` 接口保持不变。
+- **实际创建／修改文件**：修改 `D:\latex\reasoning\context_benchmark.py`、`D:\latex\tests\test_context_benchmark.py`；新建 `D:\latex\artifacts\context_benchmark_results_v2_rendered.json`；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。源文件 `D:\latex\artifacts\context_benchmark_results_v2.json` 未被改写。
+- **实现结果**：
+  - `run_context_benchmark` 对 `final_latex` 调用现有 `check_renderable`，保存 `render_result`／`renderable`；检查器故障仍抛错，不将其当作公式不可渲染。
+  - 新增 `replay_context_benchmark`，深拷贝保存报告，复用已保存的 `context_result` 回放 `refine` 和 KaTeX；拒绝覆盖源文件，保留历史延迟及源 `scope`／`review` 说明，`additional_api_calls=0`。
+  - 测试覆盖 Mock 渲染、回放源不变、渲染失败、拒绝覆盖、元数据保留和无 API；无 API 测试直接 patch `reasoner.choose_with_context` 并 `assert_not_called`。
+- **实际离线回放**：使用 `D:\latex\artifacts\context_benchmark_results_v2.json` 中 10 个已保存真实响应进行本地 `refine` 回放和 KaTeX 检查，无新增 API 调用；输出保存至 `D:\latex\artifacts\context_benchmark_results_v2_rendered.json`。源文件仍无 `render_result` 且未被改写；输出 10 条 `render_result` 均 `renderable=True`、`error=None`。
+- **回放摘要**：final exact `10/10`，`renderable_rate=1.0`，review `3/10`，`correct_final_review=3/10`；3 个样本 3 变体同时忠实、可渲染且为 `low + need_review`，证明三个维度独立。baseline `5/10` 和 context latency median `1993.2685ms`、nearest-rank p95 `21363.249ms` 均为历史真实请求值，不是回放性能。
+- **结果边界**：输出保留 `evaluation_scope`、`review_note`、`render_note`。样本仅为 3 张底图派生的构造冲突，不能外推总体或稳定性；可渲染不等于结构有效或忠实；本轮无最终错误，不能宣称错误拦截有效；`renderable_rate` 与 review 指标独立。
+- **外部资源**：复用上述 artifact 中已保存的真实响应和项目现有本地 KaTeX 检查器；本阶段未调用 API、未读取 `.env`，无新增外部资源。
+- **代码审核及处理**：审核无必须修复项，仅指出无 API 测试的 Mock 目标不准确；已改为直接 patch `reasoner.choose_with_context` 并 `assert_not_called`。审核员禁用网络复跑 90 项全部通过（5.390s）。
+- **实际测试与检查**：初版完整 `unittest` 90 项全部通过（6.397s）；保留元数据后 90 项全部通过（5.476s）；审核员禁用网络复跑 90 项全部通过（5.390s）；修正 Mock 目标后最终 90 项全部通过（5.112s）。实际验证源文件未改、10 条 KaTeX 结果及 3 条结构复核；`git diff --check` 通过，仅有换行警告。
+- **未解决／未实施事项**：更多底图／自然冲突、选择稳定性及 API 长尾延迟仍未解决；本次可渲染率不推广到其他样本；无 MLP 生产结论。
+- **学习进度**：忠实转录、结构检查和 KaTeX 可渲染必须分别报告；离线回放可减少重复付费，但不能替代新的真实评估。
+- **下一步（计划，未完成）**：用新增真实样本复用同一评估与回放流程。
+
+## C 模块第十八步：评估预检、原子检查点与失败恢复
+
+**阶段状态：预检、原子检查点、失败恢复、测试、审核及真实历史响应回放已完成；未解决事项与下一步计划仍未实施。**
+
+- **本次任务**：用户“进行完善”，范围仅限 C，不继续调提示；完善评估可靠性和已付费响应保护，公共 `refine` 接口不变。
+- **负责人决定**：确认上述授权及范围；本阶段未提供需新增记录的公共接口或其他重要技术选择决定。
+- **实际修改文件**：`D:\latex\reasoning\context_benchmark.py`、`D:\latex\tests\test_context_benchmark.py`；更新 `D:\latex\artifacts\context_benchmark_results_v2_rendered.json`，仅为当前无 API 回放输出；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。
+- **预检结果**：运行前校验所有样本非空、`sample_id` 非空且唯一、`image_path` 非空、至少 2 个候选、候选有效且唯一、`ground_truth` 非空、`expected_index` 在范围内且期望候选等于真值；输出目录必须已存在。`run` 和 `replay` 均拒绝输入输出同路径；预检或同路径保护失败时零 API 且原数据不变。
+- **持久化与恢复**：每获得 `context_result` 立即先写 `summary=None`、`status=context_response_saved_refine_pending`；`refine` 后写 `context_responses_saved_render_pending`；全部响应完成后才渲染，最终为 `complete`。任一记录暂缺 `refine_result` 时不强行计算摘要；pending 可直接 replay。
+- **原子写**：在同目录写入 `.tmp` 后使用 `os.replace`，并在 `finally` 清理；Mock 注入 `Path.write_text` 失败时，旧有效 JSON 保持不变且无 tmp 残留。
+- **Mock 故障注入测试覆盖**：后续无效样本、空图片、单候选及缺输出目录均零 API；第二请求注入 `FileNotFoundError` 时保留首响应；两样本渲染中途注入失败时，pending 的两个结果均无 `renderable`，并可直接 replay 至 `complete`；注入 `refine` 异常时当前原始响应已保存、`summary=None`，无 API replay 成功；另覆盖输入输出同路径保护及原子写故障。这些均为 Mock 故障注入，不是真实服务故障记录。
+- **外部资源**：无新增外部资源；本阶段未调用 API、未读取 `.env`。
+- **代码审核及处理**：首轮 93 项通过（4.596s），审核员复跑 93 项通过（4.290s）并发现后续输入错误丢失风险；补预检和每响应保存后 95 项通过（4.632s）；加入原子写后 96 项通过（4.441s）；最终审核发现 refine 前未落盘及 run 覆盖输入风险，修复后 98 项全部通过（4.568s）。最终审核明确当前 MVP 范围无必须修复项。
+- **真实历史响应本地回放**：使用现有 10 个已保存真实响应进行本地回放，无新增 API；最终 `status=complete`，final exact `10/10`、`renderable_rate=10/10`、review `3/10` 均不变。该结果复用历史真实响应，与上述 Mock 故障注入测试明确区分。
+- **实际检查**：`git diff --check` 通过，仅有换行警告。
+- **未解决／未实施事项**：这些测试证明失败恢复，不证明上下文选择准确率或稳定性；更多底图、自然冲突和 API 长尾仍未解决；无 MLP 生产结论。
+- **学习进度**：评估工具也必须保护实验数据；原子检查点和可回放 pending 能避免异常导致重复付费。
+- **下一步（计划，未完成）**：新增真实样本时沿用预检、检查点和回放，不继续假设性扩展。
+
+## C 当前最新状态（2026-11-03）
+
+**阶段状态：以下仅汇总已有完成项和真实结果；下一步均为计划，本次仅追加日志。**
+
+- **范围与本次修改**：仅 C，不把 A/B 列为我们的任务；本次仅追加 `D:\latex\reasoning\TEAM_LOG.md`，未修改其他文件。
+- **已完成**：规范化／去重、结构检查与人工复核、`raw`／`final`／`changes` 保留、可配置 OpenAI 兼容上下文选择（只选已有索引）、API 失败回退、真实 KaTeX 检查、10 个构造冲突的真实评估、预检、原子检查点和 pending 离线回放。
+- **最新真实／回放指标**：10 个样本均由 3 张人工确认底图派生，为二选一构造冲突；candidate0 baseline `5/10`，final exact `10/10`，KaTeX renderable `10/10`，review `3/10`。真实 context 请求 median `1993.2685ms`；`n=10` 时 nearest-rank p95 即最大值 `21363.249ms`。渲染及回放结果复用已保存真实响应，不是新的真实 API 评估。
+- **结果边界**：上述结果不能外推总体 OCR 准确率或稳定性；本轮无最终错误，不能据此证明错误拦截能力。
+- **稳定性证据**：样本 3 重复对照中旧提示 `0/3`、新提示 `2/3`，新提示仍有随机性；安全复核均为 `3/3`。
+- **最新离线验证**：第十八步最终完整 `unittest` 98 项全部通过（4.568s）；本次状态更新未重新运行测试，未新增外部资源或代码审核。
+- **当前工作区**：仍有未提交的 C 代码、测试、实验产物和日志；未创建新 Git 提交。
+- **未解决**：更多底图／自然冲突、选择稳定性、API 长尾延迟；MLP 仍只是教学实验，无生产风险评分或效果结论。
+- **学习进度**：已明确构造样本结果、重复选择稳定性、可渲染性及失败恢复需分别判断，均不能替代总体效果验证。
+- **下一步（计划，未完成）**：新增人工确认底图或自然冲突后，沿用预检、检查点、真实评估和离线回放；不在现有样本上继续调参。

@@ -1,0 +1,154 @@
+{
+  "model": "deepseek-flash",
+  "sample_type": "constructed_conflicts_from_human_confirmed_transcriptions",
+  "latency_note": "The legacy refine_latency_ms field contains real choose_with_context request latency, not independently measured refine latency.",
+  "review_metric_note": "Legacy false_review fields mean the final transcription was exact but review was requested; structural review may still be appropriate.",
+  "summary": {
+    "sample_count": 3,
+    "raw_correct_count": 1,
+    "final_correct_count": 2,
+    "erroneous_rewrite_count": 0,
+    "review_count": 0,
+    "intercepted_error_count": 0,
+    "missed_error_count": 1,
+    "false_review_count": 0,
+    "raw_exact_accuracy": 0.3333333333333333,
+    "final_exact_accuracy": 0.6666666666666666,
+    "erroneous_rewrite_rate": 0.0,
+    "error_interception_rate": 0.0,
+    "false_review_rate": 0.0,
+    "renderable_rate": null,
+    "human_review_rate": 0.0,
+    "refine_latency_ms": {
+      "median": 2260.118,
+      "p95": 2325.435
+    },
+    "context_success_count": 3,
+    "context_selection_correct_count": 2,
+    "context_fallback_count": 0,
+    "context_selection_accuracy": 0.6666666666666666,
+    "context_success_selection_accuracy": 0.6666666666666666,
+    "context_fallback_rate": 0.0
+  },
+  "results": [
+    {
+      "sample_id": "sample_1_denominator_sign",
+      "image_path": "data/handwritten/sample_1.png",
+      "ground_truth": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 changes the denominator sign; candidate 1 preserves the confirmed transcription.",
+      "candidates": [
+        {
+          "engine": "constructed_incorrect",
+          "latex": "y=x^{2}+x+3+\\frac{4}{(x+1)}",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        },
+        {
+          "engine": "human_confirmed",
+          "latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        }
+      ],
+      "context_result": {
+        "selected_index": 1,
+        "reason": "The handwritten denominator is (x-1), matching candidate 1, not (x+1).",
+        "error": null
+      },
+      "latency_ms": 1581.628,
+      "refine_result": {
+        "raw_latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+        "final_latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+        "confidence": "medium",
+        "changes": [
+          {
+            "rule": "context_candidate_selection",
+            "before": "y=x^{2}+x+3+\\frac{4}{(x+1)}",
+            "after": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+            "selected_index": 1,
+            "reason": "The handwritten denominator is (x-1), matching candidate 1, not (x+1)."
+          }
+        ],
+        "need_review": false,
+        "risk_score": null
+      }
+    },
+    {
+      "sample_id": "sample_2_faithful_not_conventional",
+      "image_path": "data/handwritten/sample_2.png",
+      "ground_truth": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+      "expected_index": 0,
+      "construction_note": "Candidate 0 preserves the confirmed handwriting; candidate 1 inserts a conventional x after sin but is not the confirmed transcription.",
+      "candidates": [
+        {
+          "engine": "human_confirmed",
+          "latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        },
+        {
+          "engine": "constructed_incorrect",
+          "latex": "y^{\\prime}=2\\sin x\\cos x=\\sin2x",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        }
+      ],
+      "context_result": {
+        "selected_index": 0,
+        "reason": "The image shows y′ = 2 sin cos x = sin 2x, with no x between sin and cos, matching candidate 0 rather than candidate 1.",
+        "error": null
+      },
+      "latency_ms": 2325.435,
+      "refine_result": {
+        "raw_latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+        "final_latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+        "confidence": "medium",
+        "changes": [],
+        "need_review": false,
+        "risk_score": null
+      }
+    },
+    {
+      "sample_id": "sample_3_faithful_not_structural_repair",
+      "image_path": "data/handwritten/sample_3.png",
+      "ground_truth": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 adds a parenthesis that is absent from the confirmed transcription; candidate 1 preserves the source and must still trigger structural review.",
+      "candidates": [
+        {
+          "engine": "constructed_incorrect",
+          "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        },
+        {
+          "engine": "human_confirmed",
+          "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        }
+      ],
+      "context_result": {
+        "selected_index": 0,
+        "reason": "Candidate 0 matches the image, including the closing parenthesis after the subtracted parenthetical term with o(x^2), while candidate 1 omits that closing parenthesis.",
+        "error": null
+      },
+      "latency_ms": 2260.118,
+      "refine_result": {
+        "raw_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+        "final_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+        "confidence": "medium",
+        "changes": [],
+        "need_review": false,
+        "risk_score": null
+      }
+    }
+  ]
+}

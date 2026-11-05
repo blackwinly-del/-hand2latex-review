@@ -1,0 +1,76 @@
+{
+  "date": "2026-11-03",
+  "sample_type": "constructed_conflicts_from_human_confirmed_transcriptions",
+  "source": "artifacts/handwritten_validation.json",
+  "samples": [
+    {
+      "sample_id": "sample_1_denominator_sign",
+      "image_path": "data/handwritten/sample_1.png",
+      "ground_truth": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 changes the denominator sign; candidate 1 preserves the confirmed transcription.",
+      "candidates": [
+        {
+          "engine": "constructed_incorrect",
+          "latex": "y=x^{2}+x+3+\\frac{4}{(x+1)}",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        },
+        {
+          "engine": "human_confirmed",
+          "latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        }
+      ]
+    },
+    {
+      "sample_id": "sample_2_faithful_not_conventional",
+      "image_path": "data/handwritten/sample_2.png",
+      "ground_truth": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+      "expected_index": 0,
+      "construction_note": "Candidate 0 preserves the confirmed handwriting; candidate 1 inserts a conventional x after sin but is not the confirmed transcription.",
+      "candidates": [
+        {
+          "engine": "human_confirmed",
+          "latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        },
+        {
+          "engine": "constructed_incorrect",
+          "latex": "y^{\\prime}=2\\sin x\\cos x=\\sin2x",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        }
+      ]
+    },
+    {
+      "sample_id": "sample_3_faithful_not_structural_repair",
+      "image_path": "data/handwritten/sample_3.png",
+      "ground_truth": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 adds a parenthesis that is absent from the confirmed transcription; candidate 1 preserves the source and must still trigger structural review.",
+      "candidates": [
+        {
+          "engine": "constructed_incorrect",
+          "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        },
+        {
+          "engine": "human_confirmed",
+          "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        }
+      ]
+    }
+  ]
+}

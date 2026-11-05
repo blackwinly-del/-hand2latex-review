@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-03",
+  "model": "deepseek-flash",
+  "image_path": "data/handwritten/sample_1.png",
+  "expected_selected_index": 1,
+  "candidates": [
+    {
+      "engine": "smoke_incorrect",
+      "latex": "y=x^{2}+x+3+\\frac{4}{(x+1)}",
+      "score": null,
+      "latency_ms": 0,
+      "error": null
+    },
+    {
+      "engine": "smoke_correct",
+      "latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "score": null,
+      "latency_ms": 0,
+      "error": null
+    }
+  ],
+  "initial_failure": {
+    "cause": "OPENAI_MODEL was configured as true instead of a supported model name",
+    "status_code": 400,
+    "provider_error_type": "invalid_request_error",
+    "context_result": {
+      "selected_index": null,
+      "reason": "",
+      "error": "BadRequestError: context selection failed"
+    },
+    "latency_ms": 636.917,
+    "refine_result": {
+      "raw_latex": "y=x^{2}+x+3+\\frac{4}{(x+1)}",
+      "final_latex": "y=x^{2}+x+3+\\frac{4}{(x+1)}",
+      "confidence": "low",
+      "changes": [],
+      "need_review": true,
+      "risk_score": null
+    }
+  },
+  "successful_result": {
+    "context_result": {
+      "selected_index": 1,
+      "reason": "The image shows the denominator as (x-1), matching candidate 1, while candidate 0 has (x+1).",
+      "error": null
+    },
+    "latency_ms": 1442.32,
+    "refine_result": {
+      "raw_latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "final_latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "confidence": "medium",
+      "changes": [
+        {
+          "rule": "context_candidate_selection",
+          "before": "y=x^{2}+x+3+\\frac{4}{(x+1)}",
+          "after": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+          "selected_index": 1,
+          "reason": "The image shows the denominator as (x-1), matching candidate 1, while candidate 0 has (x+1)."
+        }
+      ],
+      "need_review": false,
+      "risk_score": null
+    }
+  },
+  "scope_note": "One real request on one constructed conflict sample confirms the integration path only; it does not establish general selection accuracy or calibration."
+}

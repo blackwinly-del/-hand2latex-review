@@ -1,3 +1,4 @@
+from reasoning.context import choose_with_context
 from reasoning.validators import validate_structure
 
 
@@ -43,9 +44,26 @@ def refine(image_path: str, candidates: list[dict]) -> dict:
         }
 
     selected = deduplicated[0]
+    has_conflict = len(deduplicated) > 1
+    context_result = None
+    if has_conflict:
+        context_result = choose_with_context(image_path, deduplicated)
+        if context_result["selected_index"] is not None:
+            selected = deduplicated[context_result["selected_index"]]
+
     raw_latex = selected["latex"]
     final_latex = normalize_latex(raw_latex)
     changes = []
+    if selected is not deduplicated[0]:
+        changes.append(
+            {
+                "rule": "context_candidate_selection",
+                "before": deduplicated[0]["latex"],
+                "after": raw_latex,
+                "selected_index": context_result["selected_index"],
+                "reason": context_result["reason"],
+            }
+        )
     if final_latex != raw_latex:
         changes.append(
             {
@@ -55,9 +73,12 @@ def refine(image_path: str, candidates: list[dict]) -> dict:
             }
         )
 
-    structure_issues = validate_structure(final_latex)
-    has_conflict = len(deduplicated) > 1
-    need_review = has_conflict or bool(structure_issues)
+    has_structure_issues = any(
+        validate_structure(normalize_latex(candidate["latex"]))
+        for candidate in deduplicated
+    )
+    context_failed = has_conflict and context_result["selected_index"] is None
+    need_review = context_failed or has_structure_issues
     matching_engines = {
         candidate.get("engine")
         for candidate in candidates
@@ -67,7 +88,7 @@ def refine(image_path: str, candidates: list[dict]) -> dict:
     }
     if need_review:
         confidence = "low"
-    elif len(matching_engines) > 1:
+    elif not has_conflict and len(matching_engines) > 1:
         confidence = "high"
     else:
         confidence = "medium"

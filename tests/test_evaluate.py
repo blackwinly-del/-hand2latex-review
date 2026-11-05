@@ -1,6 +1,6 @@
 import unittest
 
-from reasoning.evaluate import evaluate_refinement
+from reasoning.evaluate import evaluate_context_selection, evaluate_refinement
 
 
 def make_sample(ground_truth, raw, final, latency, review, renderable=None):
@@ -37,6 +37,11 @@ class EvaluateRefinementTests(unittest.TestCase):
         self.assertEqual(result["raw_exact_accuracy"], 0.5)
         self.assertEqual(result["final_exact_accuracy"], 0.75)
         self.assertEqual(result["erroneous_rewrite_rate"], 0.5)
+        self.assertEqual(result["intercepted_error_count"], 1)
+        self.assertEqual(result["missed_error_count"], 0)
+        self.assertEqual(result["correct_final_review_count"], 1)
+        self.assertEqual(result["error_interception_rate"], 1.0)
+        self.assertEqual(result["correct_final_review_rate"], 1 / 3)
         self.assertEqual(result["renderable_rate"], 0.75)
         self.assertEqual(result["human_review_rate"], 0.5)
         self.assertEqual(result["refine_latency_ms"], {"median": 25, "p95": 40})
@@ -94,6 +99,47 @@ class EvaluateRefinementTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             evaluate_refinement(samples)
+
+
+class EvaluateContextSelectionTests(unittest.TestCase):
+    def test_selection_success_and_fallback_are_reported_separately(self):
+        samples = [
+            {"expected_index": 1, "context_result": {"selected_index": 1}},
+            {"expected_index": 0, "context_result": {"selected_index": 0}},
+            {"expected_index": 1, "context_result": {"selected_index": None}},
+            {"expected_index": 2, "context_result": {"selected_index": 1}},
+        ]
+
+        result = evaluate_context_selection(samples)
+
+        self.assertEqual(result["context_success_count"], 3)
+        self.assertEqual(result["context_selection_correct_count"], 2)
+        self.assertEqual(result["context_fallback_count"], 1)
+        self.assertEqual(result["context_selection_accuracy"], 0.5)
+        self.assertEqual(result["context_success_selection_accuracy"], 2 / 3)
+        self.assertEqual(result["context_fallback_rate"], 0.25)
+
+    def test_no_successful_selection_has_no_success_accuracy(self):
+        result = evaluate_context_selection(
+            [{"expected_index": 0, "context_result": {"selected_index": None}}]
+        )
+
+        self.assertIsNone(result["context_success_selection_accuracy"])
+        self.assertEqual(result["context_selection_accuracy"], 0.0)
+
+    def test_invalid_context_evaluation_inputs_are_rejected(self):
+        with self.assertRaises(TypeError):
+            evaluate_context_selection(None)
+        with self.assertRaises(ValueError):
+            evaluate_context_selection([])
+        with self.assertRaises(ValueError):
+            evaluate_context_selection(
+                [{"expected_index": -1, "context_result": {"selected_index": 0}}]
+            )
+        with self.assertRaises(ValueError):
+            evaluate_context_selection(
+                [{"expected_index": 0, "context_result": {"selected_index": True}}]
+            )
 
 
 if __name__ == "__main__":
