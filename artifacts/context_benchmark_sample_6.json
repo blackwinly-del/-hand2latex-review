@@ -1,0 +1,84 @@
+{
+  "model": "deepseek-flash",
+  "sample_type": "real_ocr_error_vs_user_confirmed_transcription",
+  "summary": {
+    "sample_count": 1,
+    "raw_correct_count": 0,
+    "final_correct_count": 1,
+    "erroneous_rewrite_count": 0,
+    "review_count": 0,
+    "intercepted_error_count": 0,
+    "missed_error_count": 0,
+    "correct_final_review_count": 0,
+    "raw_exact_accuracy": 0.0,
+    "final_exact_accuracy": 1.0,
+    "erroneous_rewrite_rate": null,
+    "error_interception_rate": null,
+    "correct_final_review_rate": 0.0,
+    "renderable_rate": 1.0,
+    "human_review_rate": 0.0,
+    "context_latency_ms": {
+      "median": 7478.977,
+      "p95": 7478.977
+    },
+    "context_success_count": 1,
+    "context_selection_correct_count": 1,
+    "context_fallback_count": 0,
+    "context_selection_accuracy": 1.0,
+    "context_success_selection_accuracy": 1.0,
+    "context_fallback_rate": 0.0
+  },
+  "results": [
+    {
+      "sample_id": "sample_6_real_ocr_prefix_error",
+      "image_path": "data/handwritten/sample_6.png",
+      "ground_truth": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 is the unchanged real PP-FormulaNet-L output with an incorrect prefix; candidate 1 is the user-confirmed formula-only transcription.",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "(3)\\sqrt{\\frac{1}{n}}+1=\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+          "score": null,
+          "latency_ms": 14826.419,
+          "error": null
+        },
+        {
+          "engine": "user_confirmed",
+          "latex": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        }
+      ],
+      "context_result": {
+        "selected_index": 1,
+        "reason": "Candidate 1 accurately transcribes the limit expression visibly present in the image, while candidate 0 includes hallucinated notation (a square root expression) that does not appear in the handwritten text.",
+        "error": null
+      },
+      "latency_ms": 7478.977,
+      "refine_result": {
+        "raw_latex": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+        "final_latex": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+        "confidence": "medium",
+        "changes": [
+          {
+            "rule": "context_candidate_selection",
+            "before": "(3)\\sqrt{\\frac{1}{n}}+1=\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+            "after": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+            "selected_index": 1,
+            "reason": "Candidate 1 accurately transcribes the limit expression visibly present in the image, while candidate 0 includes hallucinated notation (a square root expression) that does not appear in the handwritten text."
+          }
+        ],
+        "need_review": false,
+        "risk_score": null
+      },
+      "render_result": {
+        "renderable": true,
+        "error": null
+      },
+      "renderable": true
+    }
+  ],
+  "evaluation_status": "complete"
+}

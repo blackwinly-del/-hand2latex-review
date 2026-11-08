@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-03",
+  "sample_type": "real_ocr_error_vs_user_confirmed_transcription",
+  "source": "artifacts/handwritten_new_samples.json",
+  "sample_count": 1,
+  "samples": [
+    {
+      "sample_id": "sample_6_real_ocr_prefix_error",
+      "image_path": "data/handwritten/sample_6.png",
+      "ground_truth": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 is the unchanged real PP-FormulaNet-L output with an incorrect prefix; candidate 1 is the user-confirmed formula-only transcription.",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "(3)\\sqrt{\\frac{1}{n}}+1=\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+          "score": null,
+          "latency_ms": 14826.419,
+          "error": null
+        },
+        {
+          "engine": "user_confirmed",
+          "latex": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        }
+      ]
+    }
+  ]
+}

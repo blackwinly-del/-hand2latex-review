@@ -379,3 +379,60 @@
 - **未解决**：更多底图／自然冲突、选择稳定性、API 长尾延迟；MLP 仍只是教学实验，无生产风险评分或效果结论。
 - **学习进度**：已明确构造样本结果、重复选择稳定性、可渲染性及失败恢复需分别判断，均不能替代总体效果验证。
 - **下一步（计划，未完成）**：新增人工确认底图或自然冲突后，沿用预检、检查点、真实评估和离线回放；不在现有样本上继续调参。
+
+## C 模块混合识别实验：中文与公式拆分尝试
+
+**阶段状态：2 次真实多模态请求及结果保存已完成；本样本公式成功、中文失败，混合识别未成功，参考与人工复核仍待确认。**
+
+- **本次任务**：用户要求尝试改进 OCR 配置以支持中文公式混合；主 Agent 说明 PP-FormulaNet-L 配置属于 B，且不会可靠增加中文能力。用户明确选择“C侧混合识别实验（推荐）”，因此未修改 B、OCR 配置、生产代码或公共接口。
+- **负责人决定**：确认采用 C 侧混合识别实验；不通过修改 B 的 PP-FormulaNet-L 配置宣称获得中文能力。
+- **实际修改文件**：实验结果保存至 `D:\latex\artifacts\mixed_ocr_smoke.json`；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。
+- **真实实验**：对 `D:\latex\data\handwritten\sample_6.png` 使用现有 `deepseek-flash` 进行 2 次真实多模态请求，均要求返回 `{text,latex}`，且提示中不提供预期中文。
+  - 第一次使用英文提示，耗时 `2617.012ms`；`text` 为“ԭʽ”，`latex` 为 `\lim_{t\to0}\frac{t-\ln(1+t)}{t^2}`。
+  - 第二次使用中文提示并明确禁止拼音、乱码和猜测，耗时 `2561.92ms`；`text` 仍为“ԭʽ”，`latex` 为 `\lim_{t\to 0}\frac{t-\ln(1+t)}{t^2}`。
+- **结果与边界**：两次公式均与待用户确认的参考一致，但中文均与“原式”不符，不能算混合识别成功。artifact 中 `reference` 和 `human_review` 仍为 `pending`，不计算准确率。结论仅限当前服务在此样本上公式成功、中文失败；提示调整未解决中文问题，不宣称支持中文混排。
+- **外部资源**：上述实验实际使用了现有 `deepseek-flash` 多模态服务；本次日志追加未调用 API、未读取 `.env`，无其他新增外部资源。
+- **代码审核及处理**：无生产代码改动，未做新代码审核。
+- **实际测试**：未运行单元测试，原因是无代码改动；上述结果仅为 2 次真实多模态请求，不作为单元测试或总体效果评估。
+- **未解决事项**：当前服务在该样本上的中文识别失败，参考与人工复核仍待确认，尚无中文混排支持或准确率结论。
+- **学习进度**：公式输出正确不能证明同次请求的中文输出正确；加强提示约束未解决本样本的中文乱码问题。
+- **下一步（计划，未完成）**：若继续，需评估支持中文的视觉模型或独立中文 OCR；这属于新的识别方案，不在当前 C 生产范围。不在同样本继续堆提示。
+
+## C 模块新增真实样本：样本 6 OCR 冲突评估
+
+**阶段状态：样本 6 的确认、1 次真实上下文请求、本地 KaTeX 检查及结果保存已完成；样本 4/5 仍 pending，下一步仅为计划。**
+
+- **本次任务**：记录用户“确认样本 6 的标准转录”，并保存该真实 OCR 冲突样本的上下文评估结果；本次仅追加日志，不修改其他文件。
+- **负责人决定**：样本 6 的纯公式真值确认为 `\lim\limits_{t\rightarrow0}\frac{t-\ln(1+t)}{t^{2}}`；题号和中文原式不纳入。样本 4/5 仍待确认。
+- **评估阶段实际创建／修改文件**：`D:\latex\artifacts\handwritten_new_samples.json` 中样本 6 已写入 `ground_truth` 和 `confirmed_correct`，真实 PP-FormulaNet 候选保持不变；新建 `D:\latex\artifacts\context_conflict_sample_6.json` 和 `D:\latex\artifacts\context_benchmark_sample_6.json`；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。
+- **冲突样本**：候选 0 为真实 OCR 错误前缀 `(3)\sqrt{\frac{1}{n}}+1=...`，候选 1 为用户确认的正确公式，`expected_index=1`。
+- **真实评估结果**：使用 `deepseek-flash` 执行 1 次真实上下文请求，并执行本地 KaTeX 检查；结果保存至 `D:\latex\artifacts\context_benchmark_sample_6.json`，`status=complete`。模型选择索引 1，理由指出候选 0 含图中不存在的根式。
+- **指标与延迟**：raw baseline `0/1`，final exact `1/1`，renderable `1/1`，review `0`，fallback `0`；`changes` 记录从错误候选切换到正确候选。context latency `7478.977ms`；OCR 此前 latency `14826.419ms`。
+- **结果边界**：仅 1 个样本、1 次真实请求，不能宣称选择稳定或总体准确率；`error_interception_rate=null`。
+- **外部资源**：上述评估实际使用了用户配置的 `deepseek-flash` 服务和本地 KaTeX；本次日志追加未调用 API、未读取 `.env`，无其他新增外部资源。
+- **代码审核及处理**：无生产代码改动，无新增代码审核意见。
+- **实际检查**：未重跑单元测试；已解析并断言确认文件和结果文件，`git diff --check` 通过，仅有换行警告。
+- **未解决事项**：样本 4/5 尚未确认；本样本结果不足以评价稳定性、总体准确率或错误拦截能力。
+- **学习进度**：真实 OCR 错误可作为上下文冲突候选，但单样本成功不能替代多样本和重复评估。
+- **下一步（计划，未完成）**：样本 4/5 待确认后再评估；本次不将其写为已完成。
+
+## C 模块新增真实样本：样本 4–6 完整评估
+
+**阶段状态：样本 4/5 用户确认、3 样本单轮真实评估、真实写盘故障后的无 API 离线恢复、Mock 回归及结果保存已完成；下一步仅为计划。**
+
+- **本次任务**：完成新增真实样本 4–6 的人工确认、冲突评估、渲染结果恢复及故障回归；本次仅追加日志，不修改其他文件。
+- **负责人决定**：用户已确认样本 4、5，样本 6 真值维持此前确认；至此样本 4/5/6 全部为 `confirmed_correct`，`D:\latex\artifacts\handwritten_new_samples.json` 的 `review_status=ground_truth_user_confirmed`。本阶段无新增公共接口或重要技术选择决定。
+- **评估阶段实际创建／修改文件**：更新 `D:\latex\artifacts\handwritten_new_samples.json`；新建 `D:\latex\artifacts\context_conflict_new_samples.json`、`D:\latex\artifacts\context_benchmark_new_samples.json`、`D:\latex\artifacts\context_benchmark_new_samples_rendered.json`；修改 `D:\latex\tests\test_context_benchmark.py`；本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。无生产逻辑修改。
+- **新建冲突样本**：
+  - 样本 4：候选 0 为真实 OCR 正确结果，候选 1 为将常数 `4` 改为 `1` 的构造错误。
+  - 样本 5：候选 0 为分母 `x+1` 的构造错误，候选 1 为真实 OCR 正确结果。
+  - 样本 6：候选 0 为真实 OCR 错误前缀结果，候选 1 为用户确认结果。
+- **真实 API 评估**：使用 `deepseek-flash` 执行 3 次真实请求。真实 OCR 本身在样本 4/5 正确、样本 6 错误，即 `2/3`；这不等于 benchmark 的 candidate0 baseline `1/3`。上下文选择 `3/3`，fallback `0`，final exact `3/3`，renderable `3/3`，review `0`，错误改写 `0`。
+- **真实请求延迟**：context latencies 分别为 `2150.6ms`、`1270.342ms`、`2248.92ms`，median `2150.6ms`；`n=3` 时 nearest-rank p95 即最大值 `2248.92ms`。仅为 3 个样本的单轮结果，不能外推稳定性或总体表现。
+- **实际故障与无 API 离线恢复**：最终写渲染结果时，Windows `os.replace` 实际发生 `PermissionError`，这不是 Mock 故障；`D:\latex\artifacts\context_benchmark_new_samples.json` 的 `render_pending` 检查点已保存 3 个真实响应。随后直接离线 replay 到新文件 `D:\latex\artifacts\context_benchmark_new_samples_rendered.json`，无新增 API，`status=complete`，3 个样本结果全部恢复；不重复请求。
+- **外部资源**：上述真实评估实际使用了用户配置的 `deepseek-flash` 服务及本地 KaTeX；离线恢复、Mock 回归和本次日志追加未调用 API、未读取 `.env`，无其他新增外部资源。
+- **代码审核及处理**：本阶段未提供新增代码审核意见；真实故障通过回归测试覆盖，无生产逻辑修改。
+- **Mock 回归、实际测试与检查**：针对上述真实故障，在 `D:\latex\tests\test_context_benchmark.py` 增加第三次 `os.replace` 失败的 Mock 回归，验证 pending 保留且无 tmp 残留；完整 `unittest` 99 项全部通过（5.422s）。已断言样本全部确认、3 条完整结果以及 final／renderable／fallback 指标；`git diff --check` 通过，仅有换行警告。结果文件未提交。
+- **未解决事项**：当前只有 3 个样本的单轮评估，不能据此宣称选择稳定或总体有效；不宣称中文混排支持。
+- **学习进度**：真实 OCR 正确率与构造基准 candidate0 baseline 必须分开报告；真实写盘故障可由已保存响应离线恢复，Mock 回归用于防止同类故障复发，二者不能混同。
+- **下一步（计划，未完成）**：获得更多不同底图／自然冲突后再评估；本次日志记录未调用 API。

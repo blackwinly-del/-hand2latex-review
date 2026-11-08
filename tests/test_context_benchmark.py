@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -340,6 +341,38 @@ class ContextBenchmarkTests(unittest.TestCase):
                 json.loads(output_path.read_text(encoding="utf-8")),
                 {"previous": "valid"},
             )
+            self.assertFalse((Path(directory) / "results.json.tmp").exists())
+
+    @patch("reasoning.context_benchmark.check_renderable")
+    @patch("reasoning.context_benchmark.choose_with_context")
+    def test_final_replace_failure_preserves_render_pending_checkpoint(self, choose_mock, render_mock):
+        sample = make_sample("valid", "x", 0, ["x", "y"])
+        choose_mock.return_value = {"selected_index": 0, "reason": "saved", "error": None}
+        render_mock.return_value = {"renderable": True, "error": None}
+        real_replace = os.replace
+        replace_count = 0
+
+        def fail_final_replace(source, destination):
+            nonlocal replace_count
+            replace_count += 1
+            if replace_count == 3:
+                raise PermissionError("target temporarily unavailable")
+            real_replace(source, destination)
+
+        with tempfile.TemporaryDirectory() as directory:
+            input_path = Path(directory) / "samples.json"
+            output_path = Path(directory) / "results.json"
+            input_path.write_text(
+                json.dumps({"sample_type": "test", "samples": [sample]}),
+                encoding="utf-8",
+            )
+            with patch("reasoning.context_benchmark.os.replace", side_effect=fail_final_replace):
+                with self.assertRaises(PermissionError):
+                    run_context_benchmark(input_path, output_path)
+
+            checkpoint = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(checkpoint["evaluation_status"], "context_responses_saved_render_pending")
+            self.assertNotIn("renderable", checkpoint["results"][0])
             self.assertFalse((Path(directory) / "results.json.tmp").exists())
 
     @patch("reasoning.context_benchmark.choose_with_context")
