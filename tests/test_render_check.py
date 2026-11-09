@@ -65,6 +65,13 @@ class RenderCheckTests(unittest.TestCase):
             check_renderable("x")
 
     @patch("reasoning.render_check.subprocess.run")
+    def test_invalid_output_decoding_is_checker_error(self, run_mock):
+        run_mock.side_effect = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid byte")
+
+        with self.assertRaisesRegex(RuntimeError, "invalid output"):
+            check_renderable("x")
+
+    @patch("reasoning.render_check.subprocess.run")
     def test_invalid_parse_response_is_checker_error(self, run_mock):
         run_mock.return_value = subprocess.CompletedProcess(
             args="node", returncode=2, stdout="not json", stderr=""
@@ -105,6 +112,7 @@ class RenderCheckTests(unittest.TestCase):
         arguments = run_mock.call_args
         self.assertEqual(arguments.args[0][:2], ["node", "-e"])
         self.assertEqual(json.loads(arguments.kwargs["input"]), {"latex": latex})
+        self.assertEqual(arguments.kwargs["encoding"], "utf-8")
         self.assertFalse(arguments.kwargs.get("shell", False))
 
 

@@ -39,7 +39,7 @@ def check_renderable(latex: str) -> dict:
             ["node", "-e", _NODE_SCRIPT],
             input=json.dumps({"latex": latex}),
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             timeout=10,
             check=False,
             cwd=_PROJECT_ROOT,
@@ -50,6 +50,8 @@ def check_renderable(latex: str) -> dict:
         raise RuntimeError(f"render checker could not start: {error}") from error
     except subprocess.TimeoutExpired as error:
         raise RuntimeError("render checking timed out") from error
+    except UnicodeError as error:
+        raise RuntimeError("render checker returned invalid output") from error
 
     if completed.returncode not in (0, 2):
         detail = completed.stderr.strip() or completed.stdout.strip()
