@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-03",
+  "model": "deepseek-flash",
+  "source_reports": [
+    "artifacts/context_stability_run_1.json",
+    "artifacts/context_stability_run_2.json",
+    "artifacts/context_stability_run_3.json"
+  ],
+  "runs_per_sample": 3,
+  "summary": {
+    "request_count": 9,
+    "correct_selection_count": 9,
+    "fallback_count": 0,
+    "always_correct_sample_count": 3,
+    "consistent_selection_sample_count": 3,
+    "renderable_count": 9,
+    "latency_median_ms": 1826.244,
+    "latency_min_ms": 1651.139,
+    "latency_max_ms": 3626.861
+  },
+  "samples": [
+    {
+      "sample_id": "sample_4_polynomial",
+      "expected_index": 0,
+      "selected_indices": [0, 0, 0],
+      "correct_selection_count": 3,
+      "fallback_count": 0,
+      "consistent_selection": true,
+      "always_correct": true,
+      "final_correct_count": 3,
+      "renderable_count": 3,
+      "latency_median_ms": 2784.642,
+      "latency_min_ms": 1826.244,
+      "latency_max_ms": 3626.861
+    },
+    {
+      "sample_id": "sample_5_second_derivative",
+      "expected_index": 1,
+      "selected_indices": [1, 1, 1],
+      "correct_selection_count": 3,
+      "fallback_count": 0,
+      "consistent_selection": true,
+      "always_correct": true,
+      "final_correct_count": 3,
+      "renderable_count": 3,
+      "latency_median_ms": 1774.304,
+      "latency_min_ms": 1651.139,
+      "latency_max_ms": 1791.909
+    },
+    {
+      "sample_id": "sample_6_real_ocr_prefix_error",
+      "expected_index": 1,
+      "selected_indices": [1, 1, 1],
+      "correct_selection_count": 3,
+      "fallback_count": 0,
+      "consistent_selection": true,
+      "always_correct": true,
+      "final_correct_count": 3,
+      "renderable_count": 3,
+      "latency_median_ms": 2088.687,
+      "latency_min_ms": 1658.991,
+      "latency_max_ms": 2624.15
+    }
+  ],
+  "scope_note": "Nine requests across three confirmed real handwritten conflict samples. This is a small stability check, not an overall accuracy estimate."
+}

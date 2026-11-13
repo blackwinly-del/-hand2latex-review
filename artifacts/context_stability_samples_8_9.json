@@ -1,0 +1,60 @@
+{
+  "date": "2026-11-03",
+  "model": "deepseek-flash",
+  "source_reports": [
+    "artifacts/context_stability_samples_8_9_run_1.json",
+    "artifacts/context_stability_samples_8_9_run_2.json",
+    "artifacts/context_stability_samples_8_9_run_3.json"
+  ],
+  "runs_per_sample": 3,
+  "summary": {
+    "request_count": 6,
+    "correct_selection_count": 5,
+    "fallback_count": 0,
+    "missed_error_count": 1,
+    "renderable_count": 6,
+    "review_count": 0,
+    "latency_median_ms": 2071.0715,
+    "latency_min_ms": 1549.716,
+    "latency_max_ms": 8310.862
+  },
+  "samples": [
+    {
+      "sample_id": "sample_8_second_derivative_trig",
+      "expected_index": 0,
+      "selected_indices": [0, 0, 0],
+      "correct_selection_count": 3,
+      "fallback_count": 0,
+      "consistent_selection": true,
+      "always_correct": true,
+      "latencies_ms": [1549.716, 1650.462, 1781.283],
+      "latency_median_ms": 1650.462,
+      "need_review": [false, false, false],
+      "reasons": [
+        "The image clearly shows y with two prime marks (y''), matching candidate 0's y^{\\prime\\prime}, whereas candidate 1 uses a single prime.",
+        "The image shows y with two prime marks, so y^{\\prime\\prime} is the faithful transcription; the rest of the formula matches 2��sin(2x+��/2).",
+        "The image shows y with a double prime (y��), matching candidate 0 rather than the single prime in candidate 1."
+      ]
+    },
+    {
+      "sample_id": "sample_9_little_o_expansion",
+      "expected_index": 1,
+      "selected_indices": [1, 0, 1],
+      "correct_selection_count": 2,
+      "fallback_count": 0,
+      "consistent_selection": false,
+      "always_correct": false,
+      "latencies_ms": [2360.86, 2598.121, 8310.862],
+      "latency_median_ms": 2598.121,
+      "final_correct": [true, false, true],
+      "need_review": [false, false, false],
+      "missed_error_run": 2,
+      "reasons": [
+        "The final term is handwritten as a lowercase letter o, matching o(x^3), not a zero.",
+        "The image clearly displays a zero ('0') rather than a lowercase 'o' in the final term, matching candidate 0 exactly.",
+        "The handwritten symbol before (x^3) is a lowercase letter o, matching candidate 1's o(x^3), while candidate 0 uses a digit zero."
+      ]
+    }
+  ],
+  "scope_note": "Three requests per sample show sample 8 stable and sample 9 variable. Sample 9 run 2 is a missed error because the selected formula was wrong but need_review was false. This small check does not estimate overall accuracy."
+}

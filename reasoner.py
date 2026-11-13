@@ -1,5 +1,5 @@
 from reasoning.context import choose_with_context
-from reasoning.validators import validate_structure
+from reasoning.validators import find_ambiguous_glyph_conflicts, validate_structure
 
 
 def normalize_latex(latex: str) -> str:
@@ -77,8 +77,9 @@ def refine(image_path: str, candidates: list[dict]) -> dict:
         validate_structure(normalize_latex(candidate["latex"]))
         for candidate in deduplicated
     )
+    ambiguity_issues = find_ambiguous_glyph_conflicts(deduplicated)
     context_failed = has_conflict and context_result["selected_index"] is None
-    need_review = context_failed or has_structure_issues
+    need_review = context_failed or has_structure_issues or bool(ambiguity_issues)
     matching_engines = {
         candidate.get("engine")
         for candidate in candidates

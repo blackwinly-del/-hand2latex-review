@@ -1,5 +1,6 @@
 import copy
 import unittest
+from unittest.mock import patch
 
 from reasoner import deduplicate_candidates, normalize_latex, refine
 
@@ -179,6 +180,27 @@ class RefineTests(unittest.TestCase):
                 self.assertEqual(result["final_latex"], latex)
                 self.assertEqual(result["confidence"], "low")
                 self.assertTrue(result["need_review"])
+
+    @patch("reasoner.choose_with_context")
+    def test_zero_o_conflict_requires_review_without_changing_selection(self, choose_mock):
+        choose_mock.return_value = {
+            "selected_index": 0,
+            "reason": "selected first candidate",
+            "error": None,
+        }
+        candidates = [
+            make_candidate("pp_formulanet_l", "=1+x+\\frac{1}{2}x^{2}+0(x^{3})"),
+            make_candidate("user_confirmed", "=1+x+\\frac{1}{2}x^{2}+o(x^{3})"),
+        ]
+        snapshot = copy.deepcopy(candidates)
+
+        result = refine("unused.png", candidates)
+
+        self.assertEqual(result["final_latex"], candidates[0]["latex"])
+        self.assertEqual(result["confidence"], "low")
+        self.assertTrue(result["need_review"])
+        self.assertEqual(result["changes"], [])
+        self.assertEqual(candidates, snapshot)
 
     def test_mathematical_validity_is_not_corrected(self):
         result = refine(

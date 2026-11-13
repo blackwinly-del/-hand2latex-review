@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-03",
+  "model": "PP-FormulaNet-L",
+  "sample_count": 3,
+  "review_status": "ground_truth_user_confirmed",
+  "results": [
+    {
+      "sample_id": "sample_7",
+      "image_path": "data/handwritten/sample_7.png",
+      "source_page": "data/pdf_pages/page_2.png",
+      "crop": [165, 330, 430, 400],
+      "ground_truth": "y^{(n)}=\\frac{4(-1)^{n}\\cdot n!}{(x-1)^{n+1}}",
+      "human_review": "confirmed_correct",
+      "review_note": "User corrected the transcription on 2026-11-03 by adding the numerator factor 4.",
+      "candidates": [
+        {"engine": "pp_formulanet_l", "latex": "y^{(n)}=\\frac{(x-1)^{n}\\cdot n!}{(x-1)^{n+1}}", "score": null, "latency_ms": 14017.096, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_8",
+      "image_path": "data/handwritten/sample_8.png",
+      "source_page": "data/pdf_pages/page_2.png",
+      "crop": [170, 530, 550, 590],
+      "ground_truth": "y^{\\prime\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "candidates": [
+        {"engine": "pp_formulanet_l", "latex": "y^{\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})", "score": null, "latency_ms": 11936.233, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_9",
+      "image_path": "data/handwritten/sample_9.png",
+      "source_page": "data/pdf_pages/page_2.png",
+      "crop": [315, 1020, 710, 1085],
+      "ground_truth": "=1+x+\\frac{1}{2}x^{2}+o(x^{3})",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "candidates": [
+        {"engine": "pp_formulanet_l", "latex": "=1+x+\\frac{1}{2}x^{2}+0(x^{3})", "score": null, "latency_ms": 11561.075, "error": null}
+      ]
+    }
+  ]
+}

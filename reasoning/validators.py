@@ -214,3 +214,75 @@ def validate_structure(latex: str) -> list[str]:
     if script_error or _has_duplicate_scripts(latex):
         issues.append("invalid_scripts")
     return issues
+
+
+def _make_glyph_span(
+    candidate_index: int, other_index: int, position: int, text: str, message: str
+) -> dict:
+    return {
+        "span_id": (
+            f"candidate:{candidate_index}:with_candidate:{other_index}:"
+            f"{position}-{position + 1}:ambiguous_glyph_conflict"
+        ),
+        "source_revision": 0,
+        "target": f"candidate:{candidate_index}",
+        "start": position,
+        "end": position + 1,
+        "text": text,
+        "source": "ambiguous_glyph_rule",
+        "issue_type": "ambiguous_glyph_conflict",
+        "severity": "review",
+        "message": message,
+    }
+
+
+def find_ambiguous_glyph_conflicts(candidates: list[dict]) -> list[dict]:
+    if not isinstance(candidates, list):
+        raise TypeError("candidates must be a list")
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            raise TypeError("each candidate must be a dict")
+        if "latex" not in candidate:
+            raise ValueError("candidate is missing latex")
+        if not isinstance(candidate["latex"], str):
+            raise TypeError("latex must be a string")
+        if not candidate["latex"].strip():
+            raise ValueError("candidate latex must not be blank")
+        if candidate.get("error") is not None:
+            raise ValueError("ambiguous glyph candidates must not contain errors")
+
+    conflicts = []
+    for first_index in range(len(candidates)):
+        for second_index in range(first_index + 1, len(candidates)):
+            first_latex = candidates[first_index]["latex"]
+            second_latex = candidates[second_index]["latex"]
+            if len(first_latex) != len(second_latex):
+                continue
+            for position, (first_char, second_char) in enumerate(
+                zip(first_latex, second_latex)
+            ):
+                if first_char == second_char or {first_char, second_char} != {"0", "o"}:
+                    continue
+                message = (
+                    f"Candidates {first_index} and {second_index} use digit 0 and "
+                    f"letter o at position {position}; manual review is required"
+                )
+                conflicts.append(
+                    {
+                        "issue_type": "ambiguous_glyph_conflict",
+                        "glyph_pair": ["0", "o"],
+                        "candidate_indices": [first_index, second_index],
+                        "position": position,
+                        "severity": "review",
+                        "message": message,
+                        "spans": [
+                            _make_glyph_span(
+                                first_index, second_index, position, first_char, message
+                            ),
+                            _make_glyph_span(
+                                second_index, first_index, position, second_char, message
+                            ),
+                        ],
+                    }
+                )
+    return conflicts

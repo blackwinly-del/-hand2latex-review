@@ -1,0 +1,126 @@
+{
+  "model": "deepseek-flash",
+  "sample_type": "real_ocr_errors_vs_user_confirmed_transcriptions",
+  "summary": {
+    "sample_count": 2,
+    "raw_correct_count": 1,
+    "final_correct_count": 2,
+    "erroneous_rewrite_count": 0,
+    "review_count": 0,
+    "intercepted_error_count": 0,
+    "missed_error_count": 0,
+    "correct_final_review_count": 0,
+    "raw_exact_accuracy": 0.5,
+    "final_exact_accuracy": 1.0,
+    "erroneous_rewrite_rate": 0.0,
+    "error_interception_rate": null,
+    "correct_final_review_rate": 0.0,
+    "renderable_rate": 1.0,
+    "human_review_rate": 0.0,
+    "context_latency_ms": {
+      "median": 1955.288,
+      "p95": 2360.86
+    },
+    "context_success_count": 2,
+    "context_selection_correct_count": 2,
+    "context_fallback_count": 0,
+    "context_selection_accuracy": 1.0,
+    "context_success_selection_accuracy": 1.0,
+    "context_fallback_rate": 0.0
+  },
+  "results": [
+    {
+      "sample_id": "sample_8_second_derivative_trig",
+      "image_path": "data/handwritten/sample_8.png",
+      "ground_truth": "y^{\\prime\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+      "expected_index": 0,
+      "construction_note": "Candidate 0 is the user-confirmed second derivative; candidate 1 is the real OCR output with one prime omitted.",
+      "candidates": [
+        {
+          "engine": "user_confirmed",
+          "latex": "y^{\\prime\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        },
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y^{\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+          "score": null,
+          "latency_ms": 11936.233,
+          "error": null
+        }
+      ],
+      "context_result": {
+        "selected_index": 0,
+        "reason": "The image clearly shows y with two prime marks (y''), matching candidate 0's y^{\\prime\\prime}, whereas candidate 1 uses a single prime.",
+        "error": null
+      },
+      "latency_ms": 1549.716,
+      "refine_result": {
+        "raw_latex": "y^{\\prime\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+        "final_latex": "y^{\\prime\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+        "confidence": "medium",
+        "changes": [],
+        "need_review": false,
+        "risk_score": null
+      },
+      "render_result": {
+        "renderable": true,
+        "error": null
+      },
+      "renderable": true
+    },
+    {
+      "sample_id": "sample_9_little_o_expansion",
+      "image_path": "data/handwritten/sample_9.png",
+      "ground_truth": "=1+x+\\frac{1}{2}x^{2}+o(x^{3})",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 is the real OCR output that reads little-o as zero; candidate 1 is the user-confirmed transcription.",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "=1+x+\\frac{1}{2}x^{2}+0(x^{3})",
+          "score": null,
+          "latency_ms": 11561.075,
+          "error": null
+        },
+        {
+          "engine": "user_confirmed",
+          "latex": "=1+x+\\frac{1}{2}x^{2}+o(x^{3})",
+          "score": null,
+          "latency_ms": 0,
+          "error": null
+        }
+      ],
+      "context_result": {
+        "selected_index": 1,
+        "reason": "The final term is handwritten as a lowercase letter o, matching o(x^3), not a zero.",
+        "error": null
+      },
+      "latency_ms": 2360.86,
+      "refine_result": {
+        "raw_latex": "=1+x+\\frac{1}{2}x^{2}+o(x^{3})",
+        "final_latex": "=1+x+\\frac{1}{2}x^{2}+o(x^{3})",
+        "confidence": "medium",
+        "changes": [
+          {
+            "rule": "context_candidate_selection",
+            "before": "=1+x+\\frac{1}{2}x^{2}+0(x^{3})",
+            "after": "=1+x+\\frac{1}{2}x^{2}+o(x^{3})",
+            "selected_index": 1,
+            "reason": "The final term is handwritten as a lowercase letter o, matching o(x^3), not a zero."
+          }
+        ],
+        "need_review": false,
+        "risk_score": null
+      },
+      "render_result": {
+        "renderable": true,
+        "error": null
+      },
+      "renderable": true
+    }
+  ],
+  "evaluation_status": "complete"
+}

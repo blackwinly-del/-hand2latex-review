@@ -158,6 +158,26 @@ class ContextBenchmarkTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             replay_context_benchmark("same.json", "same.json")
 
+    def test_sample_9_saved_responses_all_require_review(self):
+        for run_index in range(1, 4):
+            with self.subTest(run=run_index):
+                report = json.loads(
+                    Path(f"artifacts/context_stability_samples_8_9_run_{run_index}.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                sample = next(
+                    result for result in report["results"]
+                    if result["sample_id"] == "sample_9_little_o_expansion"
+                )
+                with patch("reasoner.choose_with_context", return_value=sample["context_result"]):
+                    result = reasoner.refine(sample["image_path"], sample["candidates"])
+
+                self.assertEqual(result["confidence"], "low")
+                self.assertTrue(result["need_review"])
+                self.assertEqual(result["final_latex"], sample["refine_result"]["final_latex"])
+                self.assertEqual(result["changes"], sample["refine_result"]["changes"])
+
     def test_expanded_dataset_has_ten_valid_balanced_conflicts(self):
         input_path = DEFAULT_INPUT.with_name("context_conflict_samples_v2.json")
         dataset = json.loads(input_path.read_text(encoding="utf-8"))
