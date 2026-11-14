@@ -1,0 +1,41 @@
+{
+  "date": "2026-11-03",
+  "sample_type": "real_ocr_errors_vs_user_confirmed_transcriptions",
+  "source": "artifacts/handwritten_samples_10_12.json",
+  "sample_count": 3,
+  "samples": [
+    {
+      "sample_id": "sample_10_third_derivative",
+      "image_path": "data/handwritten/sample_10.png",
+      "ground_truth": "y^{\\prime\\prime\\prime}=\\frac{-24}{(x-1)^{4}}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 is the unchanged real OCR output; candidate 1 is the user-corrected transcription with -24 in the numerator.",
+      "candidates": [
+        {"engine": "pp_formulanet_l", "latex": "y^{n+1}=\\frac{-3-16}{(x-1)^{4}}", "score": null, "latency_ms": 22684.214, "error": null},
+        {"engine": "user_confirmed", "latex": "y^{\\prime\\prime\\prime}=\\frac{-24}{(x-1)^{4}}", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_11_second_derivative_pi",
+      "image_path": "data/handwritten/sample_11.png",
+      "ground_truth": "y^{\\prime\\prime}=2^{2}\\sin(2x+\\pi)",
+      "expected_index": 0,
+      "construction_note": "Candidate 0 is the user-confirmed second derivative; candidate 1 is the real OCR output with y^n.",
+      "candidates": [
+        {"engine": "user_confirmed", "latex": "y^{\\prime\\prime}=2^{2}\\sin(2x+\\pi)", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "pp_formulanet_l", "latex": "y^{n}=2^{2}\\sin(2x+\\pi)", "score": null, "latency_ms": 13928.959, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_12_sine_series",
+      "image_path": "data/handwritten/sample_12.png",
+      "ground_truth": "y=1+\\sin x+\\frac{\\sin^{2}x}{2!}+\\frac{\\sin^{3}x}{3!}+\\cdots",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 is the unchanged real OCR output with 21/31 and a trailing dash; candidate 1 is the user-confirmed transcription.",
+      "candidates": [
+        {"engine": "pp_formulanet_l", "latex": "y=1+\\sin x+\\frac{\\sin^{2}x}{21}+\\frac{\\sin^{3}x}{31}+\\cdots-", "score": null, "latency_ms": 14783.762, "error": null},
+        {"engine": "user_confirmed", "latex": "y=1+\\sin x+\\frac{\\sin^{2}x}{2!}+\\frac{\\sin^{3}x}{3!}+\\cdots", "score": null, "latency_ms": 0, "error": null}
+      ]
+    }
+  ]
+}
