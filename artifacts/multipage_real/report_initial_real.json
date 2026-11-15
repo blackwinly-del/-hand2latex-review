@@ -1,0 +1,179 @@
+{
+  "sample_type": "real_handwritten_multipage_structural_smoke",
+  "evaluation_scope": "Validate page recognition completion, upload order, page-break placement, Tectonic compilation, and PDF page count. Human-visible section markers are ordering evidence only, not full-page transcription truth.",
+  "transcription_accuracy": "not_evaluated_without_full_page_truth",
+  "method": "real_api_with_saved_page_response_reuse_and_local_tectonic",
+  "manifest": "data\\multipage_samples.json",
+  "started_at": "2026-11-15T06:13:26.404085+00:00",
+  "status": "complete",
+  "results": [
+    {
+      "case_id": "contiguous_2_3_4",
+      "description": "Three consecutive handwritten content pages.",
+      "page_ids": [
+        "page_2",
+        "page_3",
+        "page_4"
+      ],
+      "additional_api_calls": 3,
+      "cache_hits": 0,
+      "pages": [
+        {
+          "page_id": "page_2",
+          "source_image": "data\\pdf_pages\\page_2.png",
+          "model": "deepseek-flash",
+          "human_review": "required",
+          "status": "request_error",
+          "error": {
+            "type": "APIStatusError",
+            "message": "Error code: 402 - Insufficient Balance (request_id: 68b37326-76bf-47b8-97a5-925c0f086577)"
+          },
+          "latency_ms": 721.059,
+          "cache_hit": false,
+          "marker": "10月26号",
+          "expected_blank": false,
+          "blank_page_has_content": null
+        },
+        {
+          "page_id": "page_3",
+          "source_image": "data\\pdf_pages\\page_3.png",
+          "model": "deepseek-flash",
+          "human_review": "required",
+          "status": "request_error",
+          "error": {
+            "type": "APIStatusError",
+            "message": "Error code: 402 - Insufficient Balance (request_id: 45b43b5b-a596-4033-b14a-265a933922f7)"
+          },
+          "latency_ms": 501.614,
+          "cache_hit": false,
+          "marker": "3.6.6",
+          "expected_blank": false,
+          "blank_page_has_content": null
+        },
+        {
+          "page_id": "page_4",
+          "source_image": "data\\pdf_pages\\page_4.png",
+          "model": "deepseek-flash",
+          "human_review": "required",
+          "status": "request_error",
+          "error": {
+            "type": "APIStatusError",
+            "message": "Error code: 402 - Insufficient Balance (request_id: 08628e1a-edae-45e2-8262-06c46a110705)"
+          },
+          "latency_ms": 526.117,
+          "cache_hit": false,
+          "marker": "3.6.8",
+          "expected_blank": false,
+          "blank_page_has_content": null
+        }
+      ],
+      "transcription_accuracy": null,
+      "human_review": "required",
+      "status": "page_recognition_failed",
+      "structural_pass": false
+    },
+    {
+      "case_id": "reverse_4_2",
+      "description": "Two non-chronological pages; upload order must still be preserved.",
+      "page_ids": [
+        "page_4",
+        "page_2"
+      ],
+      "additional_api_calls": 0,
+      "cache_hits": 2,
+      "pages": [
+        {
+          "page_id": "page_4",
+          "source_image": "data\\pdf_pages\\page_4.png",
+          "model": "deepseek-flash",
+          "human_review": "required",
+          "status": "request_error",
+          "error": {
+            "type": "APIStatusError",
+            "message": "Error code: 402 - Insufficient Balance (request_id: 08628e1a-edae-45e2-8262-06c46a110705)"
+          },
+          "latency_ms": 526.117,
+          "cache_hit": true,
+          "marker": "3.6.8",
+          "expected_blank": false,
+          "blank_page_has_content": null
+        },
+        {
+          "page_id": "page_2",
+          "source_image": "data\\pdf_pages\\page_2.png",
+          "model": "deepseek-flash",
+          "human_review": "required",
+          "status": "request_error",
+          "error": {
+            "type": "APIStatusError",
+            "message": "Error code: 402 - Insufficient Balance (request_id: 68b37326-76bf-47b8-97a5-925c0f086577)"
+          },
+          "latency_ms": 721.059,
+          "cache_hit": true,
+          "marker": "10月26号",
+          "expected_blank": false,
+          "blank_page_has_content": null
+        }
+      ],
+      "transcription_accuracy": null,
+      "human_review": "required",
+      "status": "page_recognition_failed",
+      "structural_pass": false
+    },
+    {
+      "case_id": "trailing_blank_4_5",
+      "description": "A handwritten page followed by a blank page; invented blank-page content is a failure.",
+      "page_ids": [
+        "page_4",
+        "page_5"
+      ],
+      "additional_api_calls": 1,
+      "cache_hits": 1,
+      "pages": [
+        {
+          "page_id": "page_4",
+          "source_image": "data\\pdf_pages\\page_4.png",
+          "model": "deepseek-flash",
+          "human_review": "required",
+          "status": "request_error",
+          "error": {
+            "type": "APIStatusError",
+            "message": "Error code: 402 - Insufficient Balance (request_id: 08628e1a-edae-45e2-8262-06c46a110705)"
+          },
+          "latency_ms": 526.117,
+          "cache_hit": true,
+          "marker": "3.6.8",
+          "expected_blank": false,
+          "blank_page_has_content": null
+        },
+        {
+          "page_id": "page_5",
+          "source_image": "data\\pdf_pages\\page_5.png",
+          "model": "deepseek-flash",
+          "human_review": "required",
+          "status": "request_error",
+          "error": {
+            "type": "APIStatusError",
+            "message": "Error code: 402 - Insufficient Balance (request_id: 7ef3a59d-a824-454f-b2dc-b9d3ee03820d)"
+          },
+          "latency_ms": 408.104,
+          "cache_hit": false,
+          "marker": null,
+          "expected_blank": true,
+          "blank_page_has_content": null
+        }
+      ],
+      "transcription_accuracy": null,
+      "human_review": "required",
+      "status": "page_recognition_failed",
+      "structural_pass": false
+    }
+  ],
+  "completed_at": "2026-11-15T06:13:28.603636+00:00",
+  "additional_api_calls": 4,
+  "cache_hits": 3,
+  "cases_total": 3,
+  "cases_structurally_passed": 0,
+  "latency_note": "Cached page latency_ms is historical request time, not a new per-case speed measurement.",
+  "accuracy_note": "Structural success does not establish exact transcription or mathematical correctness."
+}

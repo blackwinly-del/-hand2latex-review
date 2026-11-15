@@ -1,0 +1,89 @@
+{
+  "title": "10月26号 数学笔记",
+  "blocks": [
+    {
+      "type": "paragraph",
+      "text": "10月26号"
+    },
+    {
+      "type": "display_formula",
+      "latex": "x^3 - x^2 + x^2 + x - x + 3x - 3 + 4"
+    },
+    {
+      "type": "display_formula",
+      "latex": "3.6.1.\\ (1)\\ y = x^2 + x + 3 + \\frac{4}{(x-1)}"
+    },
+    {
+      "type": "display_formula",
+      "latex": "y' = 2x + 1 + \\frac{-4}{(x-1)^2} \\qquad y = -1 - 3x + 5x^2 - 4x^3 + \\dots"
+    },
+    {
+      "type": "display_formula",
+      "latex": "y'' = 2 + \\frac{8}{(x-1)^3} \\qquad - + \\frac{4(-1)^n}{(x-1)^{n+1}} x^n"
+    },
+    {
+      "type": "display_formula",
+      "latex": "y''' = \\frac{-24}{(x-1)^4}"
+    },
+    {
+      "type": "display_formula",
+      "latex": "y^{(n)} = \\frac{(-1)^n \\cdot n!}{(x-1)^{n+1}}"
+    },
+    {
+      "type": "display_formula",
+      "latex": "(2)\\ y' = 2\\sin x \\cos x = \\sin 2x"
+    },
+    {
+      "type": "display_formula",
+      "latex": "y'' = 2 \\cdot \\sin(2x + \\frac{\\pi}{2})"
+    },
+    {
+      "type": "display_formula",
+      "latex": "y''' = 2^2 \\sin(2x + \\pi)"
+    },
+    {
+      "type": "display_formula",
+      "latex": "\\therefore y = 0 + 0 + x + \\cdots - \\frac{2^n \\sin(2x + n\\frac{\\pi}{2})}{n!} \\cdot x^n"
+    },
+    {
+      "type": "display_formula",
+      "latex": "3.6.2\\ \\text{解：}\\ y = 1 + \\sin x + \\frac{\\sin^2 x}{2!} + \\frac{\\sin^3 x}{3!} + \\cdots"
+    },
+    {
+      "type": "display_formula",
+      "latex": "\\sin x = x - \\frac{1}{3!}x^3"
+    },
+    {
+      "type": "display_formula",
+      "latex": "y = 1 + x - \\frac{1}{6}x^3 + \\frac{1}{2} \\cdot (x - \\frac{1}{6}x^3) +"
+    },
+    {
+      "type": "display_formula",
+      "latex": "\\frac{1}{6} \\cdot (x - \\frac{1}{6}x^3)^3"
+    },
+    {
+      "type": "display_formula",
+      "latex": "= 1 + x + \\frac{1}{2}x^2 + o(x^3)"
+    },
+    {
+      "type": "display_formula",
+      "latex": "3.6.3.\\quad \\ln(x+1) = x - \\frac{1}{2}x^2 + \\frac{1}{3}x^3 - \\frac{1}{4}x^4 + \\frac{1}{5}x^5 - \\dots"
+    },
+    {
+      "type": "display_formula",
+      "latex": "\\cos x = 1 - \\frac{1}{2}x^2 + \\frac{1}{24}x^4 - \\frac{1}{720}x^6"
+    }
+  ],
+  "tex": "\\documentclass[UTF8,fontset=windows]{ctexart}\n\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage[margin=2.2cm]{geometry}\n\\title{10月26号 数学笔记}\n\\begin{document}\n\\maketitle\n10月26号\n\n\\[\nx^3 - x^2 + x^2 + x - x + 3x - 3 + 4\n\\]\n\n\\[\n3.6.1.\\ (1)\\ y = x^2 + x + 3 + \\frac{4}{(x-1)}\n\\]\n\n\\[\ny' = 2x + 1 + \\frac{-4}{(x-1)^2} \\qquad y = -1 - 3x + 5x^2 - 4x^3 + \\dots\n\\]\n\n\\[\ny'' = 2 + \\frac{8}{(x-1)^3} \\qquad - + \\frac{4(-1)^n}{(x-1)^{n+1}} x^n\n\\]\n\n\\[\ny''' = \\frac{-24}{(x-1)^4}\n\\]\n\n\\[\ny^{(n)} = \\frac{(-1)^n \\cdot n!}{(x-1)^{n+1}}\n\\]\n\n\\[\n(2)\\ y' = 2\\sin x \\cos x = \\sin 2x\n\\]\n\n\\[\ny'' = 2 \\cdot \\sin(2x + \\frac{\\pi}{2})\n\\]\n\n\\[\ny''' = 2^2 \\sin(2x + \\pi)\n\\]\n\n\\[\n\\therefore y = 0 + 0 + x + \\cdots - \\frac{2^n \\sin(2x + n\\frac{\\pi}{2})}{n!} \\cdot x^n\n\\]\n\n\\[\n3.6.2\\ \\text{解：}\\ y = 1 + \\sin x + \\frac{\\sin^2 x}{2!} + \\frac{\\sin^3 x}{3!} + \\cdots\n\\]\n\n\\[\n\\sin x = x - \\frac{1}{3!}x^3\n\\]\n\n\\[\ny = 1 + x - \\frac{1}{6}x^3 + \\frac{1}{2} \\cdot (x - \\frac{1}{6}x^3) +\n\\]\n\n\\[\n\\frac{1}{6} \\cdot (x - \\frac{1}{6}x^3)^3\n\\]\n\n\\[\n= 1 + x + \\frac{1}{2}x^2 + o(x^3)\n\\]\n\n\\[\n3.6.3.\\quad \\ln(x+1) = x - \\frac{1}{2}x^2 + \\frac{1}{3}x^3 - \\frac{1}{4}x^4 + \\frac{1}{5}x^5 - \\dots\n\\]\n\n\\[\n\\cos x = 1 - \\frac{1}{2}x^2 + \\frac{1}{24}x^4 - \\frac{1}{720}x^6\n\\]\n\n\\end{document}\n",
+  "model": "deepseek-flash",
+  "latency_ms": 29504.634,
+  "human_review": "required",
+  "source_image": "data\\pdf_pages\\page_2.png",
+  "compile": {
+    "success": true,
+    "pdf_path": "D:\\latex\\artifacts\\full_page_demo\\main.pdf",
+    "log": "note: Running TeX ...\nnote: downloading graphicx.sty\nnote: downloading graphics.sty\nnote: downloading trig.sty\nnote: downloading graphics.cfg\nnote: downloading xetex.def\nnote: downloading msam5.tfm\nnote: downloading msbm5.tfm\nnote: Rerunning TeX because \"main.aux\" changed ...\nnote: Running xdvipdfmx ...\nnote: downloading cmsy7.pfb\nnote: downloading cmmi7.pfb\nnote: Writing `D:\\latex\\artifacts\\full_page_demo\\main.pdf` (24.2041015625 KiB)\nnote: Skipped writing 1 intermediate files (use --keep-intermediates to keep them)\nFontconfig error: Cannot load default config file: No such file: (null)\nwarning: accessing absolute path `C:/windows/fonts\\simsun.ttc`; build may not be reproducible in other environments\nwarning: accessing absolute path `C:/windows/fonts\\simkai.ttf`; build may not be reproducible in other environments\nwarning: accessing absolute path `C:/windows/fonts\\simhei.ttf`; build may not be reproducible in other environments\n",
+    "errors": [],
+    "returncode": 0
+  }
+}

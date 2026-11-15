@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hand2LaTeX 智能工作台</title>
+  <style>
+    :root { color-scheme: light; --ink:#233047; --muted:#6d7687; --paper:#f5f1e8; --card:#fffdf8; --accent:#2f65d9; --danger:#b42318; --line:#e5dfd2; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:"Segoe UI","Microsoft YaHei",sans-serif; }
+    header { padding:28px clamp(18px,4vw,56px) 18px; background:#172b4d; color:white; }
+    header h1 { margin:0 0 8px; font-size:clamp(24px,3vw,38px); }
+    header p { margin:0; color:#cdd8ec; }
+    main { max-width:1500px; margin:0 auto; padding:24px clamp(14px,3vw,36px) 48px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 8px 24px #25355d10; margin-bottom:20px; }
+    .upload-row,.actions { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+    input[type=file] { max-width:100%; padding:12px; border:1px dashed #a8b0bf; border-radius:10px; background:white; }
+    button,.button { border:0; border-radius:10px; padding:11px 18px; background:var(--accent); color:white; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block; }
+    button.secondary,.button.secondary { background:#e9eef8; color:#24447e; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .status { margin-top:12px; color:var(--muted); }
+    .error-text { color:var(--danger); margin-top:12px; white-space:pre-wrap; }
+    .success-text { color:#16703b; margin-top:12px; }
+    .grid { display:grid; grid-template-columns:minmax(280px,1fr) minmax(360px,1.35fr); gap:20px; }
+    .full { grid-column:1/-1; }
+    h2 { margin:0 0 14px; font-size:19px; }
+    .source-image { width:100%; max-height:720px; object-fit:contain; background:#eee9df; border-radius:10px; border:1px solid var(--line); }
+    .page-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+    .page-grid figure { margin:0; }
+    .page-image { width:100%; height:230px; object-fit:contain; background:#eee9df; border:1px solid var(--line); border-radius:10px; }
+    .page-grid figcaption { margin-top:6px; color:var(--muted); text-align:center; }
+    textarea { width:100%; min-height:560px; resize:vertical; border:1px solid #cfd5df; border-radius:10px; padding:16px; background:#111a2b; color:#e9f0ff; font:13px/1.65 Consolas,monospace; tab-size:2; }
+    .errors { border-left:4px solid var(--danger); background:#fff0ee; padding:12px 16px; margin:12px 0; }
+    .error-item { margin:6px 0; }
+    .source-lines { max-height:320px; overflow:auto; border:1px solid var(--line); border-radius:10px; margin-top:14px; background:white; font:12px/1.55 Consolas,monospace; }
+    .source-line { display:grid; grid-template-columns:48px 1fr; padding:2px 8px; white-space:pre-wrap; }
+    .line-number { color:#8a91a0; text-align:right; padding-right:12px; user-select:none; }
+    .error-line { background:#ffe1de; color:var(--danger); font-weight:600; }
+    iframe { width:100%; height:760px; border:1px solid var(--line); border-radius:10px; background:white; }
+    .badge { display:inline-block; padding:4px 9px; border-radius:999px; background:#fff2c7; color:#785400; font-size:12px; margin-left:8px; }
+    @media (max-width:900px) { .grid { grid-template-columns:1fr; } textarea { min-height:420px; } iframe { height:620px; } }
+  </style>
+</head>
+<body>
+  <header><h1>Hand2LaTeX 智能工作台</h1><p>手写混合笔记 → 可编辑 LaTeX → 中文 PDF → 定位与修复</p></header>
+  <main id="app">
+    <section class="card">
+      <h2>1. 上传整页手写笔记</h2>
+      <div class="upload-row">
+        <input type="file" accept=".png,.jpg,.jpeg,.webp" multiple @change="selectFile">
+        <button :disabled="busy || !files.length" @click="upload">整页识别并编译</button>
+      </div>
+      <div class="status" v-if="busy">正在逐页识别和合并编译，多页内容可能需要数分钟，请勿重复点击。</div>
+      <div class="error-text" v-if="error">{{ error }}</div>
+      <div class="success-text" v-if="jobId">已生成可编辑文档。识别结果仍需人工核对。</div>
+    </section>
+
+    <div class="grid" v-if="jobId">
+      <section class="card">
+        <h2>2. 原始图片与源码<span class="badge" v-if="pageCount > 1">共 {{ pageCount }} 页</span><span class="badge" v-else>需要人工核对</span></h2>
+        <div class="page-grid">
+          <figure v-for="page in pages" :key="page.page">
+            <img class="page-image" :src="page.source_url" :alt="`第 ${page.page} 页手写笔记`">
+            <figcaption>第 {{ page.page }} 页</figcaption>
+          </figure>
+        </div>
+        <img v-if="!pages.length" class="source-image" :src="sourceUrl" alt="上传的手写笔记">
+      </section>
+
+      <section class="card">
+        <h2>3. 编辑 LaTeX 并重新编译</h2>
+        <textarea v-model="tex" @input="invalidateCompile" spellcheck="false"></textarea>
+        <div class="actions" style="margin-top:14px">
+          <button :disabled="busy" @click="recompile">重新编译</button>
+          <button class="secondary" v-if="compileResult && compileResult.errors.length" :disabled="busy" @click="requestFix">AI 生成修复建议</button>
+          <a v-if="compileResult && compileResult.success" class="button secondary" :href="pdfUrl" target="_blank" download>下载 PDF</a>
+        </div>
+        <div class="errors" v-if="compileResult && compileResult.errors.length">
+          <strong>编译错误定位</strong>
+          <div class="error-item" v-for="item in compileResult.errors" :key="item.line + item.message">
+            第 {{ item.line || '?' }} 行：{{ item.message }}
+          </div>
+        </div>
+        <div class="source-lines" v-if="tex">
+          <div class="source-line" v-for="(line,index) in sourceLines" :key="index" :class="{'error-line':errorLines.has(index+1)}">
+            <span class="line-number">{{ index+1 }}</span><span>{{ line || ' ' }}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card full" v-if="suggestedTex">
+        <h2>4. 确认 AI 修复建议</h2>
+        <p>{{ fixSummary }}</p>
+        <textarea v-model="suggestedTex" spellcheck="false"></textarea>
+        <div class="actions" style="margin-top:14px">
+          <button :disabled="busy" @click="applyFix">确认修复并重新编译</button>
+        </div>
+      </section>
+
+      <section class="card full" v-if="compileResult && compileResult.success">
+        <h2>5. PDF 预览</h2>
+        <iframe :src="pdfUrl" :key="pdfVersion" title="编译后的 PDF"></iframe>
+      </section>
+    </div>
+  </main>
+  <script src="/vendor/vue/vue.global.js"></script>
+  <script>
+    const { createApp, ref, computed } = Vue;
+    createApp({
+      setup() {
+        const files = ref([]), busy = ref(false), error = ref(''), jobId = ref(''), tex = ref(''), sourceUrl = ref(''), compileResult = ref(null), pdfVersion = ref(0), suggestedTex = ref(''), fixSummary = ref(''), pages = ref([]), pageCount = ref(0);
+        const sourceLines = computed(() => tex.value.split('\n'));
+        const errorLines = computed(() => new Set((compileResult.value?.errors || []).map(item => item.line).filter(Boolean)));
+        const pdfUrl = computed(() => `/api/jobs/${jobId.value}/pdf?v=${pdfVersion.value}`);
+        const selectFile = event => { files.value = Array.from(event.target.files || []); };
+        const readError = async response => {
+          try {
+            const data = await response.json();
+            const responseTex = data.tex || data.detail?.tex;
+            if (responseTex) { tex.value = responseTex; }
+            compileResult.value = null; suggestedTex.value = ''; fixSummary.value = '';
+            return typeof data.detail === 'string' ? data.detail : (data.detail?.message || `请求失败（${response.status}）`);
+          } catch { return `请求失败（${response.status}）`; }
+        };
+        const upload = async () => {
+          if (!files.value.length) return;
+          busy.value = true; error.value = ''; jobId.value = ''; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = '';
+          try {
+            const form = new FormData();
+            files.value.forEach(item => form.append('image', item));
+            const endpoint = files.value.length > 1 ? '/api/documents/batch' : '/api/documents';
+            const response = await fetch(endpoint, { method:'POST', body:form });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            jobId.value = data.job_id; tex.value = data.tex; sourceUrl.value = data.source_url; compileResult.value = data.compile; pages.value = data.pages || []; pageCount.value = data.page_count || 1; pdfVersion.value += 1;
+          } catch (err) { error.value = err.message; }
+          finally { busy.value = false; }
+        };
+        const recompile = async () => {
+          busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/compile`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tex:tex.value}) });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            compileResult.value = data.compile; tex.value = data.tex; pdfVersion.value += 1;
+          } catch (err) { error.value = err.message; }
+          finally { busy.value = false; }
+        };
+        const invalidateCompile = () => { compileResult.value = null; suggestedTex.value = ''; fixSummary.value = ''; };
+        const requestFix = async () => {
+          busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/suggest-fix`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tex:tex.value, log:compileResult.value.log}) });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            suggestedTex.value = data.fixed_tex; fixSummary.value = data.summary;
+          } catch (err) { error.value = err.message; }
+          finally { busy.value = false; }
+        };
+        const applyFix = async () => {
+          busy.value = true; error.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/apply-fix`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tex:suggestedTex.value, summary:fixSummary.value}) });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            tex.value = data.tex; compileResult.value = data.compile; suggestedTex.value = ''; fixSummary.value = ''; pdfVersion.value += 1;
+          } catch (err) { error.value = err.message; }
+          finally { busy.value = false; }
+        };
+        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, errorLines, pdfUrl, selectFile, upload, recompile, invalidateCompile, requestFix, applyFix };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

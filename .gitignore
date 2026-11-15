@@ -5,4 +5,12 @@ __pycache__/
 .pytest_cache/
 node_modules/
 models/
-data/pdf_pages/
+tools/
+artifacts/jobs/
+dist/
+docs/.qoder-office-docx-locks/
+data/pdf_pages/*
+!data/pdf_pages/page_2.png
+!data/pdf_pages/page_3.png
+!data/pdf_pages/page_4.png
+!data/pdf_pages/page_5.png

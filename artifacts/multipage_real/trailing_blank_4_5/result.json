@@ -1,0 +1,50 @@
+{
+  "case_id": "trailing_blank_4_5",
+  "description": "A handwritten page followed by a blank page; invented blank-page content is a failure.",
+  "page_ids": [
+    "page_4",
+    "page_5"
+  ],
+  "additional_api_calls": 0,
+  "cache_hits": 2,
+  "pages": [
+    {
+      "page_id": "page_4",
+      "source_image": "data\\pdf_pages\\page_4.png",
+      "model": "deepseek-flash",
+      "human_review": "required",
+      "status": "request_error",
+      "error": {
+        "type": "APIStatusError",
+        "message": "Error code: 402 - Insufficient Balance (request_id: 08628e1a-edae-45e2-8262-06c46a110705)"
+      },
+      "latency_ms": 526.117,
+      "cache_hit": true,
+      "normalized_empty_blank": false,
+      "marker": "3.6.8",
+      "expected_blank": false,
+      "blank_page_has_content": null
+    },
+    {
+      "page_id": "page_5",
+      "source_image": "data\\pdf_pages\\page_5.png",
+      "model": "deepseek-flash",
+      "human_review": "required",
+      "status": "request_error",
+      "error": {
+        "type": "APIStatusError",
+        "message": "Error code: 402 - Insufficient Balance (request_id: 7ef3a59d-a824-454f-b2dc-b9d3ee03820d)"
+      },
+      "latency_ms": 408.104,
+      "cache_hit": true,
+      "normalized_empty_blank": false,
+      "marker": null,
+      "expected_blank": true,
+      "blank_page_has_content": null
+    }
+  ],
+  "transcription_accuracy": null,
+  "human_review": "required",
+  "status": "page_recognition_failed",
+  "structural_pass": false
+}

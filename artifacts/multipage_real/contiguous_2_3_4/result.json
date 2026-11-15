@@ -1,0 +1,68 @@
+{
+  "case_id": "contiguous_2_3_4",
+  "description": "Three consecutive handwritten content pages.",
+  "page_ids": [
+    "page_2",
+    "page_3",
+    "page_4"
+  ],
+  "additional_api_calls": 0,
+  "cache_hits": 3,
+  "pages": [
+    {
+      "page_id": "page_2",
+      "source_image": "data\\pdf_pages\\page_2.png",
+      "model": "deepseek-flash",
+      "human_review": "required",
+      "status": "request_error",
+      "error": {
+        "type": "APIStatusError",
+        "message": "Error code: 402 - Insufficient Balance (request_id: 68b37326-76bf-47b8-97a5-925c0f086577)"
+      },
+      "latency_ms": 721.059,
+      "cache_hit": true,
+      "normalized_empty_blank": false,
+      "marker": "10月26号",
+      "expected_blank": false,
+      "blank_page_has_content": null
+    },
+    {
+      "page_id": "page_3",
+      "source_image": "data\\pdf_pages\\page_3.png",
+      "model": "deepseek-flash",
+      "human_review": "required",
+      "status": "request_error",
+      "error": {
+        "type": "APIStatusError",
+        "message": "Error code: 402 - Insufficient Balance (request_id: 45b43b5b-a596-4033-b14a-265a933922f7)"
+      },
+      "latency_ms": 501.614,
+      "cache_hit": true,
+      "normalized_empty_blank": false,
+      "marker": "3.6.6",
+      "expected_blank": false,
+      "blank_page_has_content": null
+    },
+    {
+      "page_id": "page_4",
+      "source_image": "data\\pdf_pages\\page_4.png",
+      "model": "deepseek-flash",
+      "human_review": "required",
+      "status": "request_error",
+      "error": {
+        "type": "APIStatusError",
+        "message": "Error code: 402 - Insufficient Balance (request_id: 08628e1a-edae-45e2-8262-06c46a110705)"
+      },
+      "latency_ms": 526.117,
+      "cache_hit": true,
+      "normalized_empty_blank": false,
+      "marker": "3.6.8",
+      "expected_blank": false,
+      "blank_page_has_content": null
+    }
+  ],
+  "transcription_accuracy": null,
+  "human_review": "required",
+  "status": "page_recognition_failed",
+  "structural_pass": false
+}

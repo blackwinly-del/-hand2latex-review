@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-11-15T05:49:21.889Z",
+  "images": [
+    "data/pdf_pages/page_2.png",
+    "data/pdf_pages/page_3.png"
+  ],
+  "console_errors": [],
+  "http_status": 200,
+  "job_id": "a5873937fd954c75a0f959fbcc4e45b1",
+  "page_count": 2,
+  "compile_success": true,
+  "compile_errors": [],
+  "thumbnail_count": 2,
+  "page_labels": [
+    "第 1 页",
+    "第 2 页"
+  ],
+  "badge": "共 2 页",
+  "has_newpage": true,
+  "newpage_line": 90,
+  "pdf_preview": true,
+  "pdf_download_status": 200,
+  "pdf_signature": "%PDF-",
+  "pdf_bytes": 30409,
+  "newpage_check": "Verified from the main.tex returned by the successful browser job; corrected a JavaScript escape error in the first harness run."
+}

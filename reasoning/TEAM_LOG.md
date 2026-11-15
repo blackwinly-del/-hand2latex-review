@@ -611,3 +611,80 @@
 - **未解决事项**：首次流程的 OCR 与串行 API 耗时问题尚未优化；并行请求和按需缓存未实施，本组结果不足以评价总体稳定性。
 - **学习进度**：OCR、真实 context 请求、本地 KaTeX 和离线回归耗时需分别报告；小样本 p95 可能只是最大值，复用已保存响应可避免不必要的重复真实请求。
 - **下一步（计划，未完成）**：仅计划优化评估调度并按需缓存，不写成已优化；本次日志记录未调用 API。
+
+## B/C 集成：识别接口、共享契约与联合验证
+
+**阶段状态：C 结果已提交为 `4800645`；B/C 接入、审核修复与联合验证已完成；集成改动尚未提交，第二引擎和真实速度优化未实施。**
+
+- **本次任务与负责人决定**：用户明确在当前任务完成后整合 B 和 C，先将 C 结果提交为 `4800645`，再接入同学 `Downloads` 中的 `recognizer.py`、`schemas.py`、`test_recognizer.py`、`README_B.md`，并新增 `samples/sample_plus.png`。
+- **实际接入／修改文件**：上述 B 侧文件及样本已接入；审核修复涉及识别 Mock、C 的 `refine`、B 的去重与日志键及相关测试，`README_B.md` 已补充集成边界。本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`，未修改其他文件。
+- **识别接口与共享契约**：
+  - `recognize(image_path, *, thorough=False)` 保持向后兼容；`Candidate` 五字段、`RefineResult` 六字段保持一致。
+  - B 不 `strip` 原始结果，C 仅 `trim` 首尾空白，二者兼容。
+  - 默认模型目录为 `models/PP-FormulaNet-L`，新增 `RECOGNIZER_MODEL_DIR` 配置；模型缓存键包含 `engine`、`model_name`、`model_dir`、`device`。
+- **首轮审核及必须项处理**：
+  - 发现 Mock 被当作真实成功，已改为 Mock 使用 `make_error`，经 `refine` 返回 `low + need_review=True`；成功链路改用显式 fake，不再冒充真实识别。
+  - 发现 B 仅按 `latex` 去重会丢失跨引擎证据，已改为按 `(engine, strip(latex))` 去重并同步日志键；新增跨引擎同式 `high`、同引擎多视角 `medium`、`trim` 和 Mock 失败测试。
+  - 最终复核无必须修复问题。
+- **测试环境与实际结果**：B 自测初遇 GBK 对勾编码问题，状态输出改为 ASCII 后全部 `PASS`。完整 `unittest` 初版 111 项通过；后续一次测试环境清空 `HOME` 导致 1 个 `ERROR`，修正环境后消除。非 `--real` 自测强制使用 Mock，集成测试使用绝对路径并 patch 配置和 `device`。最终完整 `unittest` 115 项全部通过（14.291s）；审核员 B/C 集成测试 7/7 通过，完整 115 项全部通过（12.747s）。本次日志追加未重新运行测试。
+- **真实本地模型联合验证**：真实本地模型完成 B→C 的 `sample4` 识别，结果正确，wall 为 39.262s，`confidence=medium`、`need_review=false`；该单样本结果不外推为总体准确率或速度结论。
+- **文档补充**：`README_B.md` 已明确 Mock 只能用于失败回退验证；B 支持 PDF/BMP/TIFF，但这些输入需转换后才可供 C 进行上下文选择。
+- **实际使用的外部资源**：同学 `Downloads` 中上述文件及本地 `models/PP-FormulaNet-L` 模型；本次日志追加未调用 API 或真实模型。
+- **学习进度**：已明确 Mock 失败回退与显式 fake 成功链路必须区分；跨引擎一致证据不能在 B 侧按纯 `latex` 提前去重；真实单样本成功不等于已完成性能优化。
+- **未解决／未实施事项**：集成改动未提交；未实现第二引擎；真实识别速度优化未做。
+- **下一步（计划，未完成）**：仅计划由负责人确认后提交集成改动或继续联调，不写成已提交。
+
+## 大赛工作台：整页识别、中文编译、浏览器修复闭环与验收
+
+**阶段状态：整页 `.tex`、中文 PDF、浏览器编辑与修复闭环及完整回归已完成；识别准确率、跨页合并和更多整页真值验证仍未完成。**
+
+- **本次任务**：实现大赛要求的本地 Web 竖切：整页手写图片 → 可编辑 LaTeX → Tectonic 中文 PDF → 编译标行 → AI 建议 → 用户确认修复 → 预览与下载。
+- **实际创建／修改文件**：新增 `workbench/`、`tests/test_workbench.py`、`tests/test_workbench_app.py`、`samples/sample_plus.png` 和 `artifacts/full_page_browser_acceptance.json`；修改 `.gitignore`、`package.json`、`package-lock.json` 及本次日志。
+- **编译环境**：官方 Tectonic `0.17.0` 安装至 `tools/tectonic`，ctex 中文最小文档和真实整页文档均编译成功。GitHub 直连曾重置，检查官方 PowerShell 安装脚本后安装成功。整页首次 30 秒超时后，新增独立 `FULLPAGE_TIMEOUT_SECONDS`（默认 120 秒）。
+- **真实浏览器验证**：实际上传 `data/pdf_pages/page_2.png`，生成可编辑 `.tex`、预览并下载 PDF；注入 `\badmacro` 后定位到源码第 74 行，AI 建议仅删除该命令，用户确认后重新编译并恢复 PDF。
+- **原文与安全**：上传保存 `original.tex`，编辑写入 `history`，修复先写 `fix_applied.json` 再编译；修复前 `baseline_sha256` 与 `fix.before` 一致。每轮编译清理旧 PDF，过期建议被拒绝，编辑使旧错误失效，异常响应携带当前源码供页面同步。
+- **资源边界**：上传图片限制 20 MB，tex／编译日志限制 200k 字符，模型请求 `max_tokens=16000`，JSON 根节点必须为对象；运行时 jobs 和 Tectonic 工具目录已加入 `.gitignore`。
+- **实际测试**：工作台编译与端点测试、完整联合回归 `128` 项全部通过（`6.474s`）；最终代码审核无必须修复项。
+- **验收证据**：`artifacts/full_page_browser_acceptance.json` 保存真实 job、错误行号、AI 摘要、历史数量、修复基线及 PDF 签名。流程成功不等于识别准确率或模型稳定性，生成标题、段落和公式仍需人工核对。
+- **未解决／未实施事项**：跨页合并、3–5 张整页真值集、真实示意图重建、生产部署和 MLP 生产化均未实施；本批改动尚未提交。
+- **下一步（计划，未完成）**：由负责人确认后提交本批实现，补充整页真值与更多典型手写页面进行验收。
+
+## 大赛工作台：跨页合并真实浏览器验收与完整回归
+
+**阶段状态：双页跨页合并的真实浏览器验收、证据修正与完整回归已完成；整页模型稳定性及后续事项仍未完成。**
+
+- **本次任务**：记录整页提示调整后的双页上传验收、分页证据复核及联合回归；本次仅追加 `D:\latex\reasoning\TEAM_LOG.md`，不再调用真实 API，不提交 Git。
+- **实际修改／生成文件**：整页提示修改涉及 `D:\latex\workbench\full_page.py`；验收汇总修正涉及 `D:\latex\artifacts\batch_browser_acceptance.json`；真实验收生成或更新 `D:\latex\artifacts\batch_browser_success.png`、`D:\latex\artifacts\jobs\a5873937fd954c75a0f959fbcc4e45b1\main.tex` 和同目录 `main.pdf`。
+- **提示调整与重试**：`workbench/full_page.py` 的整页系统提示开头已改为 `Return the JSON object directly and keep analysis brief.`。此前真实双页浏览器上传曾因空响应／截断返回 502；本轮使用该提示重试一次成功，但单次成功不能证明模型输出已稳定。
+- **2026-11-15 真实浏览器验收**：使用本地 Playwright 在 `http://127.0.0.1:8000` 依次上传 `data/pdf_pages/page_2.png` 与 `page_3.png`，只发起一次 `POST /api/documents/batch`，HTTP 200，`job_id=a5873937fd954c75a0f959fbcc4e45b1`。接口返回 `page_count=2`、`compile_success=true`；页面显示两个缩略图、标签“第 1 页／第 2 页”和“共 2 页”。iframe PDF 预览请求成功；下载 GET 返回 200，文件签名为 `%PDF-`，大小 30409 字节；无浏览器 console error。
+- **分页证据复核**：上述成功 job 的实际 `main.tex` 第 90 行为 `\newpage`。首次 Playwright 汇总误报 `has_newpage=false`，原因是验收 Node 脚本反斜杠转义错误，不是产品分页缺失；改为核对实际 `main.tex` 后，`artifacts/batch_browser_acceptance.json` 已修正为 `has_newpage=true`、`newpage_line=90`。
+- **证据与截图边界**：证据为 `D:\latex\artifacts\batch_browser_acceptance.json`、`D:\latex\artifacts\batch_browser_success.png` 及上述 job 的 `main.tex`／`main.pdf`。无头 Chromium 截图中的 PDF iframe 视觉区域可能空白，因此仅声称 iframe 请求与 PDF 下载验证成功，不声称截图已展示 PDF 内容。
+- **实际使用资源**：上述验收使用本地 Playwright／无头 Chromium 和本地工作台服务；本次日志追加未调用真实 API，无其他新增外部资源。
+- **审核意见及处理**：本阶段未提供新增代码审核意见；验收脚本误报已通过实际 job 源码复核并修正汇总，不作为产品分页缺陷记录。
+- **实际测试**：
+  - `./.venv/Scripts/python.exe -m unittest discover -s tests`：130 tests，11.595s，`OK`。日志中的 `fix compilation failed`／`RuntimeError: boom` 是故障注入测试的预期输出，不是失败。
+  - `./.venv/Scripts/python.exe test_recognizer.py`：非 `--real` 的 B 自测全部 `PASS`，真实模型项 `SKIP`；Windows 控制台中文仍有乱码，不影响退出和测试判定。
+  - 本次日志追加未重新运行上述测试。
+- **Git 状态**：本轮没有提交 Git；本次未检查 Git 当前状态，不新增集成与工作台改动提交状态断言。
+- **未解决／未实施事项**：更多真实多页样本、跨页语义一致性、整页模型稳定性统计、真实示意图重建、生产部署和性能优化均未完成。
+- **学习进度**：验收脚本自身的转义错误可能造成误报，须以实际产物复核；iframe 请求和 PDF 下载成功不等于截图已完成 PDF 视觉验证，故障注入的预期日志也不等于回归失败。
+- **下一步（计划，未完成）**：由负责人确认后扩展真实多页样本，检查跨页语义并统计整页模型稳定性；其余未实施事项不写成已完成。
+
+## 多页样本评估扩充、402 阻塞与空白页修复
+
+**阶段状态：评估工具、首次真实请求失败证据、离线复跑、空白页修复、审核及本地测试已完成；新的真实多页识别成功结果和三组真实合并／PDF 验收均未完成。**
+
+- **本次任务**：用户要求“扩充真实多页样本测试”。本轮建立多页评估样本与可恢复评估工具，并处理审核发现的空白页成功路径缺失；不把工具或离线验证完成写成真实扩充识别完成。
+- **样本与评估口径**：新增 `D:\latex\data\multipage_samples.json`，选择连续 `page_2/page_3/page_4`、逆序 `page_4/page_2`、`page_4/空白 page_5` 三组；`page_1` 为无笔记封面，本轮排除。指标仅为识别完成、人工可见章节标记落在预期分页、`\newpage` 数、Tectonic 编译、PDF 页数／尾页空白；没有整页逐字真值，不计算转录准确率。
+- **实际新增／修改文件**：新增 `D:\latex\workbench\multipage_eval.py`、`D:\latex\tests\test_multipage_eval.py` 及上述 manifest；修改 `D:\latex\workbench\full_page.py`；生成或更新 `D:\latex\artifacts\multipage_real\report_initial_real.json` 和 `D:\latex\artifacts\multipage_real\report.json`。本次记录仅追加 `D:\latex\reasoning\TEAM_LOG.md`。
+- **已完成的评估工具**：按逐页源文件 SHA256 缓存，采用原子 JSON 写入，支持 `pending/request_error/invalid_document/success`、跨用例复用、`--offline` 和 `--retry-failed`；缓存 raw 响应／错误，并记录合并 `document/main.tex`、编译及 PDF 结构结果。
+- **首次真实运行结果**：四个唯一页面各请求一次，共 4 次，模型为 `deepseek-flash`；全部在约 0.4–0.7 秒快速返回 `APIStatusError 402 Insufficient Balance`。三组均为 `page_recognition_failed`，未进入合并／编译，没有产生新 PDF，不能据此断言产品分页失败。原始证据保存在 `D:\latex\artifacts\multipage_real\report_initial_real.json`。
+- **同缓存离线复跑**：随后使用 `--offline`，新增 API 调用为 0，`cache_hits=7`、`successful_cache_hits=0`、`failed_cache_hits=7`。当前 `D:\latex\artifacts\multipage_real\report.json` 是 `execution_mode=offline` 的离线报告；错误缓存命中不等于真实识别成功。
+- **审核意见及空白页修复**：首轮只读审核发现 1 个必须项：`expected_blank` 的忠实空 `blocks` 会触发 `invalid_document`，填入非空内容又构成编造，空白用例没有可成功路径。现已在 `workbench/full_page.py` 支持显式 `{"type":"blank_page"}` 转为 `\null`，并调整提示为仅真正空白页返回单个 `blank_page`；评估器对人工真值 `expected_blank` 且原始 `blocks=[]` 保留 `raw_document`，同时将规范化 `document` 设为 `blank_page`。带正文、公式或图描述的空白页仍失败。报告新增 `execution_mode`、`retry_failed`、successful／failed cache hits。
+- **PDF 尾页判定与复核**：尾页必须无正文、图片和绘图，只允许自动数字页码。修复过程中真实 Tectonic 测试初次失败，原因是第二页自动带页码“2”；随后明确页码不是正文并调整判定，这不是掩盖识别错误。复核员确认原必须项已解决，无剩余必须修复项。
+- **实际测试**：新增评估器 3 项通过；workbench 9 项通过，其中包括真实 Tectonic 编译内容页加 `blank_page` 后得到 2 页 PDF，尾页只有自动页码“2”且无图片／绘图。最终 `./.venv/Scripts/python.exe -m unittest discover -s tests` 为 `134 tests`、`8.967s`、`OK`；故障注入 `RuntimeError: boom` 日志不是测试失败。没有重新运行 B 的 `--real`，没有新的真实模型识别成功结果。本次日志追加未重新运行测试。
+- **实际使用的外部资源**：上述阶段首次真实运行使用了 `deepseek-flash` 服务，空白页验证使用了本地真实 Tectonic；离线复跑和本次日志追加未调用真实 API，无其他新增外部资源。
+- **Git 状态**：本轮未提交 Git。
+- **未解决／未完成事项**：第 2 至 5 页的新真实识别、三组真实合并／PDF 验收、真实空白页模型响应、整页转录真值与准确率、跨页语义一致性均未完成。
+- **学习进度**：已明确真实请求失败、失败缓存离线命中、工具测试通过和真实识别成功是不同证据；自动页码与正文需区分，空白页忠实空结果也必须有合法成功路径。
+- **下一步（计划，未完成）**：余额恢复后计划执行 `./.venv/Scripts/python.exe -m workbench.multipage_eval --manifest data/multipage_samples.json --output artifacts/multipage_real --retry-failed`；尚未通过该命令取得成功的真实复跑，不写成已完成。

@@ -1,0 +1,13 @@
+{
+  "page_id": "page_4",
+  "source_image": "data\\pdf_pages\\page_4.png",
+  "source_sha256": "9ae1c300329db119a085f22de46c02a8084571ed7cd391f24082ae5db980a121",
+  "model": "deepseek-flash",
+  "human_review": "required",
+  "status": "request_error",
+  "error": {
+    "type": "APIStatusError",
+    "message": "Error code: 402 - Insufficient Balance (request_id: 08628e1a-edae-45e2-8262-06c46a110705)"
+  },
+  "latency_ms": 526.117
+}
