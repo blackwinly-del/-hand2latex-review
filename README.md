@@ -27,6 +27,7 @@
 | 错误率 / 误改写率 / 复核率评估口径 | `reasoning/evaluate.py` | `tests/test_evaluate.py` |
 | 单页整页识别（中文 + 公式 + 图片占位） | `workbench/full_page.py` | `artifacts/full_page_browser_acceptance.json` |
 | 多页上传、按上传顺序合并、页间插入 `\newpage` | `workbench/app.py` `/api/documents/batch` | `artifacts/batch_browser_acceptance.json` |
+| 4 张真实手写页的多页结构评估（顺序、分页、编译、页数、忠实空白页） | `workbench/multipage_eval.py` | `artifacts/multipage_real/report.json` |
 | 编译失败片段定位 + AI 建议 + 人工确认局部修正 | `/api/jobs/{id}/suggest-fix`、`/apply-fix` | `tests/test_workbench_app.py` |
 | Tectonic + ctex 真实中文 PDF 编译与预览、下载 | `workbench/compiler.py` | `tests/test_workbench.py` |
 | 显式空白页（`blank_page` → `\null`）忠实排版 | `workbench/full_page.py` | `tests/test_workbench.py` |
@@ -34,8 +35,10 @@
 ### 尚未实现或尚未证明（审阅时请重点看这里）
 
 - **整页转录准确率没有真值集**，因此所有"识别效果"都只是人工观察，不是指标。
-- **扩充后的真实多页评估没跑通**：4 次真实请求全部返回 HTTP 402 `Insufficient Balance`，
-  细节见 `artifacts/multipage_real/report_initial_real.json`。充值后用下面的命令重试即可。
+  2026-11-17 的 4 张真实页多页评估已跑通（三组结构全过，见第九节），但它只证明结构链路，
+  **不证明转录逐字正确**；首次因 402 失败的记录保留在 `artifacts/multipage_real/report_initial_real.json`。
+- **模型稳定性只有单次证据**：`page_3` 首次因推理 token 耗尽输出预算返回空内容，放宽后重试才成功，
+  没有多次重复运行的稳定性统计。
 - 跨页**语义**一致性（跨页公式续写、符号统一）未实现；当前只保证合并顺序和分页。
 - 手绘图形只输出文字描述占位，不重绘。
 - 第二个识别引擎（UniMERNet）只在 `recognizer.py` 里留了槽位，未接入，因此没有跨引擎投票。
@@ -268,8 +271,24 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
 ```
 
 每页响应按图片 SHA256 落盘，中断可续跑。当前仓库里的
-`artifacts/multipage_real/report.json` 是**离线回放**结果，
-`report_initial_real.json` 是首次真实请求因 402 全部失败的记录，两者都不代表多页评估已通过。
+`artifacts/multipage_real/report.json` 是 **2026-11-17 的真实请求结果**：
+`execution_mode=real_api_and_cache`，三组用例结构全部通过，PDF 页数分别为 4 / 3 / 2，
+末页空白用例 `trailing_blank_pdf_is_blank=true`。`report_initial_real.json` 保留首次真实请求
+因 402 全部失败的历史记录，不要把它当成当前状态。
+
+**推理模型的输出预算要单独留意**：`deepseek-flash` 的 `max_tokens` 会把推理 token 算进去，
+`page_3` 在默认 24000 下返回空内容、`finish_reason=length`，提高到 40000 后同页成功
+（79.4 秒，16 个块）。遇到同样的空响应可以这样重试，只重发失败的页：
+
+```bash
+FULLPAGE_MAX_TOKENS=40000 FULLPAGE_TIMEOUT_SECONDS=300 \
+./.venv/Scripts/python.exe -m workbench.multipage_eval \
+  --manifest data/multipage_samples.json \
+  --output artifacts/multipage_real --retry-failed
+```
+
+结构通过仍然**不等于转录正确**，本次 `transcription_accuracy` 依旧是
+`not_evaluated_without_full_page_truth`，识别出的中文与公式需要人工对原图核对。
 
 ## 十、打包时故意没有包含的东西
 

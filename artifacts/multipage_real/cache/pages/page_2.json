@@ -4,10 +4,92 @@
   "source_sha256": "adb45f8cdbbdfc9b9f4221256796d61ceb035e59be66d88d1b1f7d809b2aadfb",
   "model": "deepseek-flash",
   "human_review": "required",
-  "status": "request_error",
-  "error": {
-    "type": "APIStatusError",
-    "message": "Error code: 402 - Insufficient Balance (request_id: 68b37326-76bf-47b8-97a5-925c0f086577)"
+  "status": "success",
+  "document": {
+    "title": "10月26号数学笔记",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "text": "10月26号"
+      },
+      {
+        "type": "display_formula",
+        "latex": "x^3-x^2+x^2+x-x+3x-3+4"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\text{3.6.1. (1)}\\quad y=x^2+x+3+\\frac{4}{x-1}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "y'=2x+1+\\frac{-4}{(x-1)^2}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\therefore y=-1-3x+5x^2-4x^3+"
+      },
+      {
+        "type": "display_formula",
+        "latex": "-+\\frac{4(-1)^n}{(x+1)^{n+1}}x^n"
+      },
+      {
+        "type": "display_formula",
+        "latex": "y''=2+\\frac{8}{(x-1)^3}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "y'''=\\frac{-24}{(x-1)^4}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "y^{(n)}=\\frac{4(-1)^n\\cdot n!}{(x-1)^{n+1}}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "(2)\\quad y'=2\\sin x\\cos x=\\sin 2x"
+      },
+      {
+        "type": "display_formula",
+        "latex": "y''=2\\cdot\\sin\\left(2x+\\frac{\\pi}{2}\\right)"
+      },
+      {
+        "type": "display_formula",
+        "latex": "y'''=2^2\\sin(2x+\\pi)"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\therefore y=0+0+x+\\cdots-\\frac{2^n\\sin(2x+n\\frac{\\pi}{2})}{n!}\\cdot x^n"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\text{3.6.2 解：}\\quad y=1+\\sin x+\\frac{\\sin^2 x}{2!}+\\frac{\\sin^3 x}{3!}+\\cdots"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\sin x=x-\\frac{1}{3!}x^3"
+      },
+      {
+        "type": "display_formula",
+        "latex": "y=1+x-\\frac{1}{6}x^3+\\frac{1}{2}\\cdot\\left(x-\\frac{1}{6}x^3\\right)^2+"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\frac{1}{6}\\cdot\\left(x-\\frac{1}{6}x^3\\right)^3"
+      },
+      {
+        "type": "display_formula",
+        "latex": "=1+x+\\frac{1}{2}x^2+o(x^3)"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\text{3.6.3.}\\quad \\ln(x+1)=x-\\frac{1}{2}x^2+\\frac{1}{3}x^3-\\frac{1}{4}x^4+\\frac{1}{5}x^5-\\frac{1}{6}x^6"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\cos x=1-\\frac{1}{2}x^2+\\frac{1}{24}x^4-\\frac{1}{720}x^6"
+      }
+    ]
   },
-  "latency_ms": 721.059
+  "latency_ms": 52389.941,
+  "tex": "\\documentclass[UTF8,fontset=windows]{ctexart}\n\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage[margin=2.2cm]{geometry}\n\\title{10月26号数学笔记}\n\\begin{document}\n\\maketitle\n10月26号\n\n\\[\nx^3-x^2+x^2+x-x+3x-3+4\n\\]\n\n\\[\n\\text{3.6.1. (1)}\\quad y=x^2+x+3+\\frac{4}{x-1}\n\\]\n\n\\[\ny'=2x+1+\\frac{-4}{(x-1)^2}\n\\]\n\n\\[\n\\therefore y=-1-3x+5x^2-4x^3+\n\\]\n\n\\[\n-+\\frac{4(-1)^n}{(x+1)^{n+1}}x^n\n\\]\n\n\\[\ny''=2+\\frac{8}{(x-1)^3}\n\\]\n\n\\[\ny'''=\\frac{-24}{(x-1)^4}\n\\]\n\n\\[\ny^{(n)}=\\frac{4(-1)^n\\cdot n!}{(x-1)^{n+1}}\n\\]\n\n\\[\n(2)\\quad y'=2\\sin x\\cos x=\\sin 2x\n\\]\n\n\\[\ny''=2\\cdot\\sin\\left(2x+\\frac{\\pi}{2}\\right)\n\\]\n\n\\[\ny'''=2^2\\sin(2x+\\pi)\n\\]\n\n\\[\n\\therefore y=0+0+x+\\cdots-\\frac{2^n\\sin(2x+n\\frac{\\pi}{2})}{n!}\\cdot x^n\n\\]\n\n\\[\n\\text{3.6.2 解：}\\quad y=1+\\sin x+\\frac{\\sin^2 x}{2!}+\\frac{\\sin^3 x}{3!}+\\cdots\n\\]\n\n\\[\n\\sin x=x-\\frac{1}{3!}x^3\n\\]\n\n\\[\ny=1+x-\\frac{1}{6}x^3+\\frac{1}{2}\\cdot\\left(x-\\frac{1}{6}x^3\\right)^2+\n\\]\n\n\\[\n\\frac{1}{6}\\cdot\\left(x-\\frac{1}{6}x^3\\right)^3\n\\]\n\n\\[\n=1+x+\\frac{1}{2}x^2+o(x^3)\n\\]\n\n\\[\n\\text{3.6.3.}\\quad \\ln(x+1)=x-\\frac{1}{2}x^2+\\frac{1}{3}x^3-\\frac{1}{4}x^4+\\frac{1}{5}x^5-\\frac{1}{6}x^6\n\\]\n\n\\[\n\\cos x=1-\\frac{1}{2}x^2+\\frac{1}{24}x^4-\\frac{1}{720}x^6\n\\]\n\n\\end{document}\n"
 }

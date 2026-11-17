@@ -4,10 +4,48 @@
   "source_sha256": "9ae1c300329db119a085f22de46c02a8084571ed7cd391f24082ae5db980a121",
   "model": "deepseek-flash",
   "human_review": "required",
-  "status": "request_error",
-  "error": {
-    "type": "APIStatusError",
-    "message": "Error code: 402 - Insufficient Balance (request_id: 08628e1a-edae-45e2-8262-06c46a110705)"
+  "status": "success",
+  "document": {
+    "title": "3.6.8 选取 x_0∈[0,2]",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "text": "3.6.8 选取 \\(x_0 \\in [0,2]\\)"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\because\\quad f(x_1)=f(x_0)+f'(x_0)(x_1-x_0)+\\frac{f''(\\xi_1)}{2!}(x_1-x_0)^2"
+      },
+      {
+        "type": "display_formula",
+        "latex": "f(x_2)=f(x_0)+f'(x_0)(x_2-x_0)+\\frac{f''(\\xi_2)}{2!}(x_2-x_0)^2"
+      },
+      {
+        "type": "paragraph",
+        "text": "令 \\(x_1=0,\\ x_2=2\\)"
+      },
+      {
+        "type": "display_formula",
+        "latex": "f(0)=f(x_0)+f'(x_0)(-x_0)+\\frac{f''(\\xi_1)}{2!}(-x_0)^2"
+      },
+      {
+        "type": "display_formula",
+        "latex": "f(2)=f(x_0)+f'(x_0)(2-x_0)+\\frac{f''(\\xi_2)}{2!}(2-x_0)^2"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\Rightarrow\\quad 2|f(x_0)|\\le |f(0)|+|f(2)|+\\cdots"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\le 4"
+      },
+      {
+        "type": "display_formula",
+        "latex": "\\Rightarrow\\quad |f(x_0)|\\le 2"
+      }
+    ]
   },
-  "latency_ms": 526.117
+  "latency_ms": 28766.162,
+  "tex": "\\documentclass[UTF8,fontset=windows]{ctexart}\n\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage[margin=2.2cm]{geometry}\n\\title{3.6.8 选取 x\\_0∈[0,2]}\n\\begin{document}\n\\maketitle\n3.6.8 选取 \\textbackslash{}(x\\_0 \\textbackslash{}in [0,2]\\textbackslash{})\n\n\\[\n\\because\\quad f(x_1)=f(x_0)+f'(x_0)(x_1-x_0)+\\frac{f''(\\xi_1)}{2!}(x_1-x_0)^2\n\\]\n\n\\[\nf(x_2)=f(x_0)+f'(x_0)(x_2-x_0)+\\frac{f''(\\xi_2)}{2!}(x_2-x_0)^2\n\\]\n\n令 \\textbackslash{}(x\\_1=0,\\textbackslash{} x\\_2=2\\textbackslash{})\n\n\\[\nf(0)=f(x_0)+f'(x_0)(-x_0)+\\frac{f''(\\xi_1)}{2!}(-x_0)^2\n\\]\n\n\\[\nf(2)=f(x_0)+f'(x_0)(2-x_0)+\\frac{f''(\\xi_2)}{2!}(2-x_0)^2\n\\]\n\n\\[\n\\Rightarrow\\quad 2|f(x_0)|\\le |f(0)|+|f(2)|+\\cdots\n\\]\n\n\\[\n\\le 4\n\\]\n\n\\[\n\\Rightarrow\\quad |f(x_0)|\\le 2\n\\]\n\n\\end{document}\n"
 }

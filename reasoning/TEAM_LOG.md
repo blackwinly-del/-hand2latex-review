@@ -688,3 +688,20 @@
 - **未解决／未完成事项**：第 2 至 5 页的新真实识别、三组真实合并／PDF 验收、真实空白页模型响应、整页转录真值与准确率、跨页语义一致性均未完成。
 - **学习进度**：已明确真实请求失败、失败缓存离线命中、工具测试通过和真实识别成功是不同证据；自动页码与正文需区分，空白页忠实空结果也必须有合法成功路径。
 - **下一步（计划，未完成）**：余额恢复后计划执行 `./.venv/Scripts/python.exe -m workbench.multipage_eval --manifest data/multipage_samples.json --output artifacts/multipage_real --retry-failed`；尚未通过该命令取得成功的真实复跑，不写成已完成。
+
+## 余额恢复后的真实多页识别：三组结构用例全部通过
+
+**阶段状态：4 张真实手写页的多页识别与三组真实合并／PDF 结构验收已完成；整页转录准确率、跨页语义一致性与模型稳定性统计仍未完成。**
+
+- **本次任务**：用户充值后要求恢复被 402 阻塞的真实多页评估（`--retry-failed`），并回归记录结论。本轮除真实请求外，只修改 `D:\latex\README.md` 并追加本日志，未修改 C 模块公共契约与其他人的模块。
+- **API 冒烟**：先用一次极小的真实请求确认计费恢复，`api.deepseek.com/v1` 的 `deepseek-flash` 正常返回（43 tokens，约 1.07 秒），不再出现 402。该请求 `max_tokens=8` 全部消耗为 `reasoning_tokens`、`content` 为空，是冒烟参数过小，不是产品请求问题。
+- **第一轮真实运行**：`--retry-failed` 对 4 张唯一页面各请求 1 次，共 4 次调用。`page_2` 成功（52389.941ms，20 块）、`page_4` 成功（28766.162ms，9 块）、`page_5` 成功（787.772ms，仅 1 个 `blank_page`，没有编造内容）；`page_3` 失败，102441.914ms 后 `ValueError: full-page response content is empty (finish_reason=length)`。该轮 `cases_structurally_passed=2/3`，`contiguous_2_3_4` 为 `page_recognition_failed`，失败点在单页请求而非合并逻辑。
+- **第二轮重试**：临时设置 `FULLPAGE_MAX_TOKENS=40000`、`FULLPAGE_TIMEOUT_SECONDS=300`（仅环境变量，未改代码）再次 `--retry-failed`，只重发失败的 `page_3`（1 次新调用），其余页面复用缓存；该轮 `cache_hits=6`、`successful_cache_hits=6`、`failed_cache_hits=0`。`page_3` 成功，79399.054ms，16 个块。最终 `report.json` 为 `execution_mode=real_api_and_cache`、`retry_failed=true`、`cases_structurally_passed=3/3`，时间 2026-11-17T09:40:57Z–09:42:25Z（UTC）。
+- **三组真实 PDF 证据**：`contiguous_2_3_4` 分页符 2/2，三处人工章节标记均落在预期页段，编译成功，PDF 4 页、33920 字节；`reverse_4_2` 分页符 1/1，两处标记顺序与上传顺序一致，PDF 3 页、29346 字节；`trailing_blank_4_5` 分页符 1/1，`trailing_blank_pdf_is_blank=true`，PDF 2 页、21143 字节。三份 PDF 均真实存在于 `artifacts/multipage_real/<case>/main.pdf`。`contiguous_2_3_4` 与 `reverse_4_2` 的 PDF 页数多于源页数，属于识别内容溢出到下一页，报告按既定口径记录为允许而非失败。
+- **实际测试**：`./.venv/Scripts/python.exe -m unittest discover -s tests` 为 `Ran 134 tests in 21.408s`、`OK`；日志中的 `fix compilation failed` 与 `RuntimeError: boom` 是故障注入用例的预期输出。本轮未运行 B 的 `--real`，未新增单页真值评估。
+- **实际使用的外部资源**：两轮共 5 次真实 `deepseek-flash` 请求（4 次首轮＋1 次重试），另有 1 次冒烟请求；PDF 均由本地 Tectonic 编译。控制台中文乱码仅为终端编码问题，缓存 JSON 为 UTF-8。
+- **证据边界**：本轮只证明结构链路（识别完成、上传顺序、分页、编译、页数、忠实空白页），`transcription_accuracy` 仍为 `not_evaluated_without_full_page_truth`；`page_3` 是先失败再重试成功，不能据此声称模型输出稳定，也没有多次重复运行统计。
+- **Git 状态**：本批真实评估产物与 README、日志更新在追加时尚未提交；上一轮一键启动相关提交 `b269cf5` 已推送到 `hand2latex-review` 并经 `git ls-remote` 核对。
+- **未解决／未完成事项**：整页转录真值集与准确率、跨页语义一致性、多轮模型稳定性统计、真实示意图重建、部署与性能优化仍未完成。
+- **学习进度**：`deepseek-flash` 的 `max_tokens` 包含推理 token，预算不足会出现"耗时很长但 `content` 为空、`finish_reason=length`"的假性失败；处理方式是提高 `FULLPAGE_MAX_TOKENS` 后只重试失败页，而不是重写合并逻辑。评估报告里的"新发请求数／缓存命中数"需按用例区分，不能混读成单页调用次数。
+- **下一步（计划，未完成）**：由负责人决定是否提交并推送本批真实评估证据；随后补整页真值集与转录准确率口径，再评估跨页语义一致性。

@@ -4,10 +4,15 @@
   "source_sha256": "4d54b1ade22b4dd53374a5edd9767fb51e0674db64958486014d6215c43b5f05",
   "model": "deepseek-flash",
   "human_review": "required",
-  "status": "request_error",
-  "error": {
-    "type": "APIStatusError",
-    "message": "Error code: 402 - Insufficient Balance (request_id: 7ef3a59d-a824-454f-b2dc-b9d3ee03820d)"
+  "status": "success",
+  "document": {
+    "title": "Blank lined page",
+    "blocks": [
+      {
+        "type": "blank_page"
+      }
+    ]
   },
-  "latency_ms": 408.104
+  "latency_ms": 787.772,
+  "tex": "\\documentclass[UTF8,fontset=windows]{ctexart}\n\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage[margin=2.2cm]{geometry}\n\\title{Blank lined page}\n\\begin{document}\n\\maketitle\n\\null\n\n\\end{document}\n"
 }

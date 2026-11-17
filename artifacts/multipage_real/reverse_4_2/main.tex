@@ -1,0 +1,120 @@
+\documentclass[UTF8,fontset=windows]{ctexart}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage[margin=2.2cm]{geometry}
+\title{3.6.8 选取 x\_0∈[0,2]}
+\begin{document}
+\maketitle
+3.6.8 选取 \textbackslash{}(x\_0 \textbackslash{}in [0,2]\textbackslash{})
+
+\[
+\because\quad f(x_1)=f(x_0)+f'(x_0)(x_1-x_0)+\frac{f''(\xi_1)}{2!}(x_1-x_0)^2
+\]
+
+\[
+f(x_2)=f(x_0)+f'(x_0)(x_2-x_0)+\frac{f''(\xi_2)}{2!}(x_2-x_0)^2
+\]
+
+令 \textbackslash{}(x\_1=0,\textbackslash{} x\_2=2\textbackslash{})
+
+\[
+f(0)=f(x_0)+f'(x_0)(-x_0)+\frac{f''(\xi_1)}{2!}(-x_0)^2
+\]
+
+\[
+f(2)=f(x_0)+f'(x_0)(2-x_0)+\frac{f''(\xi_2)}{2!}(2-x_0)^2
+\]
+
+\[
+\Rightarrow\quad 2|f(x_0)|\le |f(0)|+|f(2)|+\cdots
+\]
+
+\[
+\le 4
+\]
+
+\[
+\Rightarrow\quad |f(x_0)|\le 2
+\]
+
+\newpage
+
+10月26号
+
+\[
+x^3-x^2+x^2+x-x+3x-3+4
+\]
+
+\[
+\text{3.6.1. (1)}\quad y=x^2+x+3+\frac{4}{x-1}
+\]
+
+\[
+y'=2x+1+\frac{-4}{(x-1)^2}
+\]
+
+\[
+\therefore y=-1-3x+5x^2-4x^3+
+\]
+
+\[
+-+\frac{4(-1)^n}{(x+1)^{n+1}}x^n
+\]
+
+\[
+y''=2+\frac{8}{(x-1)^3}
+\]
+
+\[
+y'''=\frac{-24}{(x-1)^4}
+\]
+
+\[
+y^{(n)}=\frac{4(-1)^n\cdot n!}{(x-1)^{n+1}}
+\]
+
+\[
+(2)\quad y'=2\sin x\cos x=\sin 2x
+\]
+
+\[
+y''=2\cdot\sin\left(2x+\frac{\pi}{2}\right)
+\]
+
+\[
+y'''=2^2\sin(2x+\pi)
+\]
+
+\[
+\therefore y=0+0+x+\cdots-\frac{2^n\sin(2x+n\frac{\pi}{2})}{n!}\cdot x^n
+\]
+
+\[
+\text{3.6.2 解：}\quad y=1+\sin x+\frac{\sin^2 x}{2!}+\frac{\sin^3 x}{3!}+\cdots
+\]
+
+\[
+\sin x=x-\frac{1}{3!}x^3
+\]
+
+\[
+y=1+x-\frac{1}{6}x^3+\frac{1}{2}\cdot\left(x-\frac{1}{6}x^3\right)^2+
+\]
+
+\[
+\frac{1}{6}\cdot\left(x-\frac{1}{6}x^3\right)^3
+\]
+
+\[
+=1+x+\frac{1}{2}x^2+o(x^3)
+\]
+
+\[
+\text{3.6.3.}\quad \ln(x+1)=x-\frac{1}{2}x^2+\frac{1}{3}x^3-\frac{1}{4}x^4+\frac{1}{5}x^5-\frac{1}{6}x^6
+\]
+
+\[
+\cos x=1-\frac{1}{2}x^2+\frac{1}{24}x^4-\frac{1}{720}x^6
+\]
+
+\end{document}
