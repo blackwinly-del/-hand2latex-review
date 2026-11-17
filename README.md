@@ -81,6 +81,10 @@
 │   ├── Hand2LaTeX_功能演示文档.docx   中文演示稿（含真实截图证据）
 │   └── assets/                演示文档引用的图片
 ├── artifacts/                 真实运行产物（评估 JSON、验收 JSON、编译样例）
+├── scripts/
+│   └── launch.ps1             一键体检 / 装环境 / 启动 / 重启 / 停止的实际逻辑
+├── 启动工作台.bat              双击入口（ASCII 内容，中文界面由 launch.ps1 输出）
+├── 关闭工作台.bat              双击停止服务
 ├── README_B.md                B 模块的详细说明与环境变量表
 ├── requirements.txt           Web 工作台 + C 模块依赖
 └── requirements-b.txt         PP-FormulaNet-L 本地推理依赖（paddlepaddle / paddleocr）
@@ -148,6 +152,49 @@ cp .env.example .env
 完整 B 侧变量表见 [README_B.md](README_B.md)。
 
 ## 六、运行 Web 工作台
+
+### 6.1 一键启动（Windows，推荐先试这个）
+
+双击仓库根目录的 [启动工作台.bat](启动工作台.bat)，按菜单选：
+
+```text
+[1] 体检        只检查环境，不安装、不启动
+[2] 准备并启动  首次装环境 / 日常启动都用它
+[3] 重启服务    改完代码后用这个
+[4] 查看状态    看服务是否还在运行
+[5] 停止服务
+```
+
+它按顺序做这些事，每一步都是幂等的（已就绪就跳过，可反复运行）：
+
+1. 找或建 `.venv`，只接受 Python 3.10 / 3.11 / 3.12（PaddlePaddle 不支持 3.13）；
+2. 缺包才 `pip install -r requirements.txt` / `requirements-b.txt`，缺前端才 `npm install`；
+3. 没有 `.env` 就从 `.env.example` 复制一份，并检查 `OPENAI_API_KEY` / `OPENAI_MODEL` /
+   `OPENAI_BASE_URL` 是否填了（**只显示是否配置和长度，不打印密钥**）；
+4. 检查 `tools/tectonic/tectonic.exe` 与 `models/PP-FormulaNet-L` 是否就位；
+5. 跑 `test_recognizer.py` 契约自检，不过就不启动；
+6. 起 uvicorn，轮询 `/` 直到返回 200 才打开浏览器。
+
+服务在后台运行，PID 和日志分别写在 `.venv/workbench.pid` 和 `.venv/workbench.log`。
+也可以跳过菜单直接调用底层脚本：
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1 -CheckOnly   # 只体检
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1              # 装 + 启 + 开浏览器
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1 -Restart     # 改完代码重启
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1 -Status      # 查状态
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1 -Stop        # 停止（同 关闭工作台.bat）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1 -Lite        # 只装网页依赖，跳过大包
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1 -NoBrowser   # 启动但不自动开浏览器
+```
+
+体检结果分三档：绿色是已就绪，黄色是缺东西但工作台仍能起来（例如没有 Tectonic 就编译不了
+PDF），红色是直接退出并给出修复命令。端口被占用时它会拒绝启动并提示换端口，而不是去杀别人的进程。
+`-Stop` 和 `-Restart` 只认命令行里确实带 `workbench.app` 的进程：Windows 会复用 PID，
+如果 `.venv/workbench.pid` 指向的已经不是工作台（例如那台号被别的程序占了），它只会提示并忽略，
+绝不误杀。
+
+### 6.2 手动启动
 
 ```bash
 ./.venv/Scripts/python.exe -m uvicorn workbench.app:app --host 127.0.0.1 --port 8000
