@@ -1,0 +1,4 @@
+# 画板 + 动态识别 demo 的额外依赖（在 requirements.txt 基础上追加）。
+# 真实识别还需 requirements-b.txt（paddlepaddle + paddleocr + 模型权重）。
+streamlit>=1.53
+streamlit-drawable-canvas>=0.13.0

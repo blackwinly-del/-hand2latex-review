@@ -8,6 +8,7 @@ node_modules/
 models/
 tools/
 artifacts/jobs/
+artifacts/demo/
 dist/
 docs/.qoder-office-docx-locks/
 data/pdf_pages/*
