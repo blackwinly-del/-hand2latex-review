@@ -3,9 +3,13 @@
 对齐 CONTRACT.md v0.2：候选 5 个字段、失败走 error 字段、B 不做 strip、
 去重只按 strip 后比较。
 
-用法：
-    python test_recognizer.py            # 只测接口契约（mock 后端，秒出结果）
-    python test_recognizer.py --real     # 额外跑一次真模型（需要装好 paddleocr）
+用法（在仓库根目录执行）：
+    python tests/test_recognizer.py            # 只测接口契约（mock 后端，秒出结果）
+    python tests/test_recognizer.py --real     # 额外跑一次真模型（需要装好 paddleocr）
+
+注意：这是独立自检脚本（自定义 runner，非 unittest.TestCase），
+被 `python -m unittest discover -s tests` 导入时无副作用，
+只有直接运行才会执行全部检查。
 
 任何一条不通过都会以非 0 退出码结束，方便以后接 CI。
 """
@@ -19,7 +23,10 @@ import traceback
 from contextlib import contextmanager
 from pathlib import Path
 
-HERE = Path(__file__).parent
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if __name__ == "__main__":
+    # 直接运行时把仓库根目录加进 sys.path（unittest discover 时根目录本来就在）
+    sys.path.insert(0, str(_PROJECT_ROOT))
 if "--real" not in sys.argv:
     os.environ["RECOGNIZER_BACKEND"] = "mock"
 
@@ -27,7 +34,7 @@ import recognizer  # noqa: E402  （要在设置环境变量之后导入）
 import schemas  # noqa: E402
 from schemas import CANDIDATE_KEYS, make_candidate, make_error  # noqa: E402
 
-SAMPLE = HERE / "samples" / "sample_plus.png"
+SAMPLE = _PROJECT_ROOT / "samples" / "sample_plus.png"
 
 _failures: list[str] = []
 
@@ -147,7 +154,7 @@ def test_refine_result_has_risk_score() -> None:
 
 
 def test_missing_file() -> None:
-    result = recognizer.recognize(str(HERE / "samples" / "根本不存在.png"))
+    result = recognizer.recognize(str(_PROJECT_ROOT / "samples" / "根本不存在.png"))
     assert len(result) == 1, "文件不存在也要返回 1 条失败候选"
     assert result[0]["latex"] == "", "失败候选的 latex 必须是空串，不能塞报错文本"
     assert result[0]["error"], "必须通过 error 字段说明原因"
@@ -155,13 +162,13 @@ def test_missing_file() -> None:
 
 
 def test_directory_input() -> None:
-    result = recognizer.recognize(str(HERE / "samples"))
+    result = recognizer.recognize(str(_PROJECT_ROOT / "samples"))
     assert result[0]["latex"] == "" and result[0]["error"], "传目录应返回失败候选"
     assert "目录" in result[0]["error"], f"应提示给的是目录，实际：{result[0]['error']}"
 
 
 def test_bad_suffix() -> None:
-    weird = HERE / "samples" / "note.txt"
+    weird = _PROJECT_ROOT / "samples" / "note.txt"
     weird.write_text("not an image", encoding="utf-8")
     try:
         result = recognizer.recognize(str(weird))
@@ -339,7 +346,7 @@ def test_candidate_cap() -> None:
 
 def test_jsonl_log() -> None:
     """打开 RECOGNIZER_LOG_JSONL 后要能落一行合法 JSON，供 C 做测试集分析。"""
-    log_path = HERE / "_tmp_recognize.jsonl"
+    log_path = _PROJECT_ROOT / "_tmp_recognize.jsonl"
     log_path.unlink(missing_ok=True)
     old = os.environ.get("RECOGNIZER_LOG_JSONL")
     os.environ["RECOGNIZER_LOG_JSONL"] = str(log_path)

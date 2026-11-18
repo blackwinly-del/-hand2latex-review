@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+import threading
 import time
 from pathlib import Path
 
@@ -7,19 +9,50 @@ from openai import OpenAI
 
 from reasoning.context import _read_image_data_url
 
+logger = logging.getLogger("workbench.full_page")
 
-def _client() -> OpenAI:
+_CLIENT_LOCK = threading.Lock()
+_CLIENTS: dict[tuple, OpenAI] = {}
+
+
+def _llm_config() -> tuple[str, str | None, float]:
+    """统一读取并校验 OpenAI 兼容配置（fix.py 与整页识别共用）。"""
     api_key = os.environ.get("OPENAI_API_KEY")
     model = os.environ.get("OPENAI_MODEL")
     if not api_key or not api_key.strip():
         raise RuntimeError("OPENAI_API_KEY is not configured")
     if not model or not model.strip():
         raise RuntimeError("OPENAI_MODEL is not configured")
-    return OpenAI(
-        api_key=api_key.strip(),
-        base_url=os.environ.get("OPENAI_BASE_URL") or None,
-        timeout=float(os.environ.get("FULLPAGE_TIMEOUT_SECONDS", "120")),
-    )
+    base_url = (os.environ.get("OPENAI_BASE_URL") or "").strip() or None
+    raw_timeout = os.environ.get("FULLPAGE_TIMEOUT_SECONDS", "120")
+    try:
+        timeout = float(raw_timeout)
+    except ValueError:
+        raise RuntimeError("FULLPAGE_TIMEOUT_SECONDS must be a number") from None
+    return api_key.strip(), base_url, timeout
+
+
+def _model_name() -> str:
+    """读取已校验的模型名（与 _llm_config 的校验口径一致）。"""
+    model = (os.environ.get("OPENAI_MODEL") or "").strip()
+    if not model:
+        raise RuntimeError("OPENAI_MODEL is not configured")
+    return model
+
+
+def _client() -> OpenAI:
+    """返回共享的 OpenAI 客户端；同一配置只创建一次，避免每次请求重建连接。"""
+    api_key, base_url, timeout = _llm_config()
+    cache_key = (api_key, base_url, timeout)
+    client = _CLIENTS.get(cache_key)
+    if client is not None:
+        return client
+    with _CLIENT_LOCK:
+        client = _CLIENTS.get(cache_key)
+        if client is None:
+            client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+            _CLIENTS[cache_key] = client
+        return client
 
 
 def _escape_text(text: str) -> str:
@@ -111,10 +144,13 @@ def merge_documents(documents: list[dict]) -> dict:
     return {"title": title, "blocks": merged_blocks}
 
 
-def _request_page(image_path: str) -> dict:
-    client = _client()
-    completion = client.chat.completions.create(
-        model=os.environ["OPENAI_MODEL"].strip(),
+class _PageResponseError(ValueError):
+    """整页响应为空、被截断或不是合法 JSON——值得放宽 token 预算重试一次。"""
+
+
+def _call_page_model(image_path: str, max_tokens: int) -> dict:
+    completion = _client().chat.completions.create(
+        model=_model_name(),
         messages=[
             {
                 "role": "system",
@@ -140,25 +176,53 @@ def _request_page(image_path: str) -> dict:
                 ],
             },
         ],
-        max_tokens=int(os.environ.get("FULLPAGE_MAX_TOKENS", "24000")),
+        max_tokens=max_tokens,
         response_format={"type": "json_object"},
     )
     choice = completion.choices[0]
     content = choice.message.content
     if not isinstance(content, str) or not content.strip():
-        raise ValueError(f"full-page response content is empty (finish_reason={choice.finish_reason})")
+        raise _PageResponseError(f"full-page response content is empty (finish_reason={choice.finish_reason})")
     if choice.finish_reason == "length":
-        raise ValueError("full-page response was truncated by max_tokens")
+        raise _PageResponseError("full-page response was truncated by max_tokens")
     try:
         document = json.loads(content)
     except json.JSONDecodeError as error:
-        raise ValueError(
+        raise _PageResponseError(
             f"full-page response was not valid JSON "
             f"(finish_reason={choice.finish_reason}, length={len(content)})"
         ) from error
     if not isinstance(document, dict):
         raise TypeError("full-page response must be a JSON object")
     return document
+
+
+def _request_page(image_path: str) -> dict:
+    """整页识别请求，带一次放宽 token 预算的重试。
+
+    背景：真实多页评估中 page_3 曾因推理 token 耗尽输出预算而返回空内容，
+    放宽后重试成功（见 artifacts/multipage_real/report_initial_real.json）。
+    只有响应形状问题（空内容 / 截断 / 非 JSON）才重试；配置错误和网络异常
+    重试没有意义，直接抛出。
+    """
+    base_tokens = int(os.environ.get("FULLPAGE_MAX_TOKENS", "24000"))
+    budget = base_tokens
+    last_error: _PageResponseError | None = None
+    for attempt in (1, 2):
+        try:
+            return _call_page_model(image_path, max_tokens=budget)
+        except _PageResponseError as error:
+            last_error = error
+            if attempt == 1:
+                budget = int(base_tokens * 1.5)
+                logger.warning(
+                    "整页识别第 1 次尝试失败：%s；放宽 token 预算（%d → %d）后重试一次",
+                    error,
+                    base_tokens,
+                    budget,
+                )
+    assert last_error is not None
+    raise last_error
 
 
 def generate_document(image_path: str) -> dict:
@@ -169,7 +233,7 @@ def generate_document(image_path: str) -> dict:
         "title": document.get("title") or "手写笔记",
         "blocks": document["blocks"],
         "tex": tex,
-        "model": os.environ["OPENAI_MODEL"].strip(),
+        "model": _model_name(),
         "latency_ms": round((time.perf_counter() - started) * 1000, 3),
         "human_review": "required",
         "source_image": str(Path(image_path)),

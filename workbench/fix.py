@@ -1,7 +1,7 @@
 import json
 import os
 
-from workbench.full_page import _client
+from workbench.full_page import _client, _model_name
 
 
 def suggest_fix(tex: str, compile_log: str) -> dict:
@@ -12,7 +12,7 @@ def suggest_fix(tex: str, compile_log: str) -> dict:
 
     client = _client()
     completion = client.chat.completions.create(
-        model=os.environ["OPENAI_MODEL"].strip(),
+        model=_model_name(),
         messages=[
             {
                 "role": "system",

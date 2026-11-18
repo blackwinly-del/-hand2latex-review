@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import subprocess
 import sys
@@ -12,6 +13,7 @@ from reasoner import refine
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_PADDLEOCR_AVAILABLE = importlib.util.find_spec("paddleocr") is not None
 
 
 class BCIntegrationTests(unittest.TestCase):
@@ -98,7 +100,7 @@ class BCIntegrationTests(unittest.TestCase):
         environment["RECOGNIZER_BACKEND"] = "mock"
         environment["PYTHONIOENCODING"] = "utf-8"
         completed = subprocess.run(
-            [sys.executable, "test_recognizer.py"],
+            [sys.executable, "tests/test_recognizer.py"],
             cwd=_PROJECT_ROOT,
             env=environment,
             capture_output=True,
@@ -109,6 +111,7 @@ class BCIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
 
+    @unittest.skipUnless(_PADDLEOCR_AVAILABLE, "paddleocr 未安装（requirements-b.txt），跳过")
     def test_default_local_model_directory_is_used(self):
         expected_dir = _PROJECT_ROOT / "models" / "PP-FormulaNet-L"
         with (

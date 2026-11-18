@@ -76,7 +76,7 @@ def recognize_page(
     started = time.perf_counter()
     try:
         document = _request_page(str(image_path))
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - 评估器必须记录每页失败原因并继续跑其余页
         result = {
             **base,
             "status": "request_error",

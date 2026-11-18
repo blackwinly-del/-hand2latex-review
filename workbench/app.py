@@ -1,7 +1,11 @@
 import hashlib
 import json
 import logging
+import os
 import re
+import shutil
+import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -26,10 +30,63 @@ _MAX_PAGE_COUNT = 10
 _MAX_TEX_CHARS = 200_000
 _MAX_LOG_CHARS = 200_000
 
+# 过期 job 清理：默认保留 7 天，可用 WORKBENCH_JOB_MAX_AGE_DAYS 调整（0 = 永不清理）
+_JOB_MAX_AGE_SECONDS = float(os.environ.get("WORKBENCH_JOB_MAX_AGE_DAYS", "7")) * 86400.0
+
 logger = logging.getLogger("workbench")
 app = FastAPI(title="Hand2LaTeX 智能工作台")
 app.mount("/vendor/vue", StaticFiles(directory=_PROJECT_ROOT / "node_modules" / "vue" / "dist"), name="vue")
 _JOBS_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def _cleanup_expired_jobs(max_age_seconds: float | None = None) -> int:
+    """删除超过 max_age 未更新的 job 目录，返回删除数量。
+
+    只碰 artifacts/jobs 下符合 job id 命名（32 位十六进制）的目录，
+    其他文件一律不动；单个目录删除失败只记日志，不影响其余清理。
+    """
+    if max_age_seconds is None:
+        max_age_seconds = _JOB_MAX_AGE_SECONDS
+    if max_age_seconds <= 0:
+        return 0
+    removed = 0
+    now = time.time()
+    try:
+        entries = list(_JOBS_ROOT.iterdir())
+    except OSError:
+        return 0
+    for entry in entries:
+        if not entry.is_dir() or not _JOB_ID_PATTERN.fullmatch(entry.name):
+            continue
+        try:
+            if now - entry.stat().st_mtime > max_age_seconds:
+                shutil.rmtree(entry, ignore_errors=True)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def _start_job_cleanup_scheduler(interval_seconds: float = 24 * 3600.0) -> None:
+    """启动每日一次的过期 job 清理线程（守护线程，随进程退出）。"""
+    if (os.environ.get("WORKBENCH_JOB_CLEANUP") or "on").strip().lower() in {"off", "0", "false", "no"}:
+        return
+
+    def _run() -> None:
+        while True:
+            time.sleep(interval_seconds)
+            try:
+                removed = _cleanup_expired_jobs()
+                if removed:
+                    logger.info("已清理 %d 个过期 job 目录", removed)
+            except Exception:  # noqa: BLE001 - 清理线程绝不能崩
+                logger.exception("job 清理线程异常")
+
+    threading.Thread(target=_run, name="job-cleanup", daemon=True).start()
+
+
+_cleanup_expired_jobs()
+_start_job_cleanup_scheduler()
 
 
 class CompileRequest(BaseModel):
@@ -125,13 +182,31 @@ def _create_document(images: list[UploadFile]) -> dict:
     directory.mkdir()
     documents = []
     pages = []
+    failures = []
     try:
         for page_number, (suffix, content) in enumerate(uploads, start=1):
             page_directory = directory / f"page_{page_number:02d}"
             page_directory.mkdir()
             source_path = page_directory / f"source{suffix}"
             source_path.write_bytes(content)
-            document = generate_document(str(source_path))
+            # 源图先落盘再识别：某页识别失败时，原图与已成功页面都保留下来，
+            # 不让第 N 页的失败把前 N-1 页的成果全部丢掉。
+            try:
+                document = generate_document(str(source_path))
+            except Exception as error:
+                logger.exception("第 %d 页整页识别失败", page_number)
+                message = f"{type(error).__name__}: {error}"
+                failures.append({"page": page_number, "error": message})
+                pages.append(
+                    {
+                        "page": page_number,
+                        "source_url": f"/api/jobs/{job_id}/pages/{page_number}/source",
+                        "latency_ms": None,
+                        "human_review": True,
+                        "error": message,
+                    }
+                )
+                continue
             (page_directory / "original.tex").write_text(document["tex"], encoding="utf-8")
             (page_directory / "main.tex").write_text(document["tex"], encoding="utf-8")
             documents.append(document)
@@ -141,21 +216,28 @@ def _create_document(images: list[UploadFile]) -> dict:
                     "source_url": f"/api/jobs/{job_id}/pages/{page_number}/source",
                     "latency_ms": document["latency_ms"],
                     "human_review": document["human_review"],
+                    "error": None,
                 }
             )
+
+        if not documents:
+            detail = "；".join(f"第 {f['page']} 页：{f['error']}" for f in failures) or "没有可用页面"
+            raise RuntimeError(f"整页识别失败（{detail}），请检查服务配置后重试")
 
         merged = merge_documents(documents)
         merged_tex = build_tex(merged)
         (directory / "original.tex").write_text(merged_tex, encoding="utf-8")
         _write_main_tex(directory, merged_tex)
         compile_result = compile_tex(directory / "main.tex")
+    except HTTPException:
+        raise
     except Exception as error:
         logger.exception("full-page generation failed")
         raise HTTPException(
             status_code=502,
             detail=f"{type(error).__name__}: 整页识别或编译失败，请检查服务配置后重试",
         ) from error
-    return _job_payload(
+    payload = _job_payload(
         job_id,
         directory,
         merged["title"],
@@ -163,6 +245,9 @@ def _create_document(images: list[UploadFile]) -> dict:
         page_count=len(documents),
         pages=pages,
     )
+    if failures:
+        payload["failed_pages"] = failures
+    return payload
 
 
 @app.post("/api/documents")

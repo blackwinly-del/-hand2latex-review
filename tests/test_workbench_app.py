@@ -1,4 +1,6 @@
+import os
 import shutil
+import time
 import unittest
 import uuid
 from pathlib import Path
@@ -201,6 +203,121 @@ class WorkbenchAppTests(unittest.TestCase):
             self.assertTrue((directory / "fix_applied.json").is_file())
         finally:
             shutil.rmtree(directory)
+
+    @patch("workbench.app.generate_document")
+    @patch("workbench.app.compile_tex")
+    def test_batch_upload_partial_failure_keeps_successful_pages(self, compile_mock, generate_mock):
+        generate_mock.side_effect = [
+            {
+                "title": "第一页",
+                "blocks": [{"type": "paragraph", "text": "甲"}],
+                "tex": "page one",
+                "model": "test-model",
+                "latency_ms": 10,
+                "human_review": "required",
+                "source_image": "p1.png",
+            },
+            RuntimeError("page two exploded"),
+            {
+                "title": "第三页",
+                "blocks": [{"type": "paragraph", "text": "丙"}],
+                "tex": "page three",
+                "model": "test-model",
+                "latency_ms": 30,
+                "human_review": "required",
+                "source_image": "p3.png",
+            },
+        ]
+
+        def fake_compile(tex_path):
+            Path(tex_path).with_suffix(".pdf").write_bytes(b"%PDF-partial")
+            return {
+                "success": True,
+                "pdf_path": str(Path(tex_path).with_suffix(".pdf")),
+                "log": "compiled",
+                "errors": [],
+                "returncode": 0,
+            }
+
+        compile_mock.side_effect = fake_compile
+        response = self.client.post(
+            "/api/documents/batch",
+            files=[
+                ("image", ("p1.png", b"first", "image/png")),
+                ("image", ("p2.png", b"second", "image/png")),
+                ("image", ("p3.png", b"third", "image/png")),
+            ],
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()
+        job_id = data["job_id"]
+        # 成功页进入文档；失败页不进入
+        self.assertEqual(data["page_count"], 2)
+        self.assertIn("甲", data["tex"])
+        self.assertIn("丙", data["tex"])
+        self.assertNotIn("乙", data["tex"])
+        # pages 覆盖全部三页（失败页带 error），failed_pages 指明第 2 页
+        self.assertEqual(len(data["pages"]), 3)
+        self.assertEqual(data["pages"][1]["error"], "RuntimeError: page two exploded")
+        self.assertIsNone(data["pages"][0]["error"])
+        self.assertEqual(data["failed_pages"], [{"page": 2, "error": "RuntimeError: page two exploded"}])
+        # 源图三个目录都在（失败页的原图也保留），失败页没有 original.tex
+        self.assertTrue((Path("artifacts/jobs") / job_id / "page_01" / "original.tex").is_file())
+        self.assertFalse((Path("artifacts/jobs") / job_id / "page_02" / "original.tex").exists())
+        self.assertTrue((Path("artifacts/jobs") / job_id / "page_03" / "original.tex").is_file())
+        page_two_source = self.client.get(f"/api/jobs/{job_id}/pages/2/source")
+        self.assertEqual(page_two_source.content, b"second")
+        self.assertTrue(data["compile"]["success"])
+
+    @patch("workbench.app.generate_document")
+    @patch("workbench.app.compile_tex")
+    def test_batch_upload_all_pages_fail_returns_502(self, compile_mock, generate_mock):
+        generate_mock.side_effect = [RuntimeError("first down"), RuntimeError("second down")]
+
+        response = self.client.post(
+            "/api/documents/batch",
+            files=[
+                ("image", ("p1.png", b"first", "image/png")),
+                ("image", ("p2.png", b"second", "image/png")),
+            ],
+        )
+
+        self.assertEqual(response.status_code, 502)
+        compile_mock.assert_not_called()
+
+    def test_cleanup_expired_jobs_removes_only_stale_directories(self):
+        from workbench.app import _cleanup_expired_jobs
+
+        fresh = Path("artifacts/jobs") / uuid.uuid4().hex
+        stale = Path("artifacts/jobs") / uuid.uuid4().hex
+        fresh.mkdir(parents=True)
+        stale.mkdir(parents=True)
+        old_timestamp = time.time() - 8 * 86400
+        os.utime(stale, (old_timestamp, old_timestamp))
+        try:
+            removed = _cleanup_expired_jobs(max_age_seconds=7 * 86400)
+
+            self.assertFalse(stale.exists())
+            self.assertTrue(fresh.exists())
+            self.assertGreaterEqual(removed, 1)
+        finally:
+            shutil.rmtree(fresh, ignore_errors=True)
+            shutil.rmtree(stale, ignore_errors=True)
+
+    def test_cleanup_ignores_non_job_entries(self):
+        from workbench.app import _cleanup_expired_jobs
+
+        stranger = Path("artifacts/jobs") / "not-a-job-id.txt"
+        stranger.write_text("keep me", encoding="utf-8")
+        old_timestamp = time.time() - 30 * 86400
+        os.utime(stranger, (old_timestamp, old_timestamp))
+        try:
+            _cleanup_expired_jobs(max_age_seconds=7 * 86400)
+
+            self.assertTrue(stranger.exists())
+        finally:
+            stranger.unlink(missing_ok=True)
 
     def test_missing_job_returns_404(self):
         response = self.client.get("/api/jobs/00000000000000000000000000000000/pdf")

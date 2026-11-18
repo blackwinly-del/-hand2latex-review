@@ -550,7 +550,7 @@ Write-Step '运行接口契约自检 test_recognizer.py'
 if (-not $venvReady) {
     Write-Line '虚拟环境不可用，跳过自检' 'warn'
 } else {
-    $selfTest = Invoke-Captured -FilePath $VenvPython -Arguments @('test_recognizer.py')
+    $selfTest = Invoke-Captured -FilePath $VenvPython -Arguments @('tests/test_recognizer.py')
     Write-Block $selfTest.Output
     if ($selfTest.ExitCode -ne 0) {
         Stop-WithHint "test_recognizer.py 未通过（退出码 $($selfTest.ExitCode)）" `

@@ -68,10 +68,10 @@ pip install -r requirements-b.txt
 
 ```bash
 # 1. 接口契约自测（不需要装 paddle，mock 后端，秒出，共 24 项）
-python test_recognizer.py
+python tests/test_recognizer.py
 
 # 2. 真模型冒烟（需要先装好 paddle，并先跑 python samples/_gen_sample.py 生成测试图）
-python test_recognizer.py --real
+python tests/test_recognizer.py --real
 
 # 3. 单独跑一张图
 python recognizer.py samples/sample_plus.png               # 单视角，快

@@ -1,10 +1,31 @@
+import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_TECTONIC = _PROJECT_ROOT / "tools" / "tectonic" / "tectonic.exe"
+_TECTONIC_DIR = _PROJECT_ROOT / "tools" / "tectonic"
+
+
+def _find_tectonic() -> Path | None:
+    """定位 tectonic 可执行文件。
+
+    查找顺序：项目内置（Windows 为 tectonic.exe，其他平台无扩展名；两个名字
+    都会兼容探测，避免从别的平台拷贝过来的目录用不了）→ 系统 PATH。
+    都找不到返回 None，由 compile_tex 给出明确的安装提示。
+    """
+    preferred = "tectonic.exe" if os.name == "nt" else "tectonic"
+    fallback = "tectonic" if os.name == "nt" else "tectonic.exe"
+    for name in (preferred, fallback):
+        candidate = _TECTONIC_DIR / name
+        if candidate.is_file():
+            return candidate
+    found = shutil.which("tectonic")
+    if found:
+        return Path(found)
+    return None
 
 
 def parse_compile_errors(log: str) -> list[dict]:
@@ -31,10 +52,15 @@ def compile_tex(tex_path: str | Path, *, timeout: int = 120) -> dict:
     pdf_path = tex_path.with_suffix(".pdf")
     try:
         pdf_path.unlink(missing_ok=True)
-        if not _TECTONIC.is_file():
-            raise RuntimeError("tectonic is not installed in tools/tectonic")
+        tectonic = _find_tectonic()
+        if tectonic is None:
+            raise RuntimeError(
+                "tectonic is not installed: expected tools/tectonic/"
+                f"{'tectonic.exe' if os.name == 'nt' else 'tectonic'} in the project, "
+                "or tectonic on PATH"
+            )
         completed = subprocess.run(
-            [str(_TECTONIC), str(tex_path)],
+            [str(tectonic), str(tex_path)],
             cwd=tex_path.parent,
             capture_output=True,
             encoding="utf-8",

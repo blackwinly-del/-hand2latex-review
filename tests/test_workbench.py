@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -5,8 +6,14 @@ from unittest.mock import patch
 
 import pymupdf
 
-from workbench.compiler import compile_tex, parse_compile_errors
-from workbench.full_page import build_tex, generate_document, merge_documents
+from workbench.compiler import _find_tectonic, compile_tex, parse_compile_errors
+from workbench.full_page import (
+    _PageResponseError,
+    _request_page,
+    build_tex,
+    generate_document,
+    merge_documents,
+)
 from workbench.multipage_eval import _pdf_last_page_is_blank
 
 
@@ -59,6 +66,46 @@ class FullPageDocumentTests(unittest.TestCase):
         self.assertIn("x^2", result["tex"])
         self.assertEqual(result["human_review"], "required")
         self.assertGreaterEqual(result["latency_ms"], 0)
+
+
+class PageRequestRetryTests(unittest.TestCase):
+    """整页识别的"放宽 token 预算重试一次"行为（对应真实评估中 page_3 的失败案例）。"""
+
+    @patch("workbench.full_page._call_page_model")
+    def test_transient_response_error_is_retried_with_relaxed_budget(self, call_mock):
+        call_mock.side_effect = [
+            _PageResponseError("full-page response content is empty (finish_reason=None)"),
+            {"title": "手写笔记", "blocks": [{"type": "paragraph", "text": "甲"}]},
+        ]
+
+        result = _request_page("unused.png")
+
+        self.assertEqual(result["title"], "手写笔记")
+        self.assertEqual(call_mock.call_count, 2)
+        base = int(os.environ.get("FULLPAGE_MAX_TOKENS", "24000"))
+        self.assertEqual(call_mock.call_args_list[0].kwargs["max_tokens"], base)
+        self.assertEqual(call_mock.call_args_list[1].kwargs["max_tokens"], int(base * 1.5))
+
+    @patch("workbench.full_page._call_page_model")
+    def test_second_failure_propagates_after_retry(self, call_mock):
+        call_mock.side_effect = [
+            _PageResponseError("empty"),
+            _PageResponseError("still empty"),
+        ]
+
+        with self.assertRaises(_PageResponseError):
+            _request_page("unused.png")
+
+        self.assertEqual(call_mock.call_count, 2)
+
+    @patch("workbench.full_page._call_page_model")
+    def test_non_transient_error_is_not_retried(self, call_mock):
+        call_mock.side_effect = RuntimeError("OPENAI_API_KEY is not configured")
+
+        with self.assertRaises(RuntimeError):
+            _request_page("unused.png")
+
+        self.assertEqual(call_mock.call_count, 1)
 
 
 class TectonicCompilerTests(unittest.TestCase):
@@ -118,8 +165,8 @@ class TectonicCompilerTests(unittest.TestCase):
             self.assertEqual(result["errors"][0]["line"], 4)
             self.assertFalse(tex_path.with_suffix(".pdf").exists())
 
-    @patch("workbench.compiler._TECTONIC", Path("missing-tectonic.exe"))
-    def test_missing_compiler_does_not_leave_stale_pdf(self):
+    @patch("workbench.compiler._find_tectonic", return_value=None)
+    def test_missing_compiler_does_not_leave_stale_pdf(self, _locator):
         with tempfile.TemporaryDirectory() as directory:
             tex_path = Path(directory) / "main.tex"
             tex_path.write_text("content", encoding="utf-8")
@@ -133,6 +180,34 @@ class TectonicCompilerTests(unittest.TestCase):
     def test_parse_compile_error_formats(self):
         log = "main.tex:7: Undefined control sequence\nerror: at line 9: missing brace"
         self.assertEqual(parse_compile_errors(log)[0], {"line": 7, "message": "Undefined control sequence"})
+
+
+class TectonicLocatorTests(unittest.TestCase):
+    def test_builtin_binary_is_found_with_platform_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / ("tectonic.exe" if os.name == "nt" else "tectonic")
+            binary.write_bytes(b"fake-binary")
+            with patch("workbench.compiler._TECTONIC_DIR", Path(directory)):
+                self.assertEqual(_find_tectonic(), binary)
+
+    def test_fallback_name_is_accepted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            # 从另一个平台拷来的目录：只有"另一种命名"的二进制，也应能找到
+            binary = Path(directory) / ("tectonic" if os.name == "nt" else "tectonic.exe")
+            binary.write_bytes(b"fake-binary")
+            with patch("workbench.compiler._TECTONIC_DIR", Path(directory)):
+                self.assertEqual(_find_tectonic(), binary)
+
+    def test_missing_binary_reports_install_hint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tex_path = Path(directory) / "main.tex"
+            tex_path.write_text("content", encoding="utf-8")
+            with (
+                patch("workbench.compiler._TECTONIC_DIR", Path(directory) / "tools" / "tectonic"),
+                patch("workbench.compiler.shutil.which", return_value=None),
+                self.assertRaisesRegex(RuntimeError, "tectonic is not installed"),
+            ):
+                compile_tex(tex_path)
 
 
 if __name__ == "__main__":

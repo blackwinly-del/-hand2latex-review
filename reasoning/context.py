@@ -127,7 +127,7 @@ def choose_with_context(image_path: str, candidates: list[dict]) -> dict:
         return {"selected_index": selected_index, "reason": reason, "error": None}
     except _ContextConfigurationError as error:
         error_message = str(error)
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - 任何失败都必须回退为"需人工复核"，不能抛给调用方
         error_message = f"{type(error).__name__}: context selection failed"
     return {
         "selected_index": None,

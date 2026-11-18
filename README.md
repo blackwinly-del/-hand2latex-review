@@ -18,7 +18,7 @@
 
 | 能力 | 入口 | 证据 |
 | --- | --- | --- |
-| 公式图片 → LaTeX 候选列表（5 字段契约） | `recognizer.recognize()` | `test_recognizer.py` |
+| 公式图片 → LaTeX 候选列表（5 字段契约） | `recognizer.recognize()` | `tests/test_recognizer.py` |
 | 候选规范化、按 `strip` 后完整字符串去重 | `reasoner.refine()` | `tests/test_reasoner.py` |
 | 括号 / `\left\right` / `\begin\end` / 命令参数数量结构检查 | `reasoning/validators.py` | `tests/test_validators.py` |
 | `0/o` 易混淆字符漏报检测 | `find_ambiguous_glyph_conflicts()` | `tests/test_validators.py` |
@@ -52,7 +52,6 @@
 ├── recognizer.py              B：图片 → LaTeX 候选列表（不调大模型、不校验结构）
 ├── reasoner.py                C：候选 → 规范化 / 去重 / 结构检查 / 上下文选择，生产入口 refine()
 ├── schemas.py                 A / B / C 三人共享的数据契约（改动需三人同意）
-├── test_recognizer.py         B 的接口自测（mock 后端，秒出）+ --real 真模型冒烟
 │
 ├── reasoning/                 C 模块内部实现
 │   ├── CONTRACT.md            C 公共契约讨论稿 v0.3（1—12 节已实现，13—16 节含提案）
@@ -74,7 +73,7 @@
 │   ├── multipage_eval.py      可恢复的真实多页评估器（带响应缓存）
 │   └── static/index.html      Vue 3 前端单页
 │
-├── tests/                     13 个 unittest 测试模块（`python -m unittest discover -s tests`）
+├── tests/                     13 个 unittest 测试模块 + test_recognizer.py 契约自检脚本（`python -m unittest discover -s tests`）
 ├── data/
 │   ├── handwritten/           12 张真实手写公式样本 sample_1 ~ sample_12
 │   ├── pdf_pages/             真实笔记分页图 page_1 ~ page_5（多页评估素材）
@@ -97,7 +96,7 @@
 
 | 项目 | 要求 |
 | --- | --- |
-| Python | **3.10 / 3.11 / 3.12**。PaddlePaddle 不支持 3.13。 |
+| Python | **3.10 / 3.11 / 3.12**。PaddlePaddle 不支持 3.13。⚠️ `requirements.txt` 里 `numpy==2.3.5` 仅支持 3.11+；如需在 3.10 上运行，需自行把 numpy 降到 2.2.x。 |
 | Node.js | 18+，前端 Vue 与 KaTeX 渲染检查都从 `node_modules` 读取 |
 | 操作系统 | 开发在 Windows 完成；Linux/macOS 需要自行替换 Tectonic 可执行文件 |
 | Tectonic | 0.17.0，放在 `tools/tectonic/tectonic.exe`（该目录被 `.gitignore` 排除，需自备） |
@@ -175,7 +174,7 @@ cp .env.example .env
 3. 没有 `.env` 就从 `.env.example` 复制一份，并检查 `OPENAI_API_KEY` / `OPENAI_MODEL` /
    `OPENAI_BASE_URL` 是否填了（**只显示是否配置和长度，不打印密钥**）；
 4. 检查 `tools/tectonic/tectonic.exe` 与 `models/PP-FormulaNet-L` 是否就位；
-5. 跑 `test_recognizer.py` 契约自检，不过就不启动；
+5. 跑 `tests/test_recognizer.py` 契约自检，不过就不启动；
 6. 起 uvicorn，轮询 `/` 直到返回 200 才打开浏览器。
 
 服务在后台运行，PID 和日志分别写在 `.venv/workbench.pid` 和 `.venv/workbench.log`。
@@ -227,7 +226,7 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
 ./.venv/Scripts/python.exe recognizer.py data/handwritten/sample_1.png --thorough
 
 # B：接口契约自测（mock 后端，不需要装 paddle）
-./.venv/Scripts/python.exe test_recognizer.py
+./.venv/Scripts/python.exe tests/test_recognizer.py
 
 # C：上下文选择基准，默认读写 artifacts/context_conflict_samples.json
 ./.venv/Scripts/python.exe -m reasoning.context_benchmark
