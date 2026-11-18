@@ -100,7 +100,7 @@
 | Node.js | 18+，前端 Vue 与 KaTeX 渲染检查都从 `node_modules` 读取 |
 | 操作系统 | 开发在 Windows 完成；Linux/macOS 需要自行替换 Tectonic 可执行文件 |
 | Tectonic | 0.17.0，放在 `tools/tectonic/tectonic.exe`（该目录被 `.gitignore` 排除，需自备） |
-| 中文字体 | ctex 编译需要系统里装有 CJK 字体 |
+| 中文字体 | ctex 默认用 `fontset=windows`，需要系统装有 SimHei/SimSun 等 CJK 字体。**没有预装中文字体的环境**（Linux/macOS/CI runner）可设环境变量 `LATEX_FONTSET=fandol`，改用随 Tectonic TeX bundle 分发的开源 Fandol 字体，无需系统字体。合法值：`windows` / `mac` / `adobe` / `ubuntu` / `fandol` / `none`。 |
 | 模型权重 | PP-FormulaNet-L 约 695 MB，放 `models/PP-FormulaNet-L/`（同样被排除，首次运行可自动下载） |
 | 多模态 API | 任意 OpenAI 兼容接口，需支持图片输入 |
 

@@ -55,6 +55,27 @@ def _client() -> OpenAI:
         return client
 
 
+# ctex 支持的 fontset 取值，白名单用于防止把任意字符串拼进 LaTeX preamble。
+# windows 依赖系统安装的 SimHei/SimSun 等中文字体；fandol 随 TeX 发行版分发，
+# 不依赖系统字体，适合没有预装 CJK 字体的环境（如 CI runner、Linux）。
+_ALLOWED_FONTSETS = frozenset({"windows", "mac", "adobe", "ubuntu", "fandol", "none"})
+
+
+def _ctex_fontset() -> str:
+    """返回 ctex 的 fontset 配置，默认 windows，可用 LATEX_FONTSET 覆盖。"""
+    fontset = (os.environ.get("LATEX_FONTSET") or "windows").strip().lower()
+    if fontset not in _ALLOWED_FONTSETS:
+        raise RuntimeError(
+            f"LATEX_FONTSET must be one of {sorted(_ALLOWED_FONTSETS)}, got {fontset!r}"
+        )
+    return fontset
+
+
+def _ctex_documentclass() -> str:
+    """生成 ctexart 的 documentclass 行（build_tex 与真实编译测试共用）。"""
+    return r"\documentclass[UTF8,fontset=" + _ctex_fontset() + r"]{ctexart}"
+
+
 def _escape_text(text: str) -> str:
     replacements = {
         "\\": r"\textbackslash{}",
@@ -80,7 +101,7 @@ def build_tex(document: dict) -> str:
         raise ValueError("document blocks must not be empty")
 
     parts = [
-        r"\documentclass[UTF8,fontset=windows]{ctexart}",
+        _ctex_documentclass(),
         r"\usepackage{amsmath,amssymb}",
         r"\usepackage{graphicx}",
         r"\usepackage[margin=2.2cm]{geometry}",

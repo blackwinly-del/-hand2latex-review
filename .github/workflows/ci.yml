@@ -7,8 +7,10 @@ on:
 
 jobs:
   tests:
-    # 用 Windows 跑：项目按 fontset=windows 的 ctex 编译、启动脚本是 .ps1/.bat，
-    # Windows runner 自带中文字体，能覆盖真实编译链路。
+    # 用 Windows 跑：启动脚本是 .ps1/.bat，与本地目标环境一致。
+    # 注意：GitHub 的 windows-latest runner 是精简版 Windows Server，未预装
+    # SimHei/SimSun 等中文字体，因此 Run tests 里设 LATEX_FONTSET=fandol，
+    # 使用随 Tectonic TeX bundle 分发的开源字体，无需系统字体即可覆盖真实编译链路。
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -57,4 +59,7 @@ jobs:
           # 其余依赖环境变量的测试都用 patch.dict 隔离，不受影响。
           OPENAI_API_KEY: dummy-key-for-tests
           OPENAI_MODEL: dummy-model-for-tests
+          # CI runner 没有系统中文字体，改用随 TeX bundle 分发的 fandol 字体，
+          # 让两个真实 CJK 编译测试也能跑通（生产默认仍是 windows）。
+          LATEX_FONTSET: fandol
         run: python -m unittest discover -s tests -v

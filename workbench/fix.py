@@ -1,7 +1,7 @@
 import json
 import os
 
-from workbench.full_page import _client, _model_name
+from workbench.full_page import _client, _ctex_fontset, _model_name
 
 
 def suggest_fix(tex: str, compile_log: str) -> dict:
@@ -21,7 +21,7 @@ def suggest_fix(tex: str, compile_log: str) -> dict:
                     "with fixed_tex and summary strings. Fix only the reported compilation errors "
                     "and preserve every unrelated Chinese sentence, formula, and document block. "
                     "Do not improve, solve, normalize, or rewrite the transcription. Keep a "
-                    "ctex-compatible preamble with fontset=windows."
+                    "ctex-compatible preamble with fontset=" + _ctex_fontset() + "."
                 ),
             },
             {

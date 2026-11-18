@@ -9,12 +9,38 @@ import pymupdf
 from workbench.compiler import _find_tectonic, compile_tex, parse_compile_errors
 from workbench.full_page import (
     _PageResponseError,
+    _ctex_documentclass,
+    _ctex_fontset,
     _request_page,
     build_tex,
     generate_document,
     merge_documents,
 )
 from workbench.multipage_eval import _pdf_last_page_is_blank
+
+
+class FontsetConfigTests(unittest.TestCase):
+    def test_default_fontset_is_windows(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(_ctex_fontset(), "windows")
+            self.assertEqual(
+                _ctex_documentclass(),
+                r"\documentclass[UTF8,fontset=windows]{ctexart}",
+            )
+
+    def test_fontset_can_be_overridden(self):
+        with patch.dict(os.environ, {"LATEX_FONTSET": "FANDOL"}):
+            self.assertEqual(_ctex_fontset(), "fandol")
+            self.assertIn("fontset=fandol", _ctex_documentclass())
+            self.assertIn("fontset=fandol", build_tex({
+                "title": "笔记",
+                "blocks": [{"type": "paragraph", "text": "内容"}],
+            }))
+
+    def test_invalid_fontset_is_rejected(self):
+        with patch.dict(os.environ, {"LATEX_FONTSET": "not-a-fontset"}):
+            with self.assertRaises(RuntimeError):
+                _ctex_fontset()
 
 
 class FullPageDocumentTests(unittest.TestCase):
@@ -113,7 +139,7 @@ class TectonicCompilerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             tex_path = Path(directory) / "main.tex"
             tex_path.write_text(
-                "\\documentclass[UTF8,fontset=windows]{ctexart}\n"
+                _ctex_documentclass() + "\n"
                 "\\begin{document}\n"
                 "你好，Tectonic！$x^2$\n"
                 "\\end{document}\n",
