@@ -73,6 +73,37 @@ def _backend() -> str:
 # 停笔判定：比较画笔对象指纹，内容稳定满 1 秒才触发识别。
 # ---------------------------------------------------------------------------
 
+def _normalize_path(path) -> tuple:
+    """把 Fabric.js 的 path 规整成可哈希、可比较的结构。
+
+    Fabric.js 的 path 是 SVG 命令序列，元素形如 ["M", 12.3, 45.6] /
+    ["L", x, y] / ["Q", x1, y1, x2, y2]，**第一个元素是命令字母**，
+    其余才是坐标。把整段当数字 float() 会在写到第一笔时抛
+    ValueError: could not convert string to float: 'M'。
+    """
+    points = []
+    for seg in path or []:
+        if not isinstance(seg, (list, tuple)) or not seg:
+            continue
+        head = seg[0]
+        if isinstance(head, str):
+            # 标准情况：命令字母 + 若干坐标
+            coords = []
+            for value in seg[1:]:
+                try:
+                    coords.append(round(float(value), 1))
+                except (TypeError, ValueError):
+                    coords.append(str(value))
+            points.append((head, tuple(coords)))
+        else:
+            # 少数版本可能直接给纯数字数组，兜底处理
+            try:
+                points.append(("", tuple(round(float(value), 1) for value in seg)))
+            except (TypeError, ValueError):
+                points.append(("", tuple(str(value) for value in seg)))
+    return tuple(points)
+
+
 def _canvas_fingerprint(canvas_result) -> str | None:
     """对画布内容做指纹。无笔迹时返回 None。"""
     if canvas_result is None or canvas_result.json_data is None:
@@ -80,11 +111,12 @@ def _canvas_fingerprint(canvas_result) -> str | None:
     objects = canvas_result.json_data.get("objects") or []
     if not objects:
         return None
-    # 用 path 坐标序列化，能捕捉到"同一笔画还在继续延长"的变化。
-    serialized = []
-    for obj in objects:
-        coords = [tuple(round(float(c), 1) for c in p) for p in (obj.get("path") or [])]
-        serialized.append((obj.get("type"), coords))
+    # 用 path 命令序列做指纹，能捕捉到"同一笔画还在继续延长"的变化。
+    serialized = [
+        (obj.get("type"), _normalize_path(obj.get("path")))
+        for obj in objects
+        if isinstance(obj, dict)
+    ]
     return hashlib.sha1(repr(serialized).encode("utf-8")).hexdigest()
 
 
