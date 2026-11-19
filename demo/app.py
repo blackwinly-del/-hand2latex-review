@@ -89,11 +89,17 @@ def _canvas_fingerprint(canvas_result) -> str | None:
 
 
 def _idle_elapsed(fingerprint: str | None) -> float:
-    """返回当前指纹已保持稳定的时长（秒）。指纹变化则重新计时。"""
+    """返回当前指纹已保持稳定的时长（秒）。指纹变化则重新计时。
+
+    注意：空画布时 fingerprint 是 None，而 session_state.get 的缺省值也是 None，
+    两者相等会让「首次进入」被误判成「指纹未变化」，从而读不到 _fp_since
+    （KeyError）。所以必须先显式判断 key 是否存在。
+    """
     state = st.session_state
-    if fingerprint != state.get("_last_fp"):
+    if "_fp_since" not in state or fingerprint != state.get("_last_fp"):
         state["_last_fp"] = fingerprint
         state["_fp_since"] = time.time()
+        return 0.0
     return time.time() - state["_fp_since"]
 
 
