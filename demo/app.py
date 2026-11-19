@@ -35,7 +35,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from reasoner import refine  # noqa: E402  （C 层：候选 → 规范化 / 去重 / 结构检查）
-from recognizer import recognize, warmup  # noqa: E402  （B 层：图片 → LaTeX 候选）
+from recognizer import ENGINES, recognize, warmup  # noqa: E402  （B 层：图片 → LaTeX 候选）
 
 # ---------------------------------------------------------------------------
 # 配置
@@ -49,6 +49,15 @@ _STROKE_WIDTH = 3
 # 停笔判定阈值（秒）：画笔内容保持不变达到该时长即触发识别。
 _IDLE_SECONDS = 1.0
 
+# 模型档位。PP-FormulaNet-L 最准但 CPU 上单张 6~8 秒；
+# -S 快得多（体积约为 L 的 1/5），适合演示和反复试写的场景。
+# 识别前会用 _crop_to_ink 裁掉大片空白，这也是最有效的提速手段之一。
+_MODEL_CHOICES = {
+    "快速（PP-FormulaNet-S，演示推荐）": "PP-FormulaNet-S",
+    "精准（PP-FormulaNet-L，默认）": "PP-FormulaNet-L",
+}
+_DEFAULT_MODEL_LABEL = "快速（PP-FormulaNet-S，演示推荐）"
+
 # 识别结果临时图片的存放目录（在仓库 artifacts 下，避免污染源码目录）。
 _IMAGE_DIR = _PROJECT_ROOT / "artifacts" / "demo"
 _IMAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -59,8 +68,13 @@ _IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
-def _get_model(engine: str) -> None:
-    """触发 B 层的模型加载（进程内缓存）。返回值本身不用，只保证加载完成。"""
+def _get_model(engine: str, model_name: str) -> None:
+    """按 (引擎, 模型名) 加载并缓存模型。
+
+    切换档位时会加载另一份模型（各自缓存），不会反复重建；
+    recognizer.get_model 的缓存 key 里包含 model_name，所以这里可以放心改 ENGINES。
+    """
+    ENGINES[engine]["model_name"] = model_name
     warmup()
     return None
 
@@ -135,6 +149,30 @@ def _idle_elapsed(fingerprint: str | None) -> float:
     return time.time() - state["_fp_since"]
 
 
+def _crop_to_ink(image: Image.Image, padding: int = 24) -> Image.Image:
+    """裁到笔迹包围盒（留 padding 边距）。
+
+    画布 720×320，但用户写的公式往往只占中间一小块。直接把整张空白图喂给模型，
+    CPU 上白白多算好几秒；裁到笔迹范围能显著缩短推理时间，也避免大片空白干扰识别。
+    """
+    # 转灰度后反相：白底(255)变0、笔迹变高值，用 getbbox 拿到非零区域。
+    gray = image.convert("L")
+    ink_mask = gray.point(lambda pixel: 255 if pixel < 250 else 0)
+    box = ink_mask.getbbox()
+    if box is None:
+        return image
+    left, top, right, bottom = box
+    width, height = image.size
+    return image.crop(
+        (
+            max(0, left - padding),
+            max(0, top - padding),
+            min(width, right + padding),
+            min(height, bottom + padding),
+        )
+    )
+
+
 def _canvas_to_png(canvas_result) -> Path | None:
     """把画布的 RGBA 图像落盘成 PNG，返回路径；无笔迹返回 None。"""
     if canvas_result is None or canvas_result.image_data is None:
@@ -148,8 +186,10 @@ def _canvas_to_png(canvas_result) -> Path | None:
         background.paste(image, mask=image.split()[3])
     else:
         background.paste(image.convert("RGB"))
+    # 裁掉大片空白：输入更小，推理更快，也减少空白对识别的干扰。
+    cropped = _crop_to_ink(background)
     path = _IMAGE_DIR / "canvas_latest.png"
-    background.save(path)
+    cropped.save(path)
     return path
 
 
@@ -180,7 +220,7 @@ if backend == "mock":
 
 # 预热模型（首次加载，mock 模式自动跳过）。放在列布局之前，避免渲染时再加载。
 if backend != "mock":
-    _get_model("pp_formulanet_l")
+    _get_model("pp_formulanet_l", _MODEL_CHOICES[_DEFAULT_MODEL_LABEL])
 
 left, right = st.columns([1, 1])
 
@@ -202,6 +242,22 @@ with right:
     st.subheader("✨ 识别结果")
     result_placeholder = st.empty()
 
+# 模型档位放在侧边栏，切换后旧档位的模型仍留在缓存里，切回来不用重新加载。
+model_label = st.sidebar.radio(
+    "识别模型",
+    list(_MODEL_CHOICES),
+    index=list(_MODEL_CHOICES).index(_DEFAULT_MODEL_LABEL),
+    help="快速档用 PP-FormulaNet-S，CPU 上明显更快；精准档用 -L，更准但慢。",
+)
+model_name = _MODEL_CHOICES[model_label]
+
+if backend != "mock":
+    # 切档位时按新模型名加载（get_model 的缓存 key 含 model_name，各自缓存）。
+    if st.session_state.get("_loaded_model") != model_name:
+        with st.spinner(f"正在加载 {model_name}（首次约需数十秒）…"):
+            _get_model("pp_formulanet_l", model_name)
+        st.session_state["_loaded_model"] = model_name
+
 # ---------------------------------------------------------------------------
 # 停笔自动识别：内容稳定满 1 秒且尚未识别过该指纹时触发。
 # ---------------------------------------------------------------------------
@@ -209,8 +265,19 @@ with right:
 fingerprint = _canvas_fingerprint(canvas_result)
 idle = _idle_elapsed(fingerprint)
 
+# 识别结果缓存：指纹 + 模型档位 → 结果。擦掉重画回原样、或切档后切回来，都直接复用。
+result_cache = st.session_state.setdefault("_result_cache", {})
+cache_key = (fingerprint, model_name)
+
 if fingerprint is not None and idle >= _IDLE_SECONDS:
-    if st.session_state.get("_recognized_fp") != fingerprint:
+    if cache_key in result_cache:
+        # 命中缓存：直接用上次结果，不再调模型。
+        st.session_state["_last_result"] = result_cache[cache_key]
+        st.session_state["_recognized_fp"] = fingerprint
+    elif st.session_state.get("_recognized_fp") != fingerprint or (
+        st.session_state.get("_recognized_model") != model_name
+    ):
+        started = time.perf_counter()
         with st.spinner("正在识别…"):
             try:
                 image_path = _canvas_to_png(canvas_result)
@@ -220,8 +287,12 @@ if fingerprint is not None and idle >= _IDLE_SECONDS:
                     result = _run_recognition(image_path)
             except Exception as exc:  # noqa: BLE001 - 识别失败不拖垮页面，友好展示
                 result = {"error": f"{type(exc).__name__}: {exc}"}
+        elapsed = time.perf_counter() - started
         st.session_state["_recognized_fp"] = fingerprint
+        st.session_state["_recognized_model"] = model_name
         st.session_state["_last_result"] = result
+        st.session_state["_last_elapsed"] = elapsed
+        result_cache[cache_key] = result
 else:
     # 还没到停笔阈值时，不清空上一次结果，只显示提示。
     if fingerprint is None:
@@ -251,9 +322,11 @@ with right:
         else:
             st.warning("没有识别出内容。")
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         col1.metric("置信度", confidence)
         col2.metric("需人工复核", "是" if need_review else "否")
+        elapsed = st.session_state.get("_last_elapsed")
+        col3.metric("识别耗时", f"{elapsed:.1f}s" if elapsed else "—")
 
         if result.get("changes"):
             with st.expander("规范化改动（C 层）"):
@@ -267,8 +340,10 @@ with st.expander("ℹ️ 使用说明 / 环境要求"):
     st.markdown(
         """
 - **怎么玩**：左侧画板用鼠标写公式，停笔约 1 秒，右侧自动出 LaTeX 排版。
+- **识别慢怎么办**：侧边栏切「快速」档（PP-FormulaNet-S），CPU 上比 -L 快数倍；
+  识别前会自动裁掉画布空白区域，也在提速。
 - **真实识别**：需要安装 `requirements-b.txt`（paddlepaddle + paddleocr）并准备
-  `models/PP-FormulaNet-L` 模型权重（首次运行可自动下载）。
+  `models/PP-FormulaNet-L` 模型权重（首次运行可自动下载；-S 档会自动下载对应权重）。
 - **仅联调**：设 `RECOGNIZER_BACKEND=mock` 可跳过模型，跑通完整交互流程。
 - **清空重画**：画板自带工具栏的橡皮/撤销，或刷新页面。
         """
