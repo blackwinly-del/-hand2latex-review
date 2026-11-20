@@ -259,6 +259,23 @@ _MODEL_LOCK = threading.Lock()
 _MODELS: Dict[Tuple[str, str, Optional[str], str], Any] = {}
 
 
+def _formula_recognition_class() -> Any:
+    """延迟取 FormulaRecognition；Windows 上必须先让 torch 完成 DLL 加载。
+
+    paddle 启动时会把自身 libs 目录插到 DLL 搜索路径最前面。若之后 paddle 的
+    依赖链再 import torch，torch 会找不到 ``torch\\lib\\shm.dll``（WinError 127）。
+    先导入 torch 即可避开；没装或导不进 torch 时直接跳过，paddle 单独仍可运行。
+    """
+    if sys.platform == "win32":
+        try:
+            import torch  # noqa: F401
+        except Exception as exc:  # noqa: BLE001 - 缺 torch 不应阻断纯 paddle 环境
+            logger.debug("预加载 torch 失败（不影响纯 paddle 环境）：%s", exc)
+    from paddleocr import FormulaRecognition
+
+    return FormulaRecognition
+
+
 def get_model(engine: str = DEFAULT_ENGINE) -> Any:
     """返回引擎对应的模型实例，首次调用时加载并缓存。
 
@@ -287,7 +304,7 @@ def get_model(engine: str = DEFAULT_ENGINE) -> Any:
             return model
 
         # 延迟导入：本机没装 paddle 时，import recognizer 不会立刻报错
-        from paddleocr import FormulaRecognition
+        FormulaRecognition = _formula_recognition_class()
 
         started = time.time()
         model = FormulaRecognition(**model_kwargs)

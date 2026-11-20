@@ -76,20 +76,150 @@ def _ctex_documentclass() -> str:
     return r"\documentclass[UTF8,fontset=" + _ctex_fontset() + r"]{ctexart}"
 
 
+# 整页模型有时会在正文里直接写 ∈、≤ 这类 Unicode 符号；ctex 正文的单字节字体
+# 没有这些字形，编译后就是缺字。这里只做编码转换，不改变任何数学含义。
+_UNICODE_MATH = {
+    "∈": r"\in",
+    "∉": r"\notin",
+    "≤": r"\le",
+    "≥": r"\ge",
+    "≠": r"\neq",
+    "≈": r"\approx",
+    "∑": r"\sum",
+    "∏": r"\prod",
+    "∫": r"\int",
+    "∞": r"\infty",
+    "π": r"\pi",
+    "α": r"\alpha",
+    "β": r"\beta",
+    "γ": r"\gamma",
+    "θ": r"\theta",
+    "λ": r"\lambda",
+    "μ": r"\mu",
+    "σ": r"\sigma",
+    "φ": r"\phi",
+    "ω": r"\omega",
+    "Ω": r"\Omega",
+    "→": r"\rightarrow",
+    "←": r"\leftarrow",
+    "↔": r"\leftrightarrow",
+    "×": r"\times",
+    "÷": r"\div",
+    "±": r"\pm",
+}
+
+_TEXT_REPLACEMENTS = {
+    "\\": r"\textbackslash{}",
+    "{": r"\{",
+    "}": r"\}",
+    "#": r"\#",
+    "$": r"\$",
+    "%": r"\%",
+    "&": r"\&",
+    "_": r"\_",
+    "^": r"\^{}",
+    "~": r"\~{}",
+}
+
+
+def _convert_math_unicode(text: str) -> str:
+    """把数学片段里的 Unicode 符号换成命令；控制词后紧跟字母时补空格。"""
+    converted = []
+    for index, char in enumerate(text):
+        command = _UNICODE_MATH.get(char)
+        if command is None:
+            converted.append(char)
+            continue
+        converted.append(command)
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if following.isalpha():
+            converted.append(" ")
+    return "".join(converted)
+
+
+def _looks_like_inline_math(text: str) -> bool:
+    """成对的 $ 才当作公式；含中文或空内容的多半是货币/普通文字，按字面转义。"""
+    return bool(text.strip()) and "\n" not in text and not any(
+        "\u4e00" <= char <= "\u9fff" for char in text
+    )
+
+
+def _find_closing_dollar(text: str, start: int) -> int:
+    index = start
+    while index < len(text):
+        if text[index] == "\\":
+            index += 2
+            continue
+        if text[index] == "$":
+            return index
+        index += 1
+    return -1
+
+
+def _escape_plain(text: str) -> str:
+    """转义普通文字，但把其中的 Unicode 数学符号包成行内公式。"""
+    escaped = []
+    for char in text:
+        command = _UNICODE_MATH.get(char)
+        if command is not None:
+            escaped.append("$" + command + "$")
+        else:
+            escaped.append(_TEXT_REPLACEMENTS.get(char, char))
+    return "".join(escaped)
+
+
 def _escape_text(text: str) -> str:
-    replacements = {
-        "\\": r"\textbackslash{}",
-        "{": r"\{",
-        "}": r"\}",
-        "#": r"\#",
-        "$": r"\$",
-        "%": r"\%",
-        "&": r"\&",
-        "_": r"\_",
-        "^": r"\^{}",
-        "~": r"\~{}",
-    }
-    return "".join(replacements.get(char, char) for char in text)
+    """转义普通段落/标题，但原样保留模型给出的成对行内公式。
+
+    整页模型可能把行内公式写成 ``$x^2$``；旧实现把 $ 一并转义成 ``\\$``，
+    PDF 里就会出现字面反斜杠。落单的 $（例如价格 ``$5``）仍然按普通字符转义。
+    """
+    parts = []
+    plain: list[str] = []
+    index = 0
+    length = len(text)
+
+    def flush_plain() -> None:
+        if plain:
+            parts.append(_escape_plain("".join(plain)))
+            plain.clear()
+
+    while index < length:
+        char = text[index]
+        if char == "\\" and index + 1 < length and text[index + 1] == "$":
+            plain.append("$")
+            index += 2
+            continue
+
+        if char == "$":
+            if text.startswith("$$", index):
+                end = text.find("$$", index + 2)
+                if end != -1:
+                    content = text[index + 2:end]
+                    if _looks_like_inline_math(content):
+                        flush_plain()
+                        parts.append("\\[" + _convert_math_unicode(content.strip()) + "\\]")
+                        index = end + 2
+                        continue
+
+            end = _find_closing_dollar(text, index + 1)
+            if end != -1:
+                content = text[index + 1:end]
+                if _looks_like_inline_math(content):
+                    flush_plain()
+                    parts.append("$" + _convert_math_unicode(content.strip()) + "$")
+                    index = end + 1
+                    continue
+
+            plain.append("$")
+            index += 1
+            continue
+
+        plain.append(char)
+        index += 1
+
+    flush_plain()
+    return "".join(parts)
 
 
 def build_tex(document: dict) -> str:

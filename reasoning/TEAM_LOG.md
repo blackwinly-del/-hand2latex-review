@@ -705,3 +705,37 @@
 - **未解决／未完成事项**：整页转录真值集与准确率、跨页语义一致性、多轮模型稳定性统计、真实示意图重建、部署与性能优化仍未完成。
 - **学习进度**：`deepseek-flash` 的 `max_tokens` 包含推理 token，预算不足会出现"耗时很长但 `content` 为空、`finish_reason=length`"的假性失败；处理方式是提高 `FULLPAGE_MAX_TOKENS` 后只重试失败页，而不是重写合并逻辑。评估报告里的"新发请求数／缓存命中数"需按用例区分，不能混读成单页调用次数。
 - **下一步（计划，未完成）**：由负责人决定是否提交并推送本批真实评估证据；随后补整页真值集与转录准确率口径，再评估跨页语义一致性。
+
+## 2026-11-19 工作台人工复核标注与本机 GPU 识别实测
+
+**阶段状态：UI 复核标注已完成并在浏览器验证；本机 GPU 上的 PP-FormulaNet-L 单张识别成功。未修改 C 模块代码与公共契约。**
+
+- **本次任务**：用户要求（1）把"可能识别出错、需要人工复核"的位置标注出来；（2）用本机 GPU 跑一次识别。修改 `D:\latex\workbench\static\index.html`、`D:\latex\README.md`，追加本日志；未修改 C 模块、`schemas.py` 或 B 的识别逻辑。
+- **复核标注口径**：只标三类可验证信号——编译器明确报告的缺字／无法表示字符（带 `main.tex:行号`）、中文里被转义成 `\$` 的行内公式、正文中裸写的数学符号；不显示置信度、不生成风险分数、不判断识别内容对错。左栏每页有"N 处待复核"和"标为已核对"；中栏黄色行可点击跳到对应行。
+- **浏览器实测**：真实 job `3ee80c69…` 命中 6 行 `\$`（第 10/12/38/52/70/72 行），点击第 10 行能选中对应源码；把 `6bb554e9…` 的第 8 行以 fandol 编译（真实 Tectonic 日志），命中 1 处 `Missing character ... U+2208`，左右两处同字符警告已去重；多页 job `a5873937…` 两页均可勾选"已核对"，计数从 0/2 变为 1/2。截图保存在 `.venv/review_*.png`（未纳入 Git）。
+- **本地识别现状（实测）**：默认 `.venv` 中先 `import paddle` 再 `import torch` 会报 `WinError 127 ... torch\lib\shm.dll`；先 import torch 再 import paddle 正常。demo 的真实识别路径当前会受此影响，本次未改动 A／B 文件来修复，只记录现象。
+- **GPU 实测**：新建 `.venv/gpu-venv`，安装 `paddlepaddle-gpu 3.4.0`（官方 cu129 索引）、`paddleocr 3.7.0`、`tokenizers`、`ftfy`、`torch 2.15.0+cpu`。RTX 5070 Laptop（计算能力 12.0）被 Paddle 识别，`matmul` 落在 `Place(gpu:0)`。同一张 `samples/sample_plus.png`：CPU 首次 30.3 s、预热 11.7 s；GPU 首次 12.3 s、预热 0.62 s；两者输出同为 `x^{3}-x^{2}+x^{2}+x-x+3x-3+4`。识别期间 `nvidia-smi` 采样到 35–44% 利用率、约 355 MiB 显存。
+- **环境坑**：`paddleocr 3.7.0` 的公式后处理还缺 `tokenizers` 与 `ftfy`，缺任何一个都只报笼统的 "A dependency error occurred during predictor creation"。
+- **实际测试**：`./.venv/Scripts/python.exe -m unittest discover -s tests` 为 `Ran 147 tests in 21.494s`、`OK`。未新增真实整页识别请求，未调用付费 API。
+- **证据边界**：GPU 数字来自单张样本单次运行，不构成性能基准；GPU 尚未接入画板演示（演示仍用 `.venv` + CPU 配置）；`样本真实识别` 与 `GPU 基础设施可用` 是两件事，这里只证明后者和单张推理可运行。
+- **Git 状态**：本轮改动（index.html、README、本日志）尚未提交。
+- **未解决／未完成事项**：画板演示切到 GPU venv（需补 streamlit 依赖并保证 torch 先于 paddle 导入）、整页真值集与转录准确率、真实示意图重建仍未完成。
+- **学习进度**：paddle 与 torch 同时存在时，Windows DLL 搜索顺序会让后加载的一方失败；GPU 是否真的在算，要看 `Place(gpu:0)` 和 `nvidia-smi` 利用率，不能只看 `is_compiled_with_cuda()`。
+- **下一步（计划，未完成）**：如需要，可在画板演示启动脚本中增加 GPU 选项（GPU venv + `RECOGNIZER_DEVICE=gpu:0`），并实测一次鼠标写公式的端到端延迟。
+
+## 2026-11-20 收口已知缺陷：整页公式、torch 导入顺序、画板 GPU、12 样本真值
+
+**阶段状态：整页行内公式与 Unicode 数学符号已修复并测试；默认 `.venv` 真实识别恢复；画板已可用 GPU 启动；12 条用户确认真值已建立并完成一次 GPU 精确匹配评估。整页逐字真值与本地整页识别仍未完成。**
+
+- **本次任务**：用户针对上一轮列出的缺口说“来吧，干活”，要求处理：整页 `$...$` 被转义与缺字形、paddle/torch 导入顺序、画板接入 GPU、转录准确率真值、未提交改动。
+- **实际修改文件**：`D:\latex\workbench\full_page.py`、`D:\latex\tests\test_workbench.py`、`D:\latex\recognizer.py`、`D:\latex\scripts\launch_demo.ps1`、`D:\latex\启动画板.bat`、`D:\latex\demo\app.py`、`D:\latex\demo\requirements-demo.txt`、`D:\latex\README.md`、新增 `D:\latex\data\handwritten_ground_truth.json`、`D:\latex\reasoning\handwritten_eval.py`、`D:\latex\tests\test_handwritten_eval.py`，追加本日志。
+- **整页转写修复（已测试）**：`_escape_text` 现在保留成对的 `$...$` 与 `$$...$$`，把正文和公式片段里的 ∈、≤、∑、π 等 27 个 Unicode 数学符号转成 LaTeX 命令，只有落单 `$` 才转义；含中文的成对 `$` 仍按字面处理，避免把“价格 $5 … $10”误判成公式。新增 7 项 workbench 用例，包含 build_tex 段落保留 `$x\in A$`。
+- **torch 导入顺序（已实测）**：`recognizer.py` 新增 `_formula_recognition_class()`，仅在 Windows 上、加载 `paddleocr` 前按需先 `import torch`，失败则跳过。默认 `.venv` 运行 `recognizer.py samples/sample_plus.png` 成功：模型加载 9.5 s、推理 26.02 s，输出 `x^{3}-x^{2}+x^{2}+x-x+3x-3+4`，不再出现 `WinError 127 ... shm.dll`。
+- **画板 GPU（已实测）**：`scripts/launch_demo.ps1` 新增 `-Gpu`，切换到 `.venv\gpu-venv` 并设置 `RECOGNIZER_DEVICE=gpu:0`；GPU 环境缺画板依赖时按 `demo/requirements-demo.txt` 安装。已向 GPU 环境装入 streamlit 1.67.0、streamlit-drawable-canvas 0.13.0、openai 3.57.0、python-dotenv 1.2.4。用 `-Gpu -NoBrowser -Port 8599` 启动成功，浏览器实测显示“识别设备：GPU（gpu:0）”；`nvidia-smi` 的 compute apps 中出现该 Streamlit 进程，Paddle 日志报告 `GPU Compute Capability: 12.0`。测试后已停止该进程。
+- **12 样本真值（已建立）**：从 4 份旧评估产物合并出 `data/handwritten_ground_truth.json`，12 条均标注 `review_status=ground_truth_user_confirmed`，保留原 `review_note` 与来源产物路径；没有生成或修改任何真值。`reasoning/handwritten_eval.py` 复用 C 的 `evaluate_refinement` 口径（strip 后整串精确匹配），单样本失败不中断整轮。
+- **GPU 实测准确率（2026-11-20）**：RTX 5070 Laptop、`PP-FormulaNet-L`、`gpu:0`，12 样本 raw 精确 5/12（41.7%），final 精确 5/12（41.7%），C 改写正确结果为错误 0 条；规则复核命中 1 条（sample_3 结构问题），漏判 7 条。7 条错误分别是：sample_6 多出裁剪边界外的编号/根式、sample_7 漏因子 4、sample_8 单撇/双撇混淆、sample_9 `o`→`0`、sample_10 指数与分子错误、sample_11 双撇→`n`、sample_12 `2!`/`3!`→`21`/`31` 且多减号。完整报告在 `artifacts/handwritten_eval_gpu.json`。
+- **实际测试**：`./.venv/Scripts/python.exe -m unittest discover -s tests -q` 为 `Ran 159 tests in 11.800s`、`OK`；新增的 Tectonic 用例真实编译含 `$x∈A$` 与 `x ≤ 3` 的段落，验证日志无 `Missing character`。日志中的 `RuntimeError: page two exploded` 是故障注入用例的预期输出。
+- **证据边界**：12 条是公式裁剪图，不是整页；样本量小且曾用于冲突分析，41.7% 不能当泛化准确率或性能基准。整页识别仍走远端 `deepseek-flash`，本机 GPU 未覆盖整页版面分析/中文 OCR，`transcription_accuracy` 对整页仍未评估。画板 GPU 只验证了启动、页面设备显示和进程占用 GPU，没有重新用鼠标画公式做端到端识别计时。
+- **Git 状态**：本条目与上述代码、文档改动放在同一提交中（提交哈希见 `git log -1`）；本次不推送远端。
+- **学习进度**：修复“缺字”不一定要换模型，先把编码确定性转成 LaTeX 就能消除一类问题；但 7/12 的真实识别错误是模型本身看错，规则复核无法兜底，必须靠人工对原图核对。
+- **未完成事项**：整页逐字真值与准确率、本地整页识别、跨页语义一致性、模型多次运行稳定性统计仍未完成。

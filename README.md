@@ -84,8 +84,10 @@
 │   └── assets/                演示文档引用的图片
 ├── artifacts/                 真实运行产物（评估 JSON、验收 JSON、编译样例）
 ├── scripts/
-│   └── launch.ps1             一键体检 / 装环境 / 启动 / 重启 / 停止的实际逻辑
+│   ├── launch.ps1             一键体检 / 装环境 / 启动 / 重启 / 停止的实际逻辑
+│   └── launch_demo.ps1        画板演示的启动逻辑（前台窗口运行，关窗即停）
 ├── 启动工作台.bat              双击入口（ASCII 内容，中文界面由 launch.ps1 输出）
+├── 启动画板.bat                双击打开画板演示（Streamlit，默认 8501 端口）
 ├── 关闭工作台.bat              双击停止服务
 ├── README_B.md                B 模块的详细说明与环境变量表
 ├── requirements.txt           Web 工作台 + C 模块依赖
@@ -155,6 +157,24 @@ cp .env.example .env
 
 ## 六、运行 Web 工作台
 
+上传之后是三栏界面，给不懂 LaTeX 的人也能用：
+
+- **左栏原图**：点某一页，中间代码自动跳到那一页对应的位置（按 `\newpage` 锚点，跳过空行）。
+  每页下面显示「N 处待复核」；「标为已核对」按钮用来记录你已经核对过哪几页。
+- **中栏代码**：带行号和语法高亮，可直接编辑。编译报错的行标红，**可能需要人工复核的行标黄**。
+- **右栏「问题与复核」**：最上面是人工复核清单，只列三种能验证的信号：
+  1. 编译器明确报告的缺字/编码问题（带行号，例如 `main.tex:8 Missing character ... U+2208`）；
+  2. 已知转写伪影：中文里的 `$` 被转义成 `\$`，说明原文的行内公式被当成了普通文字；
+  3. 正文里直接写的数学符号（∈、≤ 等）没有用 LaTeX 写法，换字体后可能缺字。
+  下面才是编译错误/警告列表，每条配中文大白话解释，点击跳到对应行。
+
+整页转写现在会原样保留成对的 `$...$` / `$$...$$`，并把正文中的常见 Unicode 数学符号
+（∈、≤、∑、π 等）转成 LaTeX 命令；只有落单的 `$`（例如价格）才按普通字符转义。
+复核清单仍保留，用于历史任务或远端模型返回其他异常写法时提醒人工。
+
+这些标记覆盖的是"编译器和确定性规则能发现"的问题。**没有标记不等于抄对了**：
+识别内容是否忠实只能靠人对照原图判断，界面不显示置信度，也不编造风险分数。
+
 ### 6.1 一键启动（Windows，推荐先试这个）
 
 双击仓库根目录的 [启动工作台.bat](启动工作台.bat)，按菜单选：
@@ -210,13 +230,69 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
 | --- | --- |
 | `POST /api/documents` | 上传 1 张图，识别 + 编译（表单字段名 `image`） |
 | `POST /api/documents/batch` | 上传多张图，按上传顺序合并成一份 PDF（同字段名 `image`） |
-| `GET /api/jobs/{job_id}` | 任务状态、TeX 源码、块结构 |
+| `GET /api/jobs/{job_id}` | 该 job 的 TeX 源码、源图链接、PDF 链接（`human_review` 恒为 true）；识别块结构合并在这份 TeX 里，接口不单独返回块数组 |
 | `GET /api/jobs/{job_id}/pdf` | 下载编译好的 PDF |
 | `POST /api/jobs/{job_id}/compile` | 手工改完 TeX 后重新编译 |
 | `POST /api/jobs/{job_id}/suggest-fix` | 让模型给出针对某个错误片段的修改建议 |
 | `POST /api/jobs/{job_id}/apply-fix` | 人工确认后应用建议（建议过期返回 HTTP 409） |
 
 一次上传消耗的 API 量不小（每页一次整页识别），演示前先确认账户余额。
+
+### 6.3 画板演示（Streamlit，鼠标写字即时识别）
+
+双击 [启动画板.bat](启动画板.bat)，浏览器会打开 <http://127.0.0.1:8501>：
+在左侧画板用鼠标写公式，停笔约 1 秒，右侧自动给出 LaTeX。识别走本地 PP-FormulaNet-L，
+**不消耗多模态 API**；第一次识别要加载模型，较慢属正常。
+
+- 画板在**前台窗口**运行：窗口开着服务才在，关窗或按 Ctrl+C 即停止（与工作台的后台方式不同）。
+- 已经在跑时再次双击只会打开浏览器，不会重复启动。
+- 缺 `streamlit` / `streamlit-drawable-canvas` 时自动按 `demo/requirements-demo.txt` 安装。
+  依赖探测用 `find_spec`，不做裸 import——该组件脱离 Streamlit 运行时 import 会误报
+  `asset_dir` 错误，真 import 会把好环境误判成缺包。
+- 端口被占用可换：`启动画板.bat -Port 8502`（等价于 `scripts/launch_demo.ps1 -Port 8502`）。
+- 用本机 GPU 识别：`启动画板.bat -Gpu`（等价于 `scripts/launch_demo.ps1 -Gpu`）。它会改用
+  `.venv\gpu-venv` 并设置 `RECOGNIZER_DEVICE=gpu:0`；GPU 环境缺画板依赖时，按
+  `demo/requirements-demo.txt` 安装到该环境。页面会显示当前识别设备。
+
+### 6.4 本地公式识别用 GPU（实测，2026-11-19～20）
+
+只影响**本地 PP-FormulaNet-L** 这条链路（画板演示、`recognizer.py`）。Web 工作台的整页识别走远端
+`deepseek-flash`，GPU 帮不上忙。
+
+本机是 RTX 5070 Laptop（8 GB，驱动 592.82，计算能力 12.0），Paddle 官方 cu126 轮子不含
+Blackwell 内核，需要 **cu129** 构建：
+
+```bat
+py -3.12 -m venv .venv\gpu-venv
+.venv\gpu-venv\Scripts\pip install paddlepaddle-gpu==3.4.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu129/
+.venv\gpu-venv\Scripts\pip install paddleocr==3.7.0 tokenizers ftfy
+.venv\gpu-venv\Scripts\pip install torch --index-url https://download.pytorch.org/whl/cpu
+```
+
+两个环境坑（都已复现并处理）：
+
+1. **torch 必须比 paddle 先完成加载**。paddle 先加载会污染 DLL 搜索路径，之后依赖链再
+   `import torch` 时找不到 `torch\lib\shm.dll`（WinError 127）。`recognizer.py` 现在在 Windows
+   上加载模型前会自动先导入 torch（`_formula_recognition_class`），画板、命令行和评估脚本
+   都不用再手动写导入顺序；默认 `.venv` 的真实识别也已实测恢复。
+2. `paddleocr==3.7.0` 的公式后处理还缺 `tokenizers` 和 `ftfy`，缺了会在建 predictor 时
+   只报笼统的 "A dependency error occurred"。
+
+实测同一张 `samples/sample_plus.png`（`RECOGNIZER_DEVICE=gpu:0`）：
+
+| 环境 | 首次（含模型加载） | 第二次（预热后） | 输出 LaTeX |
+| --- | --- | --- | --- |
+| CPU（`paddlepaddle 3.3.0`） | 30.3 s | 11.7 s | `x^{3}-x^{2}+x^{2}+x-x+3x-3+4` |
+| GPU（`paddlepaddle-gpu 3.4.0` cu129） | 12.3 s | 0.62 s | 同上 |
+
+GPU 运行期间 `nvidia-smi` 采样到 35–44% 利用率、约 355 MiB 显存，确认真的在 GPU 上算。
+这只是单张样本的单次测量，不构成性能基准。
+
+画板现在可以直接用 GPU 启动：`启动画板.bat -Gpu`。实测浏览器页面显示
+“识别设备：GPU（gpu:0）”，Streamlit 进程出现在 `nvidia-smi` 的 compute apps 中。
+默认 `.venv` 的 CPU 识别也已恢复：`recognizer.py samples/sample_plus.png` 实测模型加载 9.5 s、
+推理 26.02 s，输出与 GPU 相同。整页识别仍然走远端 `deepseek-flash`，本机 GPU 只覆盖
+单张公式图（B 的 `recognizer.py`），两者不是同一条链路。
 
 ## 七、命令行单模块运行
 
@@ -230,12 +306,20 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
 
 # C：上下文选择基准，默认读写 artifacts/context_conflict_samples.json
 ./.venv/Scripts/python.exe -m reasoning.context_benchmark
+
+# C：12 个用户确认过的手写公式真值，精确匹配准确率（CPU）
+./.venv/Scripts/python.exe -m reasoning.handwritten_eval \
+  --output artifacts/handwritten_eval_cpu.json
+
+# 同一份真值用 GPU 识别
+RECOGNIZER_DEVICE=gpu:0 ./.venv/gpu-venv/Scripts/python.exe -m reasoning.handwritten_eval \
+  --output artifacts/handwritten_eval_gpu.json
 ```
 
 ## 八、测试
 
 ```bash
-# C + workbench 全量回归（13 个模块，含真实 Tectonic 编译，需要 tools/tectonic）
+# C + workbench 全量回归（14 个测试模块、159 项，含真实 Tectonic 编译，需要 tools/tectonic）
 ./.venv/Scripts/python.exe -m unittest discover -s tests -v
 
 # 单个模块
@@ -250,7 +334,8 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
 
 清单在 `data/multipage_samples.json`，包含三个用例：按序合并、倒序合并、尾部空白页。
 评估口径只看**结构**（合并顺序、`\newpage` 数量、标记是否落在期望页段、编译成功、PDF 页数、
-尾部空白页确实空白），**不评转录准确性**——因为没有人工真值集。
+尾部空白页确实空白），**不评整页转录准确性**——整页仍没有逐字真值。单张公式裁剪图另有
+12 条用户确认过的真值，见 9.2。
 
 ```bash
 # 真实请求（消耗 API）
@@ -288,6 +373,32 @@ FULLPAGE_MAX_TOKENS=40000 FULLPAGE_TIMEOUT_SECONDS=300 \
 
 结构通过仍然**不等于转录正确**，本次 `transcription_accuracy` 依旧是
 `not_evaluated_without_full_page_truth`，识别出的中文与公式需要人工对原图核对。
+
+### 9.2 单张手写公式真值与实测准确率（2026-11-20）
+
+12 张裁剪图的真值由用户在 2026-11-03 逐条确认，清单在
+`data/handwritten_ground_truth.json`，评估脚本是 `reasoning/handwritten_eval.py`。
+口径与 C 的 `evaluate_refinement` 一致：只做 `strip` 后**整串精确匹配**，不做语义等价。
+
+RTX 5070 Laptop、`PP-FormulaNet-L`、`gpu:0` 实测：
+
+| 指标 | 结果 |
+| --- | --- |
+| 样本数 | 12 |
+| raw 精确匹配 | 5 / 12（41.7%） |
+| final 精确匹配 | 5 / 12（41.7%） |
+| C 改写正确结果为错误 | 0 |
+| 规则判定需复核 | 1 / 12 |
+| 漏判的错误样本 | 7 / 12 |
+
+7 个错误都是真实识别差异：多出裁剪边界外的编号与根式（sample_6）、漏因子 4（sample_7）、
+单撇写成双撇（sample_8）、`o` 写成 `0`（sample_9）、指数与分子写错（sample_10）、
+双撇写成 `n`（sample_11）、阶乘 `2!`/`3!` 写成 `21`/`31` 且多一个减号（sample_12）。
+`raw` 与 `final` 相同，说明 C 没有擅自改写；规则复核只命中了 1 个结构性错误，**7 个错误
+没有被自动标记**——再次说明“没有警告”不等于“抄对了”。
+
+边界：这是公式裁剪图，不是整页；样本只有 12 个，且用于过冲突分析，不能当作泛化准确率或
+性能基准。整页转录仍未建立逐字真值。
 
 ## 十、打包时故意没有包含的东西
 

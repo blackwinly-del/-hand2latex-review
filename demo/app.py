@@ -81,9 +81,20 @@ def _canvas_fingerprint(canvas_result) -> str | None:
     if not objects:
         return None
     # 用 path 坐标序列化，能捕捉到"同一笔画还在继续延长"的变化。
+    # Fabric.js 的 path 每段形如 ["M", x, y] / ["Q", ...]，首元素是命令字母，
+    # 不能直接 float()，否则一画就 ValueError: could not convert string to float: 'M'。
     serialized = []
     for obj in objects:
-        coords = [tuple(round(float(c), 1) for c in p) for p in (obj.get("path") or [])]
+        coords = []
+        for segment in (obj.get("path") or []):
+            numeric = []
+            for value in segment:
+                try:
+                    numeric.append(round(float(value), 1))
+                except (TypeError, ValueError):
+                    continue  # 跳过 'M'/'L'/'Q' 等路径命令字母，只留坐标
+            if numeric:
+                coords.append(tuple(numeric))
         serialized.append((obj.get("type"), coords))
     return hashlib.sha1(repr(serialized).encode("utf-8")).hexdigest()
 
@@ -91,7 +102,7 @@ def _canvas_fingerprint(canvas_result) -> str | None:
 def _idle_elapsed(fingerprint: str | None) -> float:
     """返回当前指纹已保持稳定的时长（秒）。指纹变化则重新计时。"""
     state = st.session_state
-    if fingerprint != state.get("_last_fp"):
+    if "_fp_since" not in state or fingerprint != state.get("_last_fp"):
         state["_last_fp"] = fingerprint
         state["_fp_since"] = time.time()
     return time.time() - state["_fp_since"]
@@ -139,6 +150,10 @@ if backend == "mock":
         "当前 `RECOGNIZER_BACKEND=mock`，识别结果只是占位失败候选（用于联调）。"
         "接入真实模型请去掉该环境变量并安装 `requirements-b.txt`。"
     )
+else:
+    device = (os.environ.get("RECOGNIZER_DEVICE") or "cpu").strip()
+    device_label = f"GPU（{device}）" if device.lower().startswith("gpu") else "CPU"
+    st.caption(f"识别设备：{device_label}。首次识别要加载模型，GPU 约十几秒，CPU 更久。")
 
 # 预热模型（首次加载，mock 模式自动跳过）。放在列布局之前，避免渲染时再加载。
 if backend != "mock":
@@ -235,3 +250,14 @@ with st.expander("ℹ️ 使用说明 / 环境要求"):
 - **清空重画**：画板自带工具栏的橡皮/撤销，或刷新页面。
         """
     )
+
+# 画布停止更新后 Streamlit 不会自己重跑，idle 会一直停在 0，"停笔自动识别"永远不触发。
+# 有笔迹、还没到停笔阈值、且这个指纹还没识别过时，等 0.25 秒重跑一次，直到越过阈值。
+# 识别完成后 _recognized_fp 等于当前指纹，这里就不再重跑，页面安静下来。
+if (
+    fingerprint is not None
+    and idle < _IDLE_SECONDS
+    and st.session_state.get("_recognized_fp") != fingerprint
+):
+    time.sleep(0.25)
+    st.rerun()

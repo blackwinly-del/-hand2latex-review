@@ -11,6 +11,7 @@ from workbench.full_page import (
     _PageResponseError,
     _ctex_documentclass,
     _ctex_fontset,
+    _escape_text,
     _request_page,
     build_tex,
     generate_document,
@@ -59,6 +60,39 @@ class FullPageDocumentTests(unittest.TestCase):
         self.assertIn(r"测试\_笔记", tex)
         self.assertIn(r"50\%\_保留", tex)
         self.assertIn("\\[\n\\frac{x}{0}\n\\]", tex)
+
+    def test_escape_text_preserves_paired_inline_math(self):
+        self.assertEqual(
+            _escape_text(r"若 $x^2$ 且 $\frac{1}{2}$ 成立"),
+            r"若 $x^2$ 且 $\frac{1}{2}$ 成立",
+        )
+
+    def test_escape_text_escapes_unmatched_dollars(self):
+        self.assertEqual(_escape_text(r"价格 $5 与 \$10"), r"价格 \$5 与 \$10")
+
+    def test_escape_text_does_not_treat_chinese_pair_as_math(self):
+        self.assertEqual(_escape_text("甲 $ 中 乙 $ 丙"), r"甲 \$ 中 乙 \$ 丙")
+
+    def test_escape_text_converts_unicode_math_in_prose(self):
+        self.assertEqual(
+            _escape_text("若 x ∈ A 且 x ≤ 3"),
+            r"若 x $\in$ A 且 x $\le$ 3",
+        )
+
+    def test_escape_text_converts_unicode_math_inside_math(self):
+        self.assertEqual(_escape_text("$x∈A$"), r"$x\in A$")
+
+    def test_escape_text_keeps_display_math(self):
+        self.assertEqual(_escape_text("$$x∈A$$"), r"\[x\in A\]")
+
+    def test_build_tex_keeps_inline_math_in_paragraph(self):
+        tex = build_tex({
+            "title": "行内公式",
+            "blocks": [{"type": "paragraph", "text": r"若 $x∈A$ 则成立"}],
+        })
+
+        self.assertIn(r"若 $x\in A$ 则成立", tex)
+        self.assertNotIn(r"\$x", tex)
 
     def test_empty_blocks_are_rejected(self):
         with self.assertRaises(ValueError):
@@ -150,6 +184,21 @@ class TectonicCompilerTests(unittest.TestCase):
 
             self.assertTrue(result["success"], result["log"])
             self.assertTrue(Path(result["pdf_path"]).is_file())
+
+    def test_compile_paragraph_with_inline_math_and_unicode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tex_path = Path(directory) / "main.tex"
+            tex = build_tex({
+                "title": "含 ∈ 的笔记",
+                "blocks": [{"type": "paragraph", "text": "若 $x∈A$ 且 x ≤ 3，则 $x^2$ 成立"}],
+            })
+
+            self.assertNotIn(r"\$", tex)
+            tex_path.write_text(tex, encoding="utf-8")
+            result = compile_tex(tex_path)
+
+            self.assertTrue(result["success"], result["log"])
+            self.assertNotIn("Missing character", result["log"])
 
     def test_compile_trailing_blank_page(self):
         with tempfile.TemporaryDirectory() as directory:

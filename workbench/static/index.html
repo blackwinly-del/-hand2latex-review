@@ -5,113 +5,376 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hand2LaTeX 智能工作台</title>
   <style>
-    :root { color-scheme: light; --ink:#233047; --muted:#6d7687; --paper:#f5f1e8; --card:#fffdf8; --accent:#2f65d9; --danger:#b42318; --line:#e5dfd2; }
+    :root { color-scheme: light; --ink:#233047; --muted:#6d7687; --paper:#f5f1e8; --card:#fffdf8; --accent:#2f65d9; --danger:#b42318; --line:#e5dfd2; --code-lh:20px; }
     * { box-sizing:border-box; }
     body { margin:0; background:var(--paper); color:var(--ink); font-family:"Segoe UI","Microsoft YaHei",sans-serif; }
-    header { padding:28px clamp(18px,4vw,56px) 18px; background:#172b4d; color:white; }
-    header h1 { margin:0 0 8px; font-size:clamp(24px,3vw,38px); }
+    header { padding:22px clamp(18px,3vw,48px) 16px; background:#172b4d; color:white; }
+    header h1 { margin:0 0 6px; font-size:clamp(22px,2.6vw,32px); }
     header p { margin:0; color:#cdd8ec; }
-    main { max-width:1500px; margin:0 auto; padding:24px clamp(14px,3vw,36px) 48px; }
-    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 8px 24px #25355d10; margin-bottom:20px; }
+    main { max-width:1800px; margin:0 auto; padding:20px clamp(12px,2vw,28px) 40px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; box-shadow:0 8px 24px #25355d10; margin-bottom:18px; }
     .upload-row,.actions { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
     input[type=file] { max-width:100%; padding:12px; border:1px dashed #a8b0bf; border-radius:10px; background:white; }
-    button,.button { border:0; border-radius:10px; padding:11px 18px; background:var(--accent); color:white; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block; }
+    button,.button { border:0; border-radius:10px; padding:10px 16px; background:var(--accent); color:white; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block; font-size:14px; }
     button.secondary,.button.secondary { background:#e9eef8; color:#24447e; }
     button:disabled { opacity:.55; cursor:not-allowed; }
     .status { margin-top:12px; color:var(--muted); }
     .error-text { color:var(--danger); margin-top:12px; white-space:pre-wrap; }
     .success-text { color:#16703b; margin-top:12px; }
-    .grid { display:grid; grid-template-columns:minmax(280px,1fr) minmax(360px,1.35fr); gap:20px; }
-    .full { grid-column:1/-1; }
-    h2 { margin:0 0 14px; font-size:19px; }
-    .source-image { width:100%; max-height:720px; object-fit:contain; background:#eee9df; border-radius:10px; border:1px solid var(--line); }
-    .page-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
-    .page-grid figure { margin:0; }
-    .page-image { width:100%; height:230px; object-fit:contain; background:#eee9df; border:1px solid var(--line); border-radius:10px; }
-    .page-grid figcaption { margin-top:6px; color:var(--muted); text-align:center; }
-    textarea { width:100%; min-height:560px; resize:vertical; border:1px solid #cfd5df; border-radius:10px; padding:16px; background:#111a2b; color:#e9f0ff; font:13px/1.65 Consolas,monospace; tab-size:2; }
-    .errors { border-left:4px solid var(--danger); background:#fff0ee; padding:12px 16px; margin:12px 0; }
-    .error-item { margin:6px 0; }
-    .source-lines { max-height:320px; overflow:auto; border:1px solid var(--line); border-radius:10px; margin-top:14px; background:white; font:12px/1.55 Consolas,monospace; }
-    .source-line { display:grid; grid-template-columns:48px 1fr; padding:2px 8px; white-space:pre-wrap; }
-    .line-number { color:#8a91a0; text-align:right; padding-right:12px; user-select:none; }
-    .error-line { background:#ffe1de; color:var(--danger); font-weight:600; }
-    iframe { width:100%; height:760px; border:1px solid var(--line); border-radius:10px; background:white; }
-    .badge { display:inline-block; padding:4px 9px; border-radius:999px; background:#fff2c7; color:#785400; font-size:12px; margin-left:8px; }
-    @media (max-width:900px) { .grid { grid-template-columns:1fr; } textarea { min-height:420px; } iframe { height:620px; } }
+    .hint { color:var(--muted); font-size:13px; line-height:1.7; margin:6px 0 10px; }
+    h2 { margin:0 0 8px; font-size:17px; }
+    h2 .step { color:var(--accent); margin-right:6px; }
+    .badge { display:inline-block; padding:3px 9px; border-radius:999px; background:#fff2c7; color:#785400; font-size:12px; margin-left:8px; }
+    .ide { display:grid; grid-template-columns:230px minmax(0,1.25fr) minmax(0,1fr); gap:16px; align-items:start; }
+    .pane { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; box-shadow:0 8px 24px #25355d10; min-width:0; }
+    .thumb { margin:0 0 12px; cursor:pointer; border:2px solid transparent; border-radius:10px; padding:4px; }
+    .thumb.active { border-color:var(--accent); background:#eef3ff; }
+    .thumb img { width:100%; height:170px; object-fit:contain; background:#eee9df; border:1px solid var(--line); border-radius:8px; display:block; }
+    .thumb figcaption { text-align:center; font-size:13px; color:var(--muted); margin-top:4px; }
+    .thumb.active figcaption { color:var(--accent); font-weight:600; }
+    .editor { display:grid; grid-template-columns:46px minmax(0,1fr); height:600px; border:1px solid #1f2c44; border-radius:10px; overflow:hidden; background:#111a2b; }
+    .gutter { overflow:hidden; background:#0d1524; color:#5f6c85; font:13px/20px Consolas,monospace; text-align:right; padding:12px 8px 12px 0; user-select:none; }
+    .gutter-inner > div { height:var(--code-lh); }
+    .gutter .err { color:#ff9a8f; font-weight:700; }
+    .gutter .flash { color:#ffd479; }
+    .code-wrap { position:relative; height:100%; }
+    pre.hl { position:absolute; inset:0; margin:0; padding:12px; overflow:hidden; font:13px/20px Consolas,monospace; color:#e9f0ff; pointer-events:none; }
+    pre.hl .c-line { height:var(--code-lh); white-space:pre; }
+    pre.hl .c-line.err { background:#5a2222; box-shadow:-4px 0 0 #ff8a7a inset; }
+    pre.hl .c-line.flash { background:#3d3a17; box-shadow:-4px 0 0 #ffd479 inset; }
+    .tk-cmd { color:#7cc7ff; }
+    .tk-comment { color:#6f7f96; font-style:italic; }
+    .tk-math { color:#ffd479; }
+    .tk-brace { color:#c79bff; }
+    textarea.code { position:relative; width:100%; height:100%; margin:0; padding:12px; border:0; border-radius:0; background:transparent; color:transparent; caret-color:#ffffff; font:13px/20px Consolas,monospace; white-space:pre; overflow:auto; resize:none; outline:none; tab-size:2; }
+    textarea.code::selection { background:#2f65d955; color:transparent; }
+    .tabs { display:flex; gap:8px; margin-bottom:10px; }
+    .tab { border:1px solid var(--line); background:#f3efe6; color:var(--muted); border-radius:999px; padding:6px 14px; font-size:13px; font-weight:600; }
+    .tab.on { background:var(--accent); color:white; border-color:var(--accent); }
+    .tab .count { background:#ffffff33; border-radius:999px; padding:0 6px; }
+    iframe { width:100%; height:640px; border:1px solid var(--line); border-radius:10px; background:white; }
+    .issue { border-left:4px solid var(--danger); background:#fff0ee; border-radius:6px; padding:10px 12px; margin-bottom:10px; cursor:pointer; }
+    .issue.warn { border-left-color:#c08a00; background:#fff8e6; }
+    .issue .where { font-weight:700; font-size:13px; }
+    .issue .raw { font:12px/1.5 Consolas,monospace; color:#5b4a4a; word-break:break-all; margin:4px 0; }
+    .issue .plain { font-size:13px; line-height:1.6; }
+    .issue:hover { outline:2px solid #2f65d944; }
+    .review-card { border-left:4px solid #d99b00; background:#fff8e6; border-radius:6px; padding:10px 12px; margin-bottom:10px; cursor:pointer; }
+    .review-card:hover { outline:2px solid #d99b0044; }
+    .review-card .where { font-weight:700; font-size:13px; color:#7a5200; }
+    .review-card .plain { font-size:13px; line-height:1.6; margin-top:4px; }
+    .review-card .raw { font:12px/1.5 Consolas,monospace; color:#6b531a; word-break:break-all; margin:4px 0; }
+    .review-summary { background:#fff8e6; border:1px dashed #d99b00; border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:13px; line-height:1.7; color:#6b4c00; }
+    .review-summary button { background:#d99b00; padding:6px 12px; font-size:13px; margin-top:8px; }
+    pre.hl .c-line.review { background:#4a3a10; box-shadow:-4px 0 0 #ffc95c inset; }
+    .gutter .review { color:#ffc95c; font-weight:700; }
+    .page-flags { display:flex; gap:6px; justify-content:center; align-items:center; margin-top:6px; flex-wrap:wrap; }
+    .flag { font-size:12px; color:var(--muted); }
+    .flag.warn { color:#a56900; font-weight:600; }
+    .flag.bad { color:var(--danger); font-weight:700; }
+    .check { background:#fff8e6; color:#7a5200; border:1px solid #d99b00; padding:3px 8px; font-size:12px; border-radius:8px; }
+    .check.done { background:#e6f6ec; color:#16703b; border-color:#16703b; }
+    .empty-note { color:#16703b; font-size:14px; line-height:1.8; }
+    details.rawlog { margin-top:12px; }
+    details.rawlog pre { max-height:260px; overflow:auto; background:#111a2b; color:#dbe6ff; padding:10px; border-radius:8px; font:11px/1.5 Consolas,monospace; white-space:pre-wrap; }
+    .fix-panel { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; margin-top:18px; }
+    .fix-panel textarea { width:100%; min-height:280px; border:1px solid #cfd5df; border-radius:10px; padding:12px; background:#111a2b; color:#e9f0ff; font:13px/20px Consolas,monospace; }
+    @media (max-width:1200px) { .ide { grid-template-columns:1fr; } .editor { height:460px; } iframe { height:560px; } .thumb img { height:220px; } }
   </style>
 </head>
 <body>
-  <header><h1>Hand2LaTeX 智能工作台</h1><p>手写混合笔记 → 可编辑 LaTeX → 中文 PDF → 定位与修复</p></header>
+  <header><h1>Hand2LaTeX 智能工作台</h1><p>手写笔记照片 → 可编辑的 LaTeX → 中文 PDF。左边看原图，中间改代码，右边看效果。</p></header>
   <main id="app">
     <section class="card">
-      <h2>1. 上传整页手写笔记</h2>
+      <h2>第一步：上传手写笔记照片</h2>
+      <div class="hint">支持 png / jpg / webp，一次可以选多张（会按你选的顺序合成一份 PDF）。识别要调用模型，整页可能要一两分钟。</div>
       <div class="upload-row">
         <input type="file" accept=".png,.jpg,.jpeg,.webp" multiple @change="selectFile">
-        <button :disabled="busy || !files.length" @click="upload">整页识别并编译</button>
+        <button :disabled="busy || !files.length" @click="upload">识别并排版</button>
       </div>
-      <div class="status" v-if="busy">正在逐页识别和合并编译，多页内容可能需要数分钟，请勿重复点击。</div>
+      <div class="status" v-if="busy">正在识别和排版，请稍等，别重复点按钮。</div>
       <div class="error-text" v-if="error">{{ error }}</div>
-      <div class="success-text" v-if="jobId">已生成可编辑文档。识别结果仍需人工核对。</div>
+      <div class="success-text" v-if="jobId">好了。下面三栏：左边原图、中间代码、右边效果。<strong>黄色行＝可能缺字/编码问题，需要你对照原图确认</strong>；每页原图下面的“标为已核对”用来记录你已经核对过哪几页。</div>
     </section>
 
-    <div class="grid" v-if="jobId">
-      <section class="card">
-        <h2>2. 原始图片与源码<span class="badge" v-if="pageCount > 1">共 {{ pageCount }} 页</span><span class="badge" v-else>需要人工核对</span></h2>
-        <div class="page-grid">
-          <figure v-for="page in pages" :key="page.page">
-            <img class="page-image" :src="page.source_url" :alt="`第 ${page.page} 页手写笔记`">
-            <figcaption>第 {{ page.page }} 页</figcaption>
-          </figure>
-        </div>
-        <img v-if="!pages.length" class="source-image" :src="sourceUrl" alt="上传的手写笔记">
-      </section>
+    <div class="ide" v-if="jobId">
+      <aside class="pane">
+        <h2><span class="step">①</span>原图</h2>
+        <div class="hint">点某一页，中间代码会跳到那一页对应的位置，方便你核对有没有抄错。</div>
+        <figure class="thumb" v-for="page in pages" :key="page.page" :class="{active:activePage===page.page}" @click="jumpToPage(page.page)">
+          <img :src="page.source_url" :alt="'第 ' + page.page + ' 页手写原图'">
+          <figcaption>第 {{ page.page }} 页<template v-if="activePage===page.page">（正在对照）</template></figcaption>
+          <div class="page-flags">
+            <span class="flag bad" v-if="page.error">识别失败</span>
+            <span class="flag warn" v-else-if="pageReviewCount(page.page)">{{ pageReviewCount(page.page) }} 处待复核</span>
+            <span class="flag" v-else>无自动标记</span>
+            <button class="check" :class="{done:reviewedPages[page.page]}" @click.stop="togglePage(page.page)">{{ reviewedPages[page.page] ? '已核对 ✓' : '标为已核对' }}</button>
+          </div>
+        </figure>
+        <div class="hint" v-if="!pages.length">只有一页，直接对照中间代码即可。</div>
+      </aside>
 
-      <section class="card">
-        <h2>3. 编辑 LaTeX 并重新编译</h2>
-        <textarea v-model="tex" @input="invalidateCompile" spellcheck="false"></textarea>
-        <div class="actions" style="margin-top:14px">
-          <button :disabled="busy" @click="recompile">重新编译</button>
-          <button class="secondary" v-if="compileResult && compileResult.errors.length" :disabled="busy" @click="requestFix">AI 生成修复建议</button>
-          <a v-if="compileResult && compileResult.success" class="button secondary" :href="pdfUrl" target="_blank" download>下载 PDF</a>
+      <section class="pane">
+        <h2><span class="step">②</span>识别出的代码<span class="badge">可直接修改</span></h2>
+        <div class="hint">蓝色是 LaTeX 命令、黄色是公式、灰色是注释。<strong>红色行</strong>是排版报错；<strong>黄色行</strong>是可能缺字/编码出错、需要人工复核的位置。改完点"重新排版"。</div>
+        <div class="review-summary" v-if="reviewItems.length">
+          有 <strong>{{ reviewItems.length }}</strong> 处需要人工复核（黄色行）：{{ reviewKinds }}。<br>
+          系统只能标出"很可能抄错、缺字或编码出错"的位置，<strong>不能替你判断识别内容对不对</strong>——最终要对照左边原图确认。
+          <span v-if="pages.length">已核对 {{ reviewedCount }} / {{ pages.length }} 页。</span>
+          <button @click="tab='log'">查看复核清单</button>
         </div>
-        <div class="errors" v-if="compileResult && compileResult.errors.length">
-          <strong>编译错误定位</strong>
-          <div class="error-item" v-for="item in compileResult.errors" :key="item.line + item.message">
-            第 {{ item.line || '?' }} 行：{{ item.message }}
+        <div class="editor">
+          <div class="gutter"><div class="gutter-inner" :style="{transform:'translateY(' + (-scrollTop) + 'px)'}">
+            <div v-for="n in lineCount" :key="n" :class="{err:errorLines.has(n), review:!errorLines.has(n) && reviewLines.has(n), flash:flashLine===n}" :title="reviewLines.has(n) && !errorLines.has(n) ? '可能需要人工复核' : ''">{{ n }}</div>
+          </div></div>
+          <div class="code-wrap">
+            <pre class="hl" ref="hl" v-html="highlighted"></pre>
+            <textarea class="code" ref="ta" v-model="tex" spellcheck="false" @scroll="onScroll" @input="onEdit"></textarea>
           </div>
         </div>
-        <div class="source-lines" v-if="tex">
-          <div class="source-line" v-for="(line,index) in sourceLines" :key="index" :class="{'error-line':errorLines.has(index+1)}">
-            <span class="line-number">{{ index+1 }}</span><span>{{ line || ' ' }}</span>
+        <div class="actions" style="margin-top:12px">
+          <button :disabled="busy" @click="recompile">重新排版（编译）</button>
+          <a v-if="hasPdf" class="button secondary" :href="pdfUrl" target="_blank" download>下载 PDF</a>
+        </div>
+      </section>
+
+      <aside class="pane">
+        <div class="tabs">
+          <button class="tab" :class="{on:tab==='pdf'}" @click="tab='pdf'">排版效果</button>
+          <button class="tab" :class="{on:tab==='log'}" @click="tab='log'">问题与复核<span class="count">{{ issues.length + reviewItems.length }}</span></button>
+        </div>
+        <div v-show="tab==='pdf'">
+          <iframe v-if="hasPdf" :src="pdfUrl" :key="pdfVersion" title="排版后的 PDF"></iframe>
+          <div class="hint" v-if="hasPdf && dirty">你改过代码了，这份 PDF 还是上一次的。点中间的"重新排版"更新。</div>
+          <div class="hint" v-if="!hasPdf">还没有排出 PDF。先看"问题"标签里的原因，或点中间的"重新排版"。</div>
+        </div>
+        <div v-show="tab==='log'">
+          <div class="review-summary">
+            <template v-if="reviewItems.length">
+              <strong>需人工复核（{{ reviewItems.length }} 处）</strong><br>
+              这些不是排版错误，而是"很可能抄错、缺字或编码出错"的位置。系统无法自动判断对错，请对照左边原图逐条确认。
+            </template>
+            <template v-else>
+              <strong>没有发现可自动判定的缺字/编码问题。</strong><br>
+              但"没有警告"不等于"抄对了"，识别内容仍需对照原图检查。
+            </template>
+            <div v-if="pages.length" style="margin-top:8px">已核对 {{ reviewedCount }} / {{ pages.length }} 页（在左边每页下面打勾）。</div>
           </div>
+          <div class="review-card" v-for="(item,index) in reviewItems" :key="'r'+index" @click="jumpToLine(item.line)">
+            <div class="where">需复核 · {{ item.label }}<template v-if="item.line"> · 第 {{ item.line }} 行</template></div>
+            <div class="raw" v-if="item.message">{{ item.message }}</div>
+            <div class="plain">{{ item.plain }}</div>
+          </div>
+          <div class="hint">下面是编译器的报错和警告：<strong>错误</strong>会挡住 PDF；<strong>警告</strong>一般只是排版难看。点任意一条，中间代码跳到对应行。</div>
+          <div class="empty-note" v-if="!issues.length">没有报错。<br>但"能排出版"不等于"抄对了"——识别内容请对照左边原图检查。</div>
+          <div class="issue" v-for="(item,index) in issues" :key="index" :class="{warn:item.kind==='warn'}" @click="jumpToLine(item.line)">
+            <div class="where">{{ item.kind==='warn' ? '警告' : '错误' }}<template v-if="item.line"> · 第 {{ item.line }} 行</template><template v-else> · 位置未标出</template></div>
+            <div class="raw">{{ item.message }}</div>
+            <div class="plain">{{ item.plain }}</div>
+          </div>
+          <div class="actions" v-if="compileResult && compileResult.errors && compileResult.errors.length" style="margin-top:12px">
+            <button class="secondary" :disabled="busy" @click="requestFix">让 AI 给我改一版</button>
+          </div>
+          <details class="rawlog" v-if="compileResult && compileResult.log">
+            <summary>完整编译日志（给懂 LaTeX 的人看）</summary>
+            <pre>{{ compileResult.log }}</pre>
+          </details>
         </div>
-      </section>
-
-      <section class="card full" v-if="suggestedTex">
-        <h2>4. 确认 AI 修复建议</h2>
-        <p>{{ fixSummary }}</p>
-        <textarea v-model="suggestedTex" spellcheck="false"></textarea>
-        <div class="actions" style="margin-top:14px">
-          <button :disabled="busy" @click="applyFix">确认修复并重新编译</button>
-        </div>
-      </section>
-
-      <section class="card full" v-if="compileResult && compileResult.success">
-        <h2>5. PDF 预览</h2>
-        <iframe :src="pdfUrl" :key="pdfVersion" title="编译后的 PDF"></iframe>
-      </section>
+      </aside>
     </div>
+
+    <section class="fix-panel" v-if="suggestedTex">
+      <h2>AI 建议改成这样（你来决定用不用）</h2>
+      <p class="hint">{{ fixSummary }}。下面是 AI 给的代码，可以再手动改，确认后才会覆盖中间的代码并重新排版。</p>
+      <textarea v-model="suggestedTex" spellcheck="false"></textarea>
+      <div class="actions" style="margin-top:12px">
+        <button :disabled="busy" @click="applyFix">采用这份修改并重新排版</button>
+        <button class="secondary" @click="suggestedTex=''">不用了</button>
+      </div>
+    </section>
   </main>
   <script src="/vendor/vue/vue.global.js"></script>
   <script>
     const { createApp, ref, computed } = Vue;
+    const LINE_HEIGHT = 20;
+    const escapeHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const TOKEN = /(\\(?:[a-zA-Z]+@?|.))|(%.*$)|(\$[^$\n]*\$)|([{}])/g;
+    const highlightLine = line => {
+      let out = '', last = 0, match;
+      TOKEN.lastIndex = 0;
+      while ((match = TOKEN.exec(line)) !== null) {
+        out += escapeHtml(line.slice(last, match.index));
+        const cls = match[1] ? 'tk-cmd' : match[2] ? 'tk-comment' : match[3] ? 'tk-math' : 'tk-brace';
+        out += '<span class="' + cls + '">' + escapeHtml(match[0]) + '</span>';
+        last = match.index + match[0].length;
+        if (match[0] === '') TOKEN.lastIndex += 1;
+      }
+      out += escapeHtml(line.slice(last));
+      return out || '&#8203;';
+    };
+    // 把编译器术语翻译成能看懂的话；只解释，不替用户改内容。
+    const plainReason = (message, kind) => {
+      const m = message || '';
+      if (/Missing character|could not represent character/i.test(m)) return '有个符号在当前字体里不存在（∈、≤ 这类手写数学符号最常见），PDF 里它会变成空白或缺字。把它换成 LaTeX 写法（比如 $\\in$、$\\le$）就能正常显示。';
+      if (/fontspec.*package|choose a different font/i.test(m)) return '这是上一条"符号缺字"的补充建议，不用单独处理。';
+      if (/accessing absolute path/i.test(m)) return '这是在读取系统里的中文字体，属于正常提示，可以忽略。';
+      if (/No \\author given/i.test(m)) return '没有填写作者，不影响使用，可以忽略。';
+      if (/Undefined control sequence/i.test(m)) return '有条命令 LaTeX 不认识，多半是拼写错了，或者识别时多写了一个反斜杠。';
+      if (/Missing \$|math mode/i.test(m)) return '公式没有用数学符号包起来。行内公式要写成 $...$，单独一行的公式用 \\[ ... \\]。';
+      if (/fontset.*unavailable|Font .*not found|font.*not found/i.test(m)) return '字体问题：中文或某个符号的字体没找到。本地编译需要中文字体；在线 LaTeX 平台要把编译器改成 XeLaTeX。';
+      if (/Runaway argument|Paragraph ended|Missing }|Missing {/i.test(m)) return '大括号没有成对关上，检查这一行附近的 { 和 }。';
+      if (/Overfull \\hbox|Underfull \\hbox/i.test(m)) return '这一行太宽或太松，只是排版不好看，不影响打开 PDF。';
+      if (/File .* not found|not found.*\.sty|Package .* not found/i.test(m)) return '缺文件或缺宏包，不是手写内容的问题。';
+      if (/Misplaced alignment tab|Extra alignment tab/i.test(m)) return '表格里的 & 用错了，或者该换行的地方没换行。';
+      if (/^\s*$/.test(m)) return '编译器没有给出具体原因，看下面的完整日志。';
+      if (kind === 'warn') return '这是排版警告，一般不影响出 PDF。具体含义看上面的原文，不用紧张。';
+      return '编译器在这一行附近看不懂。点这条跳过去，对照原图看看是不是识别写错了。';
+    };
+
     createApp({
       setup() {
         const files = ref([]), busy = ref(false), error = ref(''), jobId = ref(''), tex = ref(''), sourceUrl = ref(''), compileResult = ref(null), pdfVersion = ref(0), suggestedTex = ref(''), fixSummary = ref(''), pages = ref([]), pageCount = ref(0);
+        const tab = ref('pdf'), scrollTop = ref(0), flashLine = ref(0), activePage = ref(0), hasPdf = ref(false), dirty = ref(false);
+        const ta = ref(null), hl = ref(null);
         const sourceLines = computed(() => tex.value.split('\n'));
+        const lineCount = computed(() => sourceLines.value.length);
         const errorLines = computed(() => new Set((compileResult.value?.errors || []).map(item => item.line).filter(Boolean)));
         const pdfUrl = computed(() => `/api/jobs/${jobId.value}/pdf?v=${pdfVersion.value}`);
+        const highlighted = computed(() => sourceLines.value.map((line, index) => {
+          const n = index + 1;
+          const cls = errorLines.value.has(n) ? 'c-line err' : (flashLine.value === n ? 'c-line flash' : (reviewLines.value.has(n) ? 'c-line review' : 'c-line'));
+          return '<div class="' + cls + '">' + highlightLine(line) + '</div>';
+        }).join(''));
+
+        const issues = computed(() => {
+          const result = [];
+          for (const item of (compileResult.value?.errors || [])) {
+            result.push({ kind:'error', line:item.line || 0, message:item.message, plain:plainReason(item.message, 'error') });
+          }
+          const log = compileResult.value?.log || '';
+          const seen = new Set();
+          for (const raw of log.split('\n')) {
+            if (!/warning|overfull|underfull/i.test(raw)) continue;
+            const text = raw.trim();
+            if (!text || seen.has(text)) continue;
+            seen.add(text);
+            const lineMatch = text.match(/(?:line|l\.)\s*(\d+)/i) || text.match(/main\.tex[:.](\d+)/);
+            result.push({ kind:'warn', line:lineMatch ? Number(lineMatch[1]) : 0, message:text, plain:plainReason(text, 'warn') });
+          }
+          return result;
+        });
+
+        // 人工复核标记：只用可验证的信号，不猜“识别对不对”。
+        // 信号一：编译器明确报告的缺字/无法表示的字符（PDF 里真的会缺东西）。
+        // 信号二：已知转写伪影——中文里的 $ 被 escape 成 \$；数学符号没写成 LaTeX 命令。
+        const RAW_MATH = /[∈≤≥≠≈∑∏∫∞παβγθλμσφΩ→←↔×÷±]/;
+        const reviewItems = computed(() => {
+          const result = [];
+          const lines = sourceLines.value;
+          const log = compileResult.value?.log || '';
+          const glyphLines = new Set();
+          const glyphEntries = [];
+          const seen = new Set();
+          for (const raw of log.split('\n')) {
+            if (!/Missing character|could not represent character/i.test(raw)) continue;
+            const text = raw.trim();
+            if (!text || seen.has(text)) continue;
+            seen.add(text);
+            const lineMatch = text.match(/main\.tex[:.](\d+)/) || text.match(/(?:line|l\.)\s*(\d+)/i);
+            const codeMatch = text.match(/\(U\+([0-9A-Fa-f]{4,6})\)/) || text.match(/\(0x([0-9A-Fa-f]+)\)/);
+            glyphEntries.push({ text, line: lineMatch ? Number(lineMatch[1]) : 0, code: codeMatch ? codeMatch[1].toUpperCase() : '' });
+          }
+          // 同一字符会同时出现"带行号"和"不带行号"两条警告，只保留带行号的那条。
+          const locatedCodes = new Set(glyphEntries.filter(entry => entry.line && entry.code).map(entry => entry.code));
+          for (const entry of glyphEntries) {
+            if (!entry.line && entry.code && locatedCodes.has(entry.code)) continue;
+            if (entry.line) glyphLines.add(entry.line);
+            result.push({
+              kind: 'glyph', line: entry.line,
+              label: '缺字/编码',
+              message: entry.text,
+              plain: '编译器说这个符号在当前字体里不存在，PDF 里会缺字。请对照原图，把符号换成 LaTeX 写法（例如 $\\in$、$\\le$）。',
+            });
+          }
+          lines.forEach((line, index) => {
+            const n = index + 1;
+            if (glyphLines.has(n)) return;
+            if (/^\s*%/.test(line) || /^\s*\\(documentclass|usepackage|title|begin|end|maketitle|newpage|null)\b/.test(line)) return;
+            if (line.includes('\\$')) {
+              result.push({
+                kind: 'inline-math', line: n,
+                label: '公式被当成了普通文字',
+                message: line.trim(),
+                plain: '这一行里的 $ 被转义成了普通字符。如果原图上这里夹着公式，需要把公式写成 $...$，不能只留文字。',
+              });
+              return;
+            }
+            if (RAW_MATH.test(line) && !line.includes('$')) {
+              result.push({
+                kind: 'unicode', line: n,
+                label: '数学符号写法',
+                message: line.trim(),
+                plain: '这行里有个数学符号没有用 LaTeX 写法，PDF 可能缺字或样式不对。对照原图，把它写成 $\\in$、$\\le$ 这样的命令。',
+              });
+            }
+          });
+          return result.sort((a, b) => (a.line || 999999) - (b.line || 999999));
+        });
+        const reviewLines = computed(() => new Set(reviewItems.value.map(item => item.line).filter(Boolean)));
+        const reviewKinds = computed(() => [...new Set(reviewItems.value.map(item => item.label))].join('、'));
+        const reviewedPages = ref({});
+        const reviewedCount = computed(() => Object.values(reviewedPages.value).filter(Boolean).length);
+        const togglePage = page => { reviewedPages.value = { ...reviewedPages.value, [page]: !reviewedPages.value[page] }; };
+
+        // 每一页原图对应代码里的位置：多页之间用 \newpage 分隔。
+        const pageAnchors = computed(() => {
+          const anchors = [];
+          const lines = sourceLines.value;
+          const first = lines.findIndex(line => line.includes('\\maketitle'));
+          anchors.push(first >= 0 ? first + 1 : 0);
+          lines.forEach((line, index) => { if (line.includes('\\newpage')) anchors.push(index + 1); });
+          return anchors;
+        });
+
+        const pageRanges = computed(() => pageAnchors.value.map((start, index) => ({
+          start,
+          end: index + 1 < pageAnchors.value.length ? pageAnchors.value[index + 1] - 1 : lineCount.value,
+        })));
+        const pageReviewCount = page => {
+          const range = pageRanges.value[page - 1];
+          if (!range) return 0;
+          return reviewItems.value.filter(item => item.line >= range.start && item.line <= range.end).length;
+        };
+
+        const onScroll = () => {
+          const el = ta.value;
+          if (!el) return;
+          scrollTop.value = el.scrollTop;
+          if (hl.value) { hl.value.scrollTop = el.scrollTop; hl.value.scrollLeft = el.scrollLeft; }
+        };
+        const jumpToLine = n => {
+          if (!n) { tab.value = 'log'; return; }
+          const el = ta.value;
+          const lines = sourceLines.value;
+          const target = Math.min(Math.max(1, n), lines.length);
+          if (el) {
+            const start = lines.slice(0, target - 1).reduce((sum, line) => sum + line.length + 1, 0);
+            el.focus();
+            el.setSelectionRange(start, start + lines[target - 1].length);
+            el.scrollTop = Math.max(0, (target - 1) * LINE_HEIGHT - el.clientHeight / 2);
+            onScroll();
+          }
+          flashLine.value = target;
+          setTimeout(() => { if (flashLine.value === target) flashLine.value = 0; }, 2600);
+        };
+        const jumpToPage = page => {
+          activePage.value = page;
+          let anchor = pageAnchors.value[page - 1];
+          if (anchor === undefined) return;
+          const lines = sourceLines.value;
+          while (anchor < lines.length - 1 && !lines[anchor].trim()) anchor += 1;
+          jumpToLine(anchor + 1);
+        };
         const selectFile = event => { files.value = Array.from(event.target.files || []); };
         const readError = async response => {
           try {
@@ -124,7 +387,7 @@
         };
         const upload = async () => {
           if (!files.value.length) return;
-          busy.value = true; error.value = ''; jobId.value = ''; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = '';
+          busy.value = true; error.value = ''; jobId.value = ''; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = ''; hasPdf.value = false; dirty.value = false; reviewedPages.value = {}; flashLine.value = 0;
           try {
             const form = new FormData();
             files.value.forEach(item => form.append('image', item));
@@ -133,6 +396,8 @@
             if (!response.ok) throw new Error(await readError(response));
             const data = await response.json();
             jobId.value = data.job_id; tex.value = data.tex; sourceUrl.value = data.source_url; compileResult.value = data.compile; pages.value = data.pages || []; pageCount.value = data.page_count || 1; pdfVersion.value += 1;
+            hasPdf.value = !!(data.compile && data.compile.success);
+            activePage.value = pages.value.length > 1 ? 1 : 0;
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
         };
@@ -143,10 +408,12 @@
             if (!response.ok) throw new Error(await readError(response));
             const data = await response.json();
             compileResult.value = data.compile; tex.value = data.tex; pdfVersion.value += 1;
+            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false;
+            if (data.compile && !data.compile.success) tab.value = 'log';
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
         };
-        const invalidateCompile = () => { compileResult.value = null; suggestedTex.value = ''; fixSummary.value = ''; };
+        const onEdit = () => { dirty.value = true; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = ''; flashLine.value = 0; };
         const requestFix = async () => {
           busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = '';
           try {
@@ -164,10 +431,11 @@
             if (!response.ok) throw new Error(await readError(response));
             const data = await response.json();
             tex.value = data.tex; compileResult.value = data.compile; suggestedTex.value = ''; fixSummary.value = ''; pdfVersion.value += 1;
+            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false;
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
         };
-        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, errorLines, pdfUrl, selectFile, upload, recompile, invalidateCompile, requestFix, applyFix };
+        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, lineCount, errorLines, pdfUrl, highlighted, issues, reviewItems, reviewLines, reviewKinds, reviewedPages, reviewedCount, togglePage, pageReviewCount, pageAnchors, tab, scrollTop, flashLine, activePage, hasPdf, dirty, ta, hl, onScroll, jumpToLine, jumpToPage, selectFile, upload, recompile, onEdit, requestFix, applyFix };
       }
     }).mount('#app');
   </script>

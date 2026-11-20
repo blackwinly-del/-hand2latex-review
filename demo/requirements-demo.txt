@@ -2,3 +2,6 @@
 # 真实识别还需 requirements-b.txt（paddlepaddle + paddleocr + 模型权重）。
 streamlit>=1.53
 streamlit-drawable-canvas>=0.13.0
+# demo 会 import reasoner，需要以下的运行依赖（CPU 环境通常已随 requirements.txt 装好）
+openai>=1.0
+python-dotenv>=1.0
