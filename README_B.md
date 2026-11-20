@@ -85,11 +85,11 @@ python recognizer.py samples/sample_plus.png --thorough    # 多视角，扩候�
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `RECOGNIZER_MODEL` | `PP-FormulaNet-L` | 换 `PP-FormulaNet_plus-L` / `_plus-M` 中文公式更强 |
-| `RECOGNIZER_MODEL_DIR` | 未设置 | 可选模型目录；默认优先使用项目内 `models/PP-FormulaNet-L` |
+| `RECOGNIZER_MODEL` | `PP-FormulaNet-L` | 可换 `PP-FormulaNet_plus-L` / `UniMERNet`；已知模型自动映射到独立引擎名（本机 12 样本对比见 README 9.2） |
+| `RECOGNIZER_MODEL_DIR` | 未设置 | 可选模型目录；默认优先使用项目内 `models/<模型名>` |
 | `RECOGNIZER_DEVICE` | `cpu` | 有显卡填 `gpu:0` |
 | `RECOGNIZER_BACKEND` | `paddle` | 填 `mock` 返回明确失败候选，仅用于联调失败回退，不得当作真实识别结果 |
-| `RECOGNIZER_ENGINES` | `pp_formulanet_l` | 以后加第二模型改成 `pp_formulanet_l,unimernet` |
+| `RECOGNIZER_ENGINES` | 按 `RECOGNIZER_MODEL` 映射 | 也可显式写 `pp_formulanet_l,unimernet` 同时跑两个独立模型 |
 | `RECOGNIZER_VIEWS` | `off` | 设 `on` 则默认多视角（慢 3~5 倍），一般用 `thorough=True` 按需触发 |
 | `RECOGNIZER_MAX_CANDIDATES` | `6` | 去重后候选数上限，防止 C 的仲裁 token 爆炸 |
 | `RECOGNIZER_LOG_JSONL` | 未设置 | 设成文件路径则每次识别追加一行 JSON，供 C 做测试集统计 |
@@ -142,9 +142,10 @@ PaddleOCR 的封装不暴露 n-best / beam search，B 只有两条不换模型�
 ## 六、B 的迭代路线（基础版跑通后再做）
 
 1. ✅ PP-FormulaNet-L 单模型 + 失败兜底 + 多视角扩池 + 契约 v0.2 对齐（本次已完成，24 项自测）
-2. 第二模型 UniMERNet：在 `recognizer.py` 的 `ENGINES` 表里加一行
-   `ENGINE_UNIMERNET: {"model_name": "UniMERNet"}`，再写一个对应的取结果逻辑，
-   `recognize()` 会自动把两个引擎的候选合并返回——**A、C 一行代码都不用改**。
+2. ✅ 第二模型 UniMERNet 已注册：设 `RECOGNIZER_MODEL=UniMERNet` 单跑，或设
+   `RECOGNIZER_ENGINES=pp_formulanet_l,unimernet` 同时跑两个独立引擎，A、C 一行代码都不用改。
+   本机 12 样本实测 UniMERNet 单视角 8/12，高于 PP-FormulaNet-L 的 5/12；
+   但多视角 + C 上下文选择实测反而 7/12，不要把候选池上限当成实际准确率。
 3. 收集测试素材：往 `samples/` 放 10+ 张真实手写公式照片（`hw_01.png`...），
    设 `RECOGNIZER_LOG_JSONL=runs/recognize.jsonl` 批量跑，把日志交给 C 做评估集。
 

@@ -153,7 +153,8 @@ if backend == "mock":
 else:
     device = (os.environ.get("RECOGNIZER_DEVICE") or "cpu").strip()
     device_label = f"GPU（{device}）" if device.lower().startswith("gpu") else "CPU"
-    st.caption(f"识别设备：{device_label}。首次识别要加载模型，GPU 约十几秒，CPU 更久。")
+    model = (os.environ.get("RECOGNIZER_MODEL") or "PP-FormulaNet-L").strip()
+    st.caption(f"识别模型：{model} · 设备：{device_label}。首次识别要加载模型，GPU 约十几秒，CPU 更久。")
 
 # 预热模型（首次加载，mock 模式自动跳过）。放在列布局之前，避免渲染时再加载。
 if backend != "mock":

@@ -739,3 +739,22 @@
 - **Git 状态**：本条目与上述代码、文档改动放在同一提交中（提交哈希见 `git log -1`）；本次不推送远端。
 - **学习进度**：修复“缺字”不一定要换模型，先把编码确定性转成 LaTeX 就能消除一类问题；但 7/12 的真实识别错误是模型本身看错，规则复核无法兜底，必须靠人工对原图核对。
 - **未完成事项**：整页逐字真值与准确率、本地整页识别、跨页语义一致性、模型多次运行稳定性统计仍未完成。
+
+## 2026-11-20 识别准确率提升：换 UniMERNet，否定多视角凑数
+
+**阶段状态：在同一 12 样本真值上完成 4 组模型/策略对比；画板优先切换到 UniMERNet 单视角，实测 final 精确匹配从 5/12 提升到 8/12。剩余 4 条错误未解决。**
+
+- **本次任务**：用户要求“41.7% 提升看看”。本轮只做实测选型与引擎注册，不改 `schemas.py`，不通过改写错误结果提高数字。
+- **诊断过程（全部实跑）**：PP-FormulaNet-L 多视角候选池 best-of-N 只有 7/12；PP-FormulaNet_plus-L 单视角 7/12、多视角 best-of-N 8/12；UniMERNet 单视角 8/12、多视角 best-of-N 9/12。对 sample_6/7/10/12 额外测试 zoom2/zoom3、加白边、锐化、对比度增强，均未产生正确结果；LaTeX_OCR_rec 在 sample_10 上输出无关公式，未采用。
+- **选择器反证**：给 `reasoning/handwritten_eval.py` 增加 `--thorough` 后，用 UniMERNet 多视角 + C 的真实上下文选择跑 12 样本，发生 6 次付费 API 选择调用，final 反而 7/12：sample_3 被选中“补括号”的候选，sample_11 被选中 `2^x`，sample_10 被选中 `-84`。因此本轮不把多视角 + 选择器作为提升方案，也不把 9/12 的候选池上限写成实际准确率。
+- **最终实测对比**：PP-FormulaNet-L 单视角 5/12（41.7%）；PP-FormulaNet_plus-L 单视角 7/12（58.3%）；UniMERNet 单视角 8/12（66.7%）；UniMERNet 多视角 + 上下文选择 7/12（58.3%）。报告分别在 `artifacts/handwritten_eval_gpu.json`、`handwritten_eval_plus_gpu.json`、`handwritten_eval_unimernet_gpu.json`、`handwritten_eval_unimernet_thorough_gpu.json`。
+- **UniMERNet 仍错 4 条**：sample_6 裁剪含“(3)原式”而真值只取公式本体；sample_7 漏因子 4；sample_10 三撇与 `-24` 识别错误；sample_11 双撇变单撇。sample_6/7/10 在已试模型的所有多视角候选里都没有正确答案。
+- **产品改动**：`recognizer.py` 把 `pp_formulanet_plus_l`、`unimernet` 注册为独立引擎，已知 `RECOGNIZER_MODEL` 自动映射引擎名，`models/<模型名>` 都可作为本地权重目录；`scripts/launch_demo.ps1` 在存在 `models/UniMERNet` 且用户未显式指定模型时优先使用 UniMERNet，并把 `PADDLE_PDX_CACHE_HOME` 固定到仓库 `.paddlex`；`demo/app.py` 显示模型名与设备；`.gitignore` 排除 `.paddlex/`。`tests/test_recognizer.py` 新增引擎映射自测。
+- **新发现的环境坑**：PaddleX 默认缓存 `%USERPROFILE%\.paddlex` 含中文用户名时，PP-FormulaNet_plus-L、UniMERNet、LaTeX_OCR_rec 都在建 predictor 时报 `inference.json` 空输入 parse error；复制到 ASCII 的 `models/<模型名>` 后均能加载。UniMERNet 权重约 1.6 GB，已放在本机 `models/UniMERNet`（Git 忽略）。
+- **浏览器实测**：`启动画板.bat -Gpu` 等价命令启动后，页面显示“识别模型：UniMERNet · 设备：GPU（gpu:0）”；`nvidia-smi` compute apps 中能看到 Streamlit 进程。测试后已停止。
+- **CPU 兼容实测**：默认 `.venv` 设 `RECOGNIZER_MODEL=UniMERNet` 跑 `samples/sample_plus.png`，引擎名正确为 `unimernet`，模型加载 10.3 s、推理 21.95 s，输出与 GPU/PP-FormulaNet-L 相同。
+- **实际测试**：B 自测脚本全部 PASS（含新增引擎映射）；`./.venv/Scripts/python.exe -m unittest discover -s tests -q` 为 `Ran 160 tests in 12.108s`、`OK`。
+- **证据边界**：8/12 来自同一批 12 个裁剪图，且这些样本参与了本轮选型，不能当泛化准确率；UniMERNet 单视角中位识别延迟约 0.79 s，仅为本机本次测量。整页识别仍走远端 API，不受本次换模型影响。
+- **Git 状态**：本条目与代码、报告、文档改动放在同一提交中（哈希见 `git log -1`）；本次不推送远端。
+- **学习进度**：提高精确匹配率不能靠“把候选修得更像数学”，多视角只扩大候选池，选择器本身也会选错；独立模型的错误分布不同，先用真值集测清单视角收益，再决定是否引入更复杂的仲裁。
+- **未完成事项**：sample_6 需要公式区域裁剪/ prose 排除策略，sample_7/10 需要更强手写识别或更多独立模型；上下文选择的忠实性仍需专门评估与改进。

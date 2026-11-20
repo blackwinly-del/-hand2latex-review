@@ -10,6 +10,11 @@ param(
 $ErrorActionPreference = 'Continue'
 $env:PYTHONIOENCODING = 'utf-8'
 $Root = Split-Path -Parent $PSScriptRoot
+# PaddleX 默认缓存到 %USERPROFILE%\.paddlex；用户名含中文时 C++ 推理会读不到
+# inference.json（parse error）。把缓存固定到仓库的 ASCII 路径，避免这个坑。
+if (-not $env:PADDLE_PDX_CACHE_HOME) {
+    $env:PADDLE_PDX_CACHE_HOME = Join-Path $Root '.paddlex'
+}
 $CpuPython = Join-Path $Root '.venv\Scripts\python.exe'
 $GpuPython = Join-Path $Root '.venv\gpu-venv\Scripts\python.exe'
 $VenvPython = $CpuPython
@@ -87,6 +92,17 @@ if (-not (Test-Path -LiteralPath $DemoApp)) {
     Stop-WithHint '没有找到 demo\app.py。' '画板演示在新版本代码里，请先 git pull 同步仓库。'
 }
 Write-Line '虚拟环境就绪' 'ok'
+
+# 本机若已准备 UniMERNet 权重则优先使用：同一份 12 样本真值上实测 8/12，
+# 高于 PP-FormulaNet-L 的 5/12。用户显式设置 RECOGNIZER_MODEL 时不覆盖。
+if (-not $env:RECOGNIZER_MODEL) {
+    $UniDir = Join-Path $Root 'models\UniMERNet'
+    if (Test-Path -LiteralPath (Join-Path $UniDir 'inference.json')) {
+        $env:RECOGNIZER_MODEL = 'UniMERNet'
+        if (-not $env:RECOGNIZER_MODEL_DIR) { $env:RECOGNIZER_MODEL_DIR = $UniDir }
+        Write-Line '识别模型：UniMERNet（实测更准；设 RECOGNIZER_MODEL 可切换）' 'ok'
+    }
+}
 
 Write-Step '检查画板依赖（streamlit + drawable-canvas）'
 $deps = Test-DemoDeps

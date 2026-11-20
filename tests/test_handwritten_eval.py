@@ -79,6 +79,35 @@ class HandwrittenEvalTests(unittest.TestCase):
         for sample in manifest["samples"]:
             self.assertTrue((root / sample["image_path"]).is_file(), sample["image_path"])
 
+    def test_thorough_flag_is_forwarded(self):
+        samples = [
+            {"sample_id": "s1", "image_path": "data/handwritten/sample_1.png", "ground_truth": "x"},
+        ]
+        seen = {}
+
+        def recognize_fn(path, thorough=False):
+            seen["thorough"] = thorough
+            return []
+
+        def refine_fn(path, candidates):
+            return {
+                "raw_latex": "",
+                "final_latex": "",
+                "confidence": "low",
+                "changes": [],
+                "need_review": True,
+                "risk_score": None,
+            }
+
+        evaluate_handwritten(
+            samples,
+            recognize_fn=recognize_fn,
+            refine_fn=refine_fn,
+            thorough=True,
+        )
+
+        self.assertTrue(seen["thorough"])
+
     def test_manifest_rejects_missing_ground_truth(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "manifest.json"

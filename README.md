@@ -253,6 +253,8 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
 - 用本机 GPU 识别：`启动画板.bat -Gpu`（等价于 `scripts/launch_demo.ps1 -Gpu`）。它会改用
   `.venv\gpu-venv` 并设置 `RECOGNIZER_DEVICE=gpu:0`；GPU 环境缺画板依赖时，按
   `demo/requirements-demo.txt` 安装到该环境。页面会显示当前识别设备。
+- 识别模型：存在 `models/UniMERNet` 时启动脚本优先用它（12 样本实测 8/12，高于
+  PP-FormulaNet-L 的 5/12，见 9.2）；显式设置 `RECOGNIZER_MODEL` 可切换，页面会显示模型名。
 
 ### 6.4 本地公式识别用 GPU（实测，2026-11-19～20）
 
@@ -277,6 +279,10 @@ py -3.12 -m venv .venv\gpu-venv
    都不用再手动写导入顺序；默认 `.venv` 的真实识别也已实测恢复。
 2. `paddleocr==3.7.0` 的公式后处理还缺 `tokenizers` 和 `ftfy`，缺了会在建 predictor 时
    只报笼统的 "A dependency error occurred"。
+3. PaddleX 默认缓存到 `%USERPROFILE%\.paddlex`；用户名含中文时 C++ 推理会读不到
+   `inference.json`（`json.exception.parse_error.101`）。画板启动脚本已把
+   `PADDLE_PDX_CACHE_HOME` 固定到仓库的 `.paddlex`（ASCII 路径）；手动 CLI 可同样设置，
+   或把模型复制到项目内的 `models/<模型名>`。
 
 实测同一张 `samples/sample_plus.png`（`RECOGNIZER_DEVICE=gpu:0`）：
 
@@ -288,8 +294,17 @@ py -3.12 -m venv .venv\gpu-venv
 GPU 运行期间 `nvidia-smi` 采样到 35–44% 利用率、约 355 MiB 显存，确认真的在 GPU 上算。
 这只是单张样本的单次测量，不构成性能基准。
 
+换用 UniMERNet（本机 12 样本实测更准，见 9.2）：
+
+```bash
+# 首次会下载约 1.6 GB 权重；缓存路径保持 ASCII
+RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 PADDLE_PDX_CACHE_HOME=D:/latex/.paddlex \
+  ./.venv/gpu-venv/Scripts/python.exe recognizer.py samples/sample_plus.png
+# 下载后把权重放到 models/UniMERNet，画板启动脚本就会优先使用它
+```
+
 画板现在可以直接用 GPU 启动：`启动画板.bat -Gpu`。实测浏览器页面显示
-“识别设备：GPU（gpu:0）”，Streamlit 进程出现在 `nvidia-smi` 的 compute apps 中。
+“识别模型：UniMERNet · 设备：GPU（gpu:0）”，Streamlit 进程出现在 `nvidia-smi` 的 compute apps 中。
 默认 `.venv` 的 CPU 识别也已恢复：`recognizer.py samples/sample_plus.png` 实测模型加载 9.5 s、
 推理 26.02 s，输出与 GPU 相同。整页识别仍然走远端 `deepseek-flash`，本机 GPU 只覆盖
 单张公式图（B 的 `recognizer.py`），两者不是同一条链路。
@@ -314,12 +329,19 @@ GPU 运行期间 `nvidia-smi` 采样到 35–44% 利用率、约 355 MiB 显存�
 # 同一份真值用 GPU 识别
 RECOGNIZER_DEVICE=gpu:0 ./.venv/gpu-venv/Scripts/python.exe -m reasoning.handwritten_eval \
   --output artifacts/handwritten_eval_gpu.json
+
+# 换 UniMERNet（本机 12 样本实测 8/12）
+RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 \
+  ./.venv/gpu-venv/Scripts/python.exe -m reasoning.handwritten_eval \
+  --output artifacts/handwritten_eval_unimernet_gpu.json
+
+# --thorough 会开多视角；出现多个候选时 C 会调用上下文选择 API（付费）
 ```
 
 ## 八、测试
 
 ```bash
-# C + workbench 全量回归（14 个测试模块、159 项，含真实 Tectonic 编译，需要 tools/tectonic）
+# C + workbench 全量回归（14 个测试模块、160 项，含真实 Tectonic 编译，需要 tools/tectonic）
 ./.venv/Scripts/python.exe -m unittest discover -s tests -v
 
 # 单个模块
@@ -380,25 +402,28 @@ FULLPAGE_MAX_TOKENS=40000 FULLPAGE_TIMEOUT_SECONDS=300 \
 `data/handwritten_ground_truth.json`，评估脚本是 `reasoning/handwritten_eval.py`。
 口径与 C 的 `evaluate_refinement` 一致：只做 `strip` 后**整串精确匹配**，不做语义等价。
 
-RTX 5070 Laptop、`PP-FormulaNet-L`、`gpu:0` 实测：
+同一批样本在 RTX 5070 Laptop、`gpu:0` 上对比（除另注外均为单视角）：
 
-| 指标 | 结果 |
-| --- | --- |
-| 样本数 | 12 |
-| raw 精确匹配 | 5 / 12（41.7%） |
-| final 精确匹配 | 5 / 12（41.7%） |
-| C 改写正确结果为错误 | 0 |
-| 规则判定需复核 | 1 / 12 |
-| 漏判的错误样本 | 7 / 12 |
+| 识别配置 | final 精确匹配 | 报告 |
+| --- | --- | --- |
+| `PP-FormulaNet-L`（旧默认） | 5 / 12（41.7%） | `artifacts/handwritten_eval_gpu.json` |
+| `PP-FormulaNet_plus-L` | 7 / 12（58.3%） | `artifacts/handwritten_eval_plus_gpu.json` |
+| `UniMERNet`（画板现在优先使用） | 8 / 12（66.7%） | `artifacts/handwritten_eval_unimernet_gpu.json` |
+| `UniMERNet` 多视角 + C 上下文选择 | 7 / 12（58.3%） | `artifacts/handwritten_eval_unimernet_thorough_gpu.json` |
 
-7 个错误都是真实识别差异：多出裁剪边界外的编号与根式（sample_6）、漏因子 4（sample_7）、
-单撇写成双撇（sample_8）、`o` 写成 `0`（sample_9）、指数与分子写错（sample_10）、
-双撇写成 `n`（sample_11）、阶乘 `2!`/`3!` 写成 `21`/`31` 且多一个减号（sample_12）。
-`raw` 与 `final` 相同，说明 C 没有擅自改写；规则复核只命中了 1 个结构性错误，**7 个错误
-没有被自动标记**——再次说明“没有警告”不等于“抄对了”。
+提升来自换模型，不是把错误结果“改对”：UniMERNet 认对了 sample_12 的阶乘，并保持
+sample_5/8/9 正确；所有配置 `raw` 与 `final` 相同，C 没有擅自改写。
+多视角候选池里最好能有 9/12，但 C 的上下文选择实际把 sample_3 选成“补了括号”的版本、
+把 sample_11 选成 `2^x`，所以**不拿多视角 + 选择器凑数**，画板默认走 UniMERNet 单视角。
 
-边界：这是公式裁剪图，不是整页；样本只有 12 个，且用于过冲突分析，不能当作泛化准确率或
-性能基准。整页转录仍未建立逐字真值。
+UniMERNet 单视角仍错 4 条：sample_6（裁剪里含“(3)原式”，真值只取公式本体）、
+sample_7（漏因子 4）、sample_10（三撇与 `-24`）、sample_11（双撇写成单撇）。
+sample_6/7/10 在已试模型的多视角候选里都没有正确答案；zoom2/3、加白边、锐化、对比度增强
+也没有救回。`LaTeX_OCR_rec` 在 sample_10 上输出无关公式，未采用。
+规则复核只能发现结构问题，**这些看错仍然只能靠人工对原图发现**。
+
+边界：这是公式裁剪图，不是整页；样本只有 12 个，且用于过冲突分析和本轮选型，不能当作
+泛化准确率或性能基准。整页转录仍未建立逐字真值。
 
 ## 十、打包时故意没有包含的东西
 

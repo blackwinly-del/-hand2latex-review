@@ -374,6 +374,14 @@ def test_jsonl_log() -> None:
         log_path.unlink(missing_ok=True)
 
 
+def test_engine_registry_maps_known_models() -> None:
+    assert recognizer._MODEL_TO_ENGINE["PP-FormulaNet-L"] == "pp_formulanet_l"
+    assert recognizer._MODEL_TO_ENGINE["PP-FormulaNet_plus-L"] == "pp_formulanet_plus_l"
+    assert recognizer._MODEL_TO_ENGINE["UniMERNet"] == "unimernet"
+    assert recognizer.ENGINES["unimernet"]["model_name"] == "UniMERNet"
+    assert recognizer.ENGINES["pp_formulanet_plus_l"]["model_name"] == "PP-FormulaNet_plus-L"
+
+
 # ---------------------------------------------------------------------------
 # 真模型冒烟（可选）
 # ---------------------------------------------------------------------------
@@ -428,6 +436,7 @@ def main() -> int:
     check("全失败 → 合并成 1 条", test_all_fail_returns_single_error)
     check("候选数封顶", test_candidate_cap)
     check("JSONL 运行日志可落盘", test_jsonl_log)
+    check("已知模型映射到独立引擎", test_engine_registry_maps_known_models)
     check("真模型冒烟", test_real_model)
 
     print()

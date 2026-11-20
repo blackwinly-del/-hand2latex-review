@@ -41,13 +41,14 @@ TAMER（AAAI 2025）的做法是：训练时联合优化序列预测和树结构
 
 环境变量：
     RECOGNIZER_MODEL          默认 "PP-FormulaNet-L"
-                              可换 "PP-FormulaNet_plus-L" / "PP-FormulaNet_plus-M"（中文更强）
-    RECOGNIZER_MODEL_DIR      可选模型目录；默认优先使用项目内 models/PP-FormulaNet-L
+                              可换 "PP-FormulaNet_plus-L" / "UniMERNet"；已知模型会自动
+                              映射到独立引擎名，候选的 engine 字段不会张冠李戴
+    RECOGNIZER_MODEL_DIR      可选模型目录；默认优先使用项目内 models/<模型名>
     RECOGNIZER_DEVICE         默认 "cpu"，有显卡填 "gpu:0"
     RECOGNIZER_BACKEND        默认 "paddle"；设成 "mock" 返回明确失败候选，
                               仅用于联调失败回退，不得当成真实识别结果
-    RECOGNIZER_ENGINES        默认 "pp_formulanet_l"；加第二模型时改成
-                              "pp_formulanet_l,unimernet"，A / C 一行都不用改
+    RECOGNIZER_ENGINES        默认按 RECOGNIZER_MODEL 选引擎；也可显式写成
+                              "pp_formulanet_l,unimernet" 同时跑两个独立模型
     RECOGNIZER_VIEWS          默认 "off"；设 "on" 默认就开多视角（慢 3~5 倍）
     RECOGNIZER_MAX_CANDIDATES 默认 6，去重后候选数上限，防止 C 的仲裁 token 爆炸
     RECOGNIZER_LOG_JSONL      设成文件路径则每次识别追加一行 JSON，供 C 做测试集分析
@@ -87,18 +88,26 @@ logger = logging.getLogger("recognizer")
 # ---------------------------------------------------------------------------
 
 ENGINE_PP_FORMULANET_L = "pp_formulanet_l"
-ENGINE_UNIMERNET = "unimernet"  # 预留槽位，PP-FormulaNet 跑通后再填
+ENGINE_PP_FORMULANET_PLUS_L = "pp_formulanet_plus_l"
+ENGINE_UNIMERNET = "unimernet"
+
+_MODEL_TO_ENGINE = {
+    "PP-FormulaNet-L": ENGINE_PP_FORMULANET_L,
+    "PP-FormulaNet_plus-L": ENGINE_PP_FORMULANET_PLUS_L,
+    "UniMERNet": ENGINE_UNIMERNET,
+}
+_DEFAULT_MODEL_NAME = os.environ.get("RECOGNIZER_MODEL", "PP-FormulaNet-L")
+DEFAULT_ENGINE = _MODEL_TO_ENGINE.get(_DEFAULT_MODEL_NAME, ENGINE_PP_FORMULANET_L)
 
 ENGINES: Dict[str, Dict[str, Any]] = {
-    ENGINE_PP_FORMULANET_L: {
-        "model_name": os.environ.get("RECOGNIZER_MODEL", "PP-FormulaNet-L"),
-    },
-    # 第二模型接入后大概长这样（现在不要打开，会直接报 KeyError）：
-    # ENGINE_UNIMERNET: {"model_name": "UniMERNet"},
+    ENGINE_PP_FORMULANET_L: {"model_name": "PP-FormulaNet-L"},
+    ENGINE_PP_FORMULANET_PLUS_L: {"model_name": "PP-FormulaNet_plus-L"},
+    ENGINE_UNIMERNET: {"model_name": "UniMERNet"},
 }
+# 未登记的自定义模型名仍占用默认引擎槽位，保持旧的 RECOGNIZER_MODEL 用法。
+ENGINES[DEFAULT_ENGINE]["model_name"] = _DEFAULT_MODEL_NAME
 
-DEFAULT_ENGINE = ENGINE_PP_FORMULANET_L
-_DEFAULT_MODEL_DIR = Path(__file__).resolve().parent / "models" / "PP-FormulaNet-L"
+_MODELS_ROOT = Path(__file__).resolve().parent / "models"
 
 # 支持的后缀。与 CONTRACT.md §2.1 保持一致（C 那边接受 png/jpg/jpeg/gif/webp）。
 _ALLOWED_SUFFIX = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tif", ".tiff", ".pdf"}
@@ -287,8 +296,10 @@ def get_model(engine: str = DEFAULT_ENGINE) -> Any:
         raise KeyError(f"未注册的引擎：{engine}，已注册：{list(ENGINES)}")
 
     model_dir = os.environ.get("RECOGNIZER_MODEL_DIR")
-    if not model_dir and cfg["model_name"] == "PP-FormulaNet-L" and _DEFAULT_MODEL_DIR.is_dir():
-        model_dir = str(_DEFAULT_MODEL_DIR)
+    if not model_dir:
+        local_dir = _MODELS_ROOT / cfg["model_name"]
+        if local_dir.is_dir():
+            model_dir = str(local_dir)
     model_kwargs = {"model_name": cfg["model_name"], "device": _device()}
     if model_dir:
         model_kwargs["model_dir"] = model_dir

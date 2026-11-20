@@ -63,9 +63,10 @@ def _empty_refine_result() -> dict:
 def evaluate_handwritten(
     samples: list[dict],
     *,
-    recognize_fn: Callable[[str], list[dict]] = recognize,
+    recognize_fn: Callable[..., list[dict]] = recognize,
     refine_fn: Callable[[str, list[dict]], dict] = refine,
     base_dir: Path = _ROOT,
+    thorough: bool = False,
 ) -> dict:
     started = time.perf_counter()
     records = []
@@ -76,7 +77,10 @@ def evaluate_handwritten(
         candidates: list[dict] = []
         error: str | None = None
         try:
-            candidates = recognize_fn(str(image_path))
+            if thorough:
+                candidates = recognize_fn(str(image_path), thorough=True)
+            else:
+                candidates = recognize_fn(str(image_path))
             if not isinstance(candidates, list):
                 raise TypeError(f"recognize must return a list, got {type(candidates).__name__}")
             result = refine_fn(str(image_path), candidates)
@@ -132,6 +136,7 @@ def evaluate_handwritten(
             "recognizer_model": (os.environ.get("RECOGNIZER_MODEL") or "PP-FormulaNet-L").strip(),
         },
         "summary": summary,
+        "thorough": thorough,
         "results": records,
         "elapsed_seconds": round(time.perf_counter() - started, 3),
     }
@@ -164,10 +169,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="评估手写公式真值集上的精确匹配准确率")
     parser.add_argument("--manifest", default=str(_DEFAULT_MANIFEST), help="真值清单路径")
     parser.add_argument("--output", help="把完整报告写入该 JSON 文件")
+    parser.add_argument(
+        "--thorough",
+        action="store_true",
+        help="开启 B 的多视角候选；出现多个候选时 C 会调用上下文选择 API",
+    )
     args = parser.parse_args(argv)
 
     manifest = load_manifest(args.manifest)
-    report = evaluate_handwritten(manifest["samples"])
+    report = evaluate_handwritten(manifest["samples"], thorough=args.thorough)
 
     if args.output:
         output_path = Path(args.output)
