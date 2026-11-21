@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import time
@@ -472,6 +473,41 @@ class WorkbenchAppTests(unittest.TestCase):
             self.assertTrue(stranger.exists())
         finally:
             stranger.unlink(missing_ok=True)
+
+    def test_job_list_supports_search_and_pagination(self):
+        directories = []
+        try:
+            for index, title in enumerate(("分页验收A", "分页验收B", "其他任务")):
+                directory = Path("artifacts/jobs") / uuid.uuid4().hex
+                directory.mkdir(parents=True)
+                directories.append(directory)
+                (directory / "main.tex").write_text("content", encoding="utf-8")
+                (directory / "job.json").write_text(
+                    json.dumps({"title": title, "page_count": 1, "pages": []}, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                timestamp = time.time() - index * 10
+                os.utime(directory, (timestamp, timestamp))
+
+            first = self.client.get("/api/jobs", params={"q": "分页验收", "limit": 1, "offset": 0})
+            second = self.client.get("/api/jobs", params={"q": "分页验收", "limit": 1, "offset": 1})
+            self.assertEqual(first.status_code, 200, first.text)
+            self.assertEqual(first.json()["total"], 2)
+            self.assertEqual(second.json()["total"], 2)
+            self.assertEqual(len(first.json()["jobs"]), 1)
+            self.assertEqual(len(second.json()["jobs"]), 1)
+            self.assertNotEqual(first.json()["jobs"][0]["job_id"], second.json()["jobs"][0]["job_id"])
+
+            by_id = self.client.get("/api/jobs", params={"q": directories[0].name[:12]})
+            self.assertEqual(by_id.json()["total"], 1)
+            self.assertEqual(by_id.json()["jobs"][0]["job_id"], directories[0].name)
+
+            missing = self.client.get("/api/jobs", params={"q": "不存在的标题"})
+            self.assertEqual(missing.json()["total"], 0)
+            self.assertEqual(missing.json()["jobs"], [])
+        finally:
+            for directory in directories:
+                shutil.rmtree(directory, ignore_errors=True)
 
     def test_missing_job_returns_404(self):
         response = self.client.get("/api/jobs/00000000000000000000000000000000/pdf")

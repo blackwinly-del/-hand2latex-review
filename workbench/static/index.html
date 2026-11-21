@@ -16,6 +16,7 @@
     .upload-row,.actions { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
     input[type=file] { max-width:100%; padding:12px; border:1px dashed #a8b0bf; border-radius:10px; background:white; }
     .job-select { max-width:min(100%,760px); padding:10px 12px; border:1px solid #cfd5df; border-radius:10px; background:white; color:var(--ink); font-size:14px; }
+    .job-search { width:min(100%,320px); padding:10px 12px; border:1px solid #cfd5df; border-radius:10px; background:white; color:var(--ink); font-size:14px; }
     button,.button { border:0; border-radius:10px; padding:10px 16px; background:var(--accent); color:white; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block; font-size:14px; }
     button.secondary,.button.secondary { background:#e9eef8; color:#24447e; }
     button:disabled { opacity:.55; cursor:not-allowed; }
@@ -93,6 +94,11 @@
         <input type="file" accept=".png,.jpg,.jpeg,.webp" multiple @change="selectFile">
         <button :disabled="busy || !files.length" @click="upload">识别并排版</button>
       </div>
+      <div class="upload-row" style="margin-top:12px">
+        <input class="job-search" v-model="jobQuery" placeholder="搜索任务标题或任务号" @keyup.enter="searchJobs">
+        <button class="secondary" :disabled="busy" @click="searchJobs">查找</button>
+        <button class="secondary" :disabled="busy" @click="loadJobs">刷新</button>
+      </div>
       <div class="upload-row" v-if="recentJobs.length" style="margin-top:12px">
         <select class="job-select" v-model="selectedJob">
           <option value="">打开最近任务…</option>
@@ -100,6 +106,13 @@
         </select>
         <button class="secondary" :disabled="busy || !selectedJob" @click="openJob(selectedJob)">打开任务</button>
       </div>
+      <div class="upload-row" v-if="jobTotal > jobLimit" style="margin-top:10px">
+        <button class="secondary" :disabled="jobOffset === 0" @click="prevJobs">上一页</button>
+        <span class="hint">第 {{ jobPage }} / {{ jobPages }} 页，共 {{ jobTotal }} 个任务</span>
+        <button class="secondary" :disabled="jobOffset + jobLimit >= jobTotal" @click="nextJobs">下一页</button>
+      </div>
+      <div class="hint" v-else-if="jobTotal">共 {{ jobTotal }} 个任务</div>
+      <div class="hint" v-else>没有找到任务</div>
       <div class="hint" v-if="jobId">当前任务 {{ jobId }}；刷新页面会自动恢复，已核对的页也会保留。</div>
       <div class="status" v-if="busy">正在识别和排版，请稍等，别重复点按钮。</div>
       <div class="error-text" v-if="error">{{ error }}</div>
@@ -249,7 +262,9 @@
       setup() {
         const files = ref([]), busy = ref(false), error = ref(''), jobId = ref(''), tex = ref(''), sourceUrl = ref(''), compileResult = ref(null), pdfVersion = ref(0), suggestedTex = ref(''), fixSummary = ref(''), pages = ref([]), pageCount = ref(0);
         const tab = ref('pdf'), scrollTop = ref(0), flashLine = ref(0), activePage = ref(0), hasPdf = ref(false), dirty = ref(false);
-        const recentJobs = ref([]), selectedJob = ref('');
+        const recentJobs = ref([]), selectedJob = ref(''), jobQuery = ref(''), jobOffset = ref(0), jobTotal = ref(0), jobLimit = 10;
+        const jobPage = computed(() => Math.floor(jobOffset.value / jobLimit) + 1);
+        const jobPages = computed(() => Math.max(1, Math.ceil(jobTotal.value / jobLimit)));
         const ta = ref(null), hl = ref(null);
         const sourceLines = computed(() => tex.value.split('\n'));
         const lineCount = computed(() => sourceLines.value.length);
@@ -446,12 +461,18 @@
         };
         const loadJobs = async () => {
           try {
-            const response = await fetch('/api/jobs');
+            const params = new URLSearchParams({ limit: String(jobLimit), offset: String(jobOffset.value) });
+            if (jobQuery.value.trim()) params.set('q', jobQuery.value.trim());
+            const response = await fetch('/api/jobs?' + params);
             if (!response.ok) return;
             const data = await response.json();
             recentJobs.value = data.jobs || [];
-          } catch { recentJobs.value = []; }
+            jobTotal.value = data.total || 0;
+          } catch { recentJobs.value = []; jobTotal.value = 0; }
         };
+        const searchJobs = () => { jobOffset.value = 0; selectedJob.value = ''; loadJobs(); };
+        const prevJobs = () => { jobOffset.value = Math.max(0, jobOffset.value - jobLimit); loadJobs(); };
+        const nextJobs = () => { if (jobOffset.value + jobLimit < jobTotal.value) { jobOffset.value += jobLimit; loadJobs(); } };
         const openJob = async id => {
           if (!id) return;
           busy.value = true; error.value = '';
@@ -469,6 +490,7 @@
             const response = await fetch(`/api/jobs/${jobId.value}/pages/${pageNumber}/retry`, { method:'POST' });
             if (!response.ok) throw new Error(await readError(response));
             applyJob(await response.json());
+            jobOffset.value = 0;
             loadJobs();
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
@@ -484,6 +506,7 @@
             if (!response.ok) throw new Error(await readError(response));
             const data = await response.json();
             applyJob(data);
+            jobOffset.value = 0;
             loadJobs();
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
@@ -535,6 +558,20 @@
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
         };
+        const clearJob = () => {
+          jobId.value = ''; tex.value = ''; sourceUrl.value = ''; compileResult.value = null;
+          pages.value = []; pageCount.value = 0; hasPdf.value = false; activePage.value = 0;
+          reviewedPages.value = {}; suggestedTex.value = ''; fixSummary.value = '';
+          selectedJob.value = ''; dirty.value = false; error.value = '';
+        };
+        window.addEventListener('hashchange', () => {
+          const match = location.hash.match(/^#job=([0-9a-f]{32})$/);
+          if (match) {
+            if (match[1] !== jobId.value) openJob(match[1]);
+          } else if (jobId.value) {
+            clearJob();
+          }
+        });
         onMounted(async () => {
           await loadJobs();
           const match = location.hash.match(/^#job=([0-9a-f]{32})$/);
@@ -543,7 +580,7 @@
         window.addEventListener('beforeunload', event => {
           if (dirty.value) { event.preventDefault(); event.returnValue = ''; }
         });
-        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, lineCount, errorLines, pdfUrl, texUrl, originalUrl, activePageData, highlighted, issues, reviewItems, reviewLines, reviewKinds, reviewedPages, reviewedCount, togglePage, pageReviewCount, pageAnchors, tab, scrollTop, flashLine, activePage, hasPdf, dirty, recentJobs, selectedJob, ta, hl, onScroll, jumpToLine, jumpToPage, selectFile, upload, openJob, retryPage, formatJobTime, recompile, restoreOriginal, onEdit, requestFix, applyFix };
+        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, lineCount, errorLines, pdfUrl, texUrl, originalUrl, activePageData, highlighted, issues, reviewItems, reviewLines, reviewKinds, reviewedPages, reviewedCount, togglePage, pageReviewCount, pageAnchors, tab, scrollTop, flashLine, activePage, hasPdf, dirty, recentJobs, selectedJob, jobQuery, jobOffset, jobTotal, jobLimit, jobPage, jobPages, searchJobs, prevJobs, nextJobs, clearJob, ta, hl, onScroll, jumpToLine, jumpToPage, selectFile, upload, openJob, retryPage, formatJobTime, recompile, restoreOriginal, onEdit, requestFix, applyFix };
       }
     }).mount('#app');
   </script>

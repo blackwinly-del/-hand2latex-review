@@ -177,8 +177,8 @@ cp .env.example .env
 
 任务与复核管理（2026-11-21 补齐）：
 
-- 上传区可打开最近任务；当前任务写入地址栏 `#job=<job_id>`，**刷新页面会自动恢复**。
-  每页“标为已核对”按任务保存在浏览器 localStorage，刷新不丢。
+- 上传区可打开最近任务，支持按标题/任务号搜索和分页；当前任务写入地址栏 `#job=<job_id>`，
+  **刷新、后退、前进都会按地址恢复**。每页“标为已核对”按任务保存在浏览器 localStorage，刷新不丢。
 - 可下载当前 `.tex` 和最初识别原稿；“恢复识别原稿”会在确认后覆盖当前修改并重新编译。
 - 某页识别失败时，该页显示“重试这一页”：只重新识别失败页，成功页复用已保存的
   `document.json`，不重复调用模型。早期任务若没有这些结构文件，会明确提示整批重传。
@@ -238,7 +238,7 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
 | --- | --- |
 | `POST /api/documents` | 上传 1 张图，识别 + 编译（表单字段名 `image`） |
 | `POST /api/documents/batch` | 上传多张图，按上传顺序合并成一份 PDF（同字段名 `image`） |
-| `GET /api/jobs` | 最近任务列表（标题、页数、失败页数、更新时间） |
+| `GET /api/jobs` | 最近任务列表，支持 `q` 搜索和 `limit`/`offset` 分页（标题、页数、失败页数、更新时间） |
 | `GET /api/jobs/{job_id}` | 该 job 的 TeX 源码、源图链接、编译结果（`human_review` 恒为 true）；识别块结构合并在这份 TeX 里，接口不单独返回块数组 |
 | `GET /api/jobs/{job_id}/pdf` | 下载编译好的 PDF |
 | `GET /api/jobs/{job_id}/tex` | 下载当前 TeX |
@@ -354,7 +354,7 @@ RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 \
 ## 八、测试
 
 ```bash
-# C + workbench 全量回归（14 个测试模块、163 项，含真实 Tectonic 编译，需要 tools/tectonic）
+# C + workbench 全量回归（14 个测试模块、164 项，含真实 Tectonic 编译，需要 tools/tectonic）
 ./.venv/Scripts/python.exe -m unittest discover -s tests -v
 
 # 单个模块

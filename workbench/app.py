@@ -376,8 +376,10 @@ def create_batch_documents(images: list[UploadFile] = File(..., alias="image")) 
 
 
 @app.get("/api/jobs")
-def list_jobs(limit: int = 20) -> dict:
+def list_jobs(limit: int = 20, offset: int = 0, q: str = "") -> dict:
     limit = max(1, min(limit, 50))
+    offset = max(0, offset)
+    keyword = q.strip().lower()
     jobs = []
     for entry in _JOBS_ROOT.iterdir():
         if not entry.is_dir() or not _JOB_ID_PATTERN.fullmatch(entry.name):
@@ -385,6 +387,8 @@ def list_jobs(limit: int = 20) -> dict:
         if not (entry / "main.tex").is_file():
             continue
         metadata = _job_metadata(entry)
+        if keyword and keyword not in metadata["title"].lower() and keyword not in entry.name:
+            continue
         stat = entry.stat()
         jobs.append(
             {
@@ -399,9 +403,11 @@ def list_jobs(limit: int = 20) -> dict:
             }
         )
     jobs.sort(key=lambda item: item["_mtime"], reverse=True)
-    for job in jobs:
+    total = len(jobs)
+    page = jobs[offset:offset + limit]
+    for job in page:
         job.pop("_mtime", None)
-    return {"jobs": jobs[:limit]}
+    return {"jobs": page, "total": total, "limit": limit, "offset": offset}
 
 
 @app.get("/api/jobs/{job_id}")
