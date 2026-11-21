@@ -175,6 +175,14 @@ cp .env.example .env
 这些标记覆盖的是"编译器和确定性规则能发现"的问题。**没有标记不等于抄对了**：
 识别内容是否忠实只能靠人对照原图判断，界面不显示置信度，也不编造风险分数。
 
+任务与复核管理（2026-11-21 补齐）：
+
+- 上传区可打开最近任务；当前任务写入地址栏 `#job=<job_id>`，**刷新页面会自动恢复**。
+  每页“标为已核对”按任务保存在浏览器 localStorage，刷新不丢。
+- 可下载当前 `.tex` 和最初识别原稿；“恢复识别原稿”会在确认后覆盖当前修改并重新编译。
+- 某页识别失败时，该页显示“重试这一页”：只重新识别失败页，成功页复用已保存的
+  `document.json`，不重复调用模型。早期任务若没有这些结构文件，会明确提示整批重传。
+
 ### 6.1 一键启动（Windows，推荐先试这个）
 
 双击仓库根目录的 [启动工作台.bat](启动工作台.bat)，按菜单选：
@@ -230,8 +238,13 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
 | --- | --- |
 | `POST /api/documents` | 上传 1 张图，识别 + 编译（表单字段名 `image`） |
 | `POST /api/documents/batch` | 上传多张图，按上传顺序合并成一份 PDF（同字段名 `image`） |
-| `GET /api/jobs/{job_id}` | 该 job 的 TeX 源码、源图链接、PDF 链接（`human_review` 恒为 true）；识别块结构合并在这份 TeX 里，接口不单独返回块数组 |
+| `GET /api/jobs` | 最近任务列表（标题、页数、失败页数、更新时间） |
+| `GET /api/jobs/{job_id}` | 该 job 的 TeX 源码、源图链接、编译结果（`human_review` 恒为 true）；识别块结构合并在这份 TeX 里，接口不单独返回块数组 |
 | `GET /api/jobs/{job_id}/pdf` | 下载编译好的 PDF |
+| `GET /api/jobs/{job_id}/tex` | 下载当前 TeX |
+| `GET /api/jobs/{job_id}/original` | 下载最初识别原稿 |
+| `POST /api/jobs/{job_id}/restore-original` | 恢复原稿并重新编译 |
+| `POST /api/jobs/{job_id}/pages/{page}/retry` | 只重试失败页，成功页复用已保存结构 |
 | `POST /api/jobs/{job_id}/compile` | 手工改完 TeX 后重新编译 |
 | `POST /api/jobs/{job_id}/suggest-fix` | 让模型给出针对某个错误片段的修改建议 |
 | `POST /api/jobs/{job_id}/apply-fix` | 人工确认后应用建议（建议过期返回 HTTP 409） |
@@ -341,7 +354,7 @@ RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 \
 ## 八、测试
 
 ```bash
-# C + workbench 全量回归（14 个测试模块、160 项，含真实 Tectonic 编译，需要 tools/tectonic）
+# C + workbench 全量回归（14 个测试模块、163 项，含真实 Tectonic 编译，需要 tools/tectonic）
 ./.venv/Scripts/python.exe -m unittest discover -s tests -v
 
 # 单个模块

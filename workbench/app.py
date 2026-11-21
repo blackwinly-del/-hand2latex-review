@@ -7,6 +7,7 @@ import shutil
 import threading
 import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -135,6 +136,109 @@ def _public_compile(result: dict, job_id: str) -> dict:
     }
 
 
+def _store_compile(directory: Path, public_result: dict) -> None:
+    (directory / "compile.json").write_text(
+        json.dumps(public_result, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _store_job_metadata(
+    directory: Path,
+    title: str,
+    page_count: int,
+    pages: list[dict],
+    failures: list[dict],
+) -> None:
+    metadata = {"title": title, "page_count": page_count, "pages": pages}
+    if failures:
+        metadata["failed_pages"] = failures
+    (directory / "job.json").write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _read_job_title(directory: Path) -> str:
+    for name in ("original.tex", "main.tex"):
+        path = directory / name
+        if not path.is_file():
+            continue
+        match = re.search(r"\\title\{(.*)\}", path.read_text(encoding="utf-8"))
+        if match and match.group(1).strip():
+            return match.group(1).strip()
+    return "手写笔记"
+
+
+def _job_metadata(directory: Path) -> dict:
+    """读取 job 元数据；老任务没有 job.json 时按目录结构重建。"""
+    path = directory / "job.json"
+    if path.is_file():
+        metadata = json.loads(path.read_text(encoding="utf-8"))
+        metadata.setdefault("title", _read_job_title(directory))
+        metadata.setdefault("page_count", 1)
+        metadata.setdefault("pages", [])
+        return metadata
+
+    pages = []
+    failures = []
+    merged_page = 0
+    for page_directory in sorted(directory.glob("page_*")):
+        match = re.fullmatch(r"page_(\d+)", page_directory.name)
+        if not page_directory.is_dir() or match is None:
+            continue
+        if not list(page_directory.glob("source.*")):
+            continue
+        page_number = int(match.group(1))
+        succeeded = (page_directory / "main.tex").is_file()
+        error = None
+        current_merged_page = None
+        if succeeded:
+            merged_page += 1
+            current_merged_page = merged_page
+        else:
+            error = "该页在之前识别中失败"
+            failures.append({"page": page_number, "error": error})
+        pages.append(
+            {
+                "page": page_number,
+                "source_url": f"/api/jobs/{directory.name}/pages/{page_number}/source",
+                "latency_ms": None,
+                "human_review": True,
+                "error": error,
+                "merged_page": current_merged_page,
+            }
+        )
+    metadata = {
+        "title": _read_job_title(directory),
+        "page_count": merged_page,
+        "pages": pages,
+    }
+    if failures:
+        metadata["failed_pages"] = failures
+    return metadata
+
+
+def _stored_compile(directory: Path, job_id: str) -> dict:
+    path = directory / "compile.json"
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    # 老任务没有 compile.json。已有 PDF 时如实说明没有保存日志，避免为了
+    # 打开任务又强制跑一遍编译；没有 PDF 时才重新编译以取得真实错误。
+    if (directory / "main.pdf").is_file():
+        return {
+            "success": True,
+            "log": "该任务早于编译记录保存，未重新编译；需要最新警告请点“重新排版”。",
+            "errors": [],
+            "returncode": 0,
+            "pdf_url": f"/api/jobs/{job_id}/pdf",
+        }
+    result = compile_tex(directory / "main.tex")
+    public_result = _public_compile(result, job_id)
+    _store_compile(directory, public_result)
+    return public_result
+
+
 def _job_payload(
     job_id: str,
     directory: Path,
@@ -142,8 +246,9 @@ def _job_payload(
     compile_result: dict,
     page_count: int = 1,
     pages: list[dict] | None = None,
+    failures: list[dict] | None = None,
 ) -> dict:
-    return {
+    payload = {
         "job_id": job_id,
         "title": title,
         "tex": (directory / "main.tex").read_text(encoding="utf-8"),
@@ -153,6 +258,9 @@ def _job_payload(
         "page_count": page_count,
         "pages": pages or [],
     }
+    if failures:
+        payload["failed_pages"] = failures
+    return payload
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -204,11 +312,16 @@ def _create_document(images: list[UploadFile]) -> dict:
                         "latency_ms": None,
                         "human_review": True,
                         "error": message,
+                        "merged_page": None,
                     }
                 )
                 continue
             (page_directory / "original.tex").write_text(document["tex"], encoding="utf-8")
             (page_directory / "main.tex").write_text(document["tex"], encoding="utf-8")
+            (page_directory / "document.json").write_text(
+                json.dumps(document, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
             documents.append(document)
             pages.append(
                 {
@@ -217,6 +330,7 @@ def _create_document(images: list[UploadFile]) -> dict:
                     "latency_ms": document["latency_ms"],
                     "human_review": document["human_review"],
                     "error": None,
+                    "merged_page": len(documents),
                 }
             )
 
@@ -229,6 +343,8 @@ def _create_document(images: list[UploadFile]) -> dict:
         (directory / "original.tex").write_text(merged_tex, encoding="utf-8")
         _write_main_tex(directory, merged_tex)
         compile_result = compile_tex(directory / "main.tex")
+        _store_job_metadata(directory, merged["title"], len(documents), pages, failures)
+        _store_compile(directory, _public_compile(compile_result, job_id))
     except HTTPException:
         raise
     except Exception as error:
@@ -244,9 +360,8 @@ def _create_document(images: list[UploadFile]) -> dict:
         compile_result,
         page_count=len(documents),
         pages=pages,
+        failures=failures,
     )
-    if failures:
-        payload["failed_pages"] = failures
     return payload
 
 
@@ -260,16 +375,48 @@ def create_batch_documents(images: list[UploadFile] = File(..., alias="image")) 
     return _create_document(images)
 
 
+@app.get("/api/jobs")
+def list_jobs(limit: int = 20) -> dict:
+    limit = max(1, min(limit, 50))
+    jobs = []
+    for entry in _JOBS_ROOT.iterdir():
+        if not entry.is_dir() or not _JOB_ID_PATTERN.fullmatch(entry.name):
+            continue
+        if not (entry / "main.tex").is_file():
+            continue
+        metadata = _job_metadata(entry)
+        stat = entry.stat()
+        jobs.append(
+            {
+                "job_id": entry.name,
+                "title": metadata["title"],
+                "updated_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                "page_count": metadata["page_count"],
+                "page_total": len(metadata["pages"]),
+                "has_pdf": (entry / "main.pdf").is_file(),
+                "failed_pages": len(metadata.get("failed_pages", [])),
+                "_mtime": stat.st_mtime,
+            }
+        )
+    jobs.sort(key=lambda item: item["_mtime"], reverse=True)
+    for job in jobs:
+        job.pop("_mtime", None)
+    return {"jobs": jobs[:limit]}
+
+
 @app.get("/api/jobs/{job_id}")
 def get_job(job_id: str) -> dict:
     directory = _job_dir(job_id)
-    return {
-        "job_id": job_id,
-        "tex": (directory / "main.tex").read_text(encoding="utf-8"),
-        "source_url": f"/api/jobs/{job_id}/source",
-        "pdf_url": f"/api/jobs/{job_id}/pdf" if (directory / "main.pdf").is_file() else None,
-        "human_review": True,
-    }
+    metadata = _job_metadata(directory)
+    return _job_payload(
+        job_id,
+        directory,
+        metadata["title"],
+        _stored_compile(directory, job_id),
+        page_count=metadata["page_count"],
+        pages=metadata["pages"],
+        failures=metadata.get("failed_pages"),
+    )
 
 
 def _source_paths(directory: Path) -> list[Path]:
@@ -303,6 +450,133 @@ def get_pdf(job_id: str) -> FileResponse:
     return FileResponse(pdf_path, media_type="application/pdf")
 
 
+@app.post("/api/jobs/{job_id}/pages/{page_number}/retry")
+def retry_failed_page(job_id: str, page_number: int) -> dict:
+    directory = _job_dir(job_id)
+    metadata = _job_metadata(directory)
+    pages = metadata["pages"]
+    entry = next((page for page in pages if page["page"] == page_number), None)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="page not found")
+    if entry.get("error") is None:
+        raise HTTPException(status_code=409, detail="这一页已识别成功，无需重试")
+
+    # 重试只重新识别失败页；其他成功页必须已有结构化 document.json，
+    # 否则合并时无法保证内容不变。老任务缺文件时明确拒绝，不整批偷偷重跑。
+    for page in pages:
+        page_directory = directory / f"page_{page['page']:02d}"
+        if page.get("error") is None and not (page_directory / "document.json").is_file():
+            raise HTTPException(
+                status_code=409,
+                detail="该任务缺少早期页面结构，不能单页重试；请重新上传整批",
+            )
+
+    sources = _source_paths(directory)
+    if page_number < 1 or page_number > len(sources):
+        raise HTTPException(status_code=404, detail="page not found")
+    try:
+        document = generate_document(str(sources[page_number - 1]))
+    except Exception as error:
+        logger.exception("第 %d 页重试识别失败", page_number)
+        raise HTTPException(
+            status_code=502,
+            detail=f"第 {page_number} 页重试失败：{type(error).__name__}: {error}",
+        ) from error
+
+    page_directory = directory / f"page_{page_number:02d}"
+    (page_directory / "original.tex").write_text(document["tex"], encoding="utf-8")
+    (page_directory / "main.tex").write_text(document["tex"], encoding="utf-8")
+    (page_directory / "document.json").write_text(
+        json.dumps(document, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    entry.update(
+        error=None,
+        latency_ms=document["latency_ms"],
+        human_review=document["human_review"],
+    )
+
+    documents = []
+    for page in sorted(pages, key=lambda item: item["page"]):
+        if page.get("error") is not None:
+            continue
+        document_path = directory / f"page_{page['page']:02d}" / "document.json"
+        documents.append(json.loads(document_path.read_text(encoding="utf-8")))
+
+    merged = merge_documents(documents)
+    merged_tex = build_tex(merged)
+    (directory / "original.tex").write_text(merged_tex, encoding="utf-8")
+    _write_main_tex(directory, merged_tex)
+    try:
+        compile_result = compile_tex(directory / "main.tex")
+    except Exception as error:
+        logger.exception("retry-page compilation failed")
+        raise HTTPException(status_code=500, detail=f"{type(error).__name__}: 重试后编译失败") from error
+
+    merged_page = 0
+    failures = []
+    for page in sorted(pages, key=lambda item: item["page"]):
+        if page.get("error") is not None:
+            page["merged_page"] = None
+            failures.append({"page": page["page"], "error": page["error"]})
+        else:
+            merged_page += 1
+            page["merged_page"] = merged_page
+    _store_job_metadata(directory, merged["title"], len(documents), pages, failures)
+    _store_compile(directory, _public_compile(compile_result, job_id))
+    return _job_payload(
+        job_id,
+        directory,
+        merged["title"],
+        compile_result,
+        page_count=len(documents),
+        pages=pages,
+        failures=failures,
+    )
+
+
+@app.get("/api/jobs/{job_id}/tex")
+def get_tex(job_id: str) -> FileResponse:
+    directory = _job_dir(job_id)
+    return FileResponse(
+        directory / "main.tex",
+        media_type="text/plain; charset=utf-8",
+        filename=f"hand2latex-{job_id[:8]}.tex",
+    )
+
+
+@app.get("/api/jobs/{job_id}/original")
+def get_original_tex(job_id: str) -> FileResponse:
+    directory = _job_dir(job_id)
+    original_path = directory / "original.tex"
+    if not original_path.is_file():
+        raise HTTPException(status_code=404, detail="original tex not found")
+    return FileResponse(
+        original_path,
+        media_type="text/plain; charset=utf-8",
+        filename=f"hand2latex-{job_id[:8]}-original.tex",
+    )
+
+
+@app.post("/api/jobs/{job_id}/restore-original")
+def restore_original_tex(job_id: str) -> dict:
+    directory = _job_dir(job_id)
+    original_path = directory / "original.tex"
+    if not original_path.is_file():
+        raise HTTPException(status_code=404, detail="original tex not found")
+    original = original_path.read_text(encoding="utf-8")
+    _write_main_tex(directory, original)
+    (directory / "suggestion.json").unlink(missing_ok=True)
+    try:
+        result = compile_tex(directory / "main.tex")
+    except Exception as error:
+        logger.exception("restore-original compilation failed")
+        raise HTTPException(status_code=500, detail=f"{type(error).__name__}: 原稿编译失败") from error
+    public_result = _public_compile(result, job_id)
+    _store_compile(directory, public_result)
+    return {"compile": public_result, "tex": original}
+
+
 @app.post("/api/jobs/{job_id}/compile")
 def compile_document(job_id: str, request: CompileRequest) -> dict:
     directory = _job_dir(job_id)
@@ -315,7 +589,9 @@ def compile_document(job_id: str, request: CompileRequest) -> dict:
     except Exception as error:
         logger.exception("document compilation failed")
         raise HTTPException(status_code=500, detail=f"{type(error).__name__}: 编译失败") from error
-    return {"compile": _public_compile(result, job_id), "tex": request.tex}
+    public_result = _public_compile(result, job_id)
+    _store_compile(directory, public_result)
+    return {"compile": public_result, "tex": request.tex}
 
 
 @app.post("/api/jobs/{job_id}/suggest-fix")
@@ -368,8 +644,10 @@ def apply_document_fix(job_id: str, request: ApplyFixRequest) -> dict:
             status_code=500,
             detail={"message": f"{type(error).__name__}: 修复后编译失败", "tex": request.tex},
         ) from error
+    public_result = _public_compile(result, job_id)
+    _store_compile(directory, public_result)
     return {
-        "compile": _public_compile(result, job_id),
+        "compile": public_result,
         "tex": request.tex,
         "summary": request.summary,
     }

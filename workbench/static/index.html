@@ -15,6 +15,7 @@
     .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; box-shadow:0 8px 24px #25355d10; margin-bottom:18px; }
     .upload-row,.actions { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
     input[type=file] { max-width:100%; padding:12px; border:1px dashed #a8b0bf; border-radius:10px; background:white; }
+    .job-select { max-width:min(100%,760px); padding:10px 12px; border:1px solid #cfd5df; border-radius:10px; background:white; color:var(--ink); font-size:14px; }
     button,.button { border:0; border-radius:10px; padding:10px 16px; background:var(--accent); color:white; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block; font-size:14px; }
     button.secondary,.button.secondary { background:#e9eef8; color:#24447e; }
     button:disabled { opacity:.55; cursor:not-allowed; }
@@ -92,6 +93,14 @@
         <input type="file" accept=".png,.jpg,.jpeg,.webp" multiple @change="selectFile">
         <button :disabled="busy || !files.length" @click="upload">识别并排版</button>
       </div>
+      <div class="upload-row" v-if="recentJobs.length" style="margin-top:12px">
+        <select class="job-select" v-model="selectedJob">
+          <option value="">打开最近任务…</option>
+          <option v-for="job in recentJobs" :value="job.job_id">{{ job.title }} · {{ job.page_count }} 页<template v-if="job.failed_pages">（{{ job.failed_pages }} 页失败）</template> · {{ formatJobTime(job.updated_at) }}</option>
+        </select>
+        <button class="secondary" :disabled="busy || !selectedJob" @click="openJob(selectedJob)">打开任务</button>
+      </div>
+      <div class="hint" v-if="jobId">当前任务 {{ jobId }}；刷新页面会自动恢复，已核对的页也会保留。</div>
       <div class="status" v-if="busy">正在识别和排版，请稍等，别重复点按钮。</div>
       <div class="error-text" v-if="error">{{ error }}</div>
       <div class="success-text" v-if="jobId">好了。下面三栏：左边原图、中间代码、右边效果。<strong>黄色行＝可能缺字/编码问题，需要你对照原图确认</strong>；每页原图下面的“标为已核对”用来记录你已经核对过哪几页。</div>
@@ -108,9 +117,11 @@
             <span class="flag bad" v-if="page.error">识别失败</span>
             <span class="flag warn" v-else-if="pageReviewCount(page.page)">{{ pageReviewCount(page.page) }} 处待复核</span>
             <span class="flag" v-else>无自动标记</span>
-            <button class="check" :class="{done:reviewedPages[page.page]}" @click.stop="togglePage(page.page)">{{ reviewedPages[page.page] ? '已核对 ✓' : '标为已核对' }}</button>
+            <button v-if="page.error" class="check" :disabled="busy" @click.stop="retryPage(page.page)">重试这一页</button>
+            <button v-else class="check" :class="{done:reviewedPages[page.page]}" @click.stop="togglePage(page.page)">{{ reviewedPages[page.page] ? '已核对 ✓' : '标为已核对' }}</button>
           </div>
         </figure>
+        <div class="hint" v-if="activePageData && activePageData.error">这一页识别失败，没有对应代码；中间只包含成功识别的页面。</div>
         <div class="hint" v-if="!pages.length">只有一页，直接对照中间代码即可。</div>
       </aside>
 
@@ -135,6 +146,9 @@
         <div class="actions" style="margin-top:12px">
           <button :disabled="busy" @click="recompile">重新排版（编译）</button>
           <a v-if="hasPdf" class="button secondary" :href="pdfUrl" target="_blank" download>下载 PDF</a>
+          <a class="button secondary" :href="texUrl" download>下载当前 .tex</a>
+          <a class="button secondary" :href="originalUrl" download>下载识别原稿</a>
+          <button class="secondary" :disabled="busy" @click="restoreOriginal">恢复识别原稿</button>
         </div>
       </section>
 
@@ -195,7 +209,7 @@
   </main>
   <script src="/vendor/vue/vue.global.js"></script>
   <script>
-    const { createApp, ref, computed } = Vue;
+    const { createApp, ref, computed, onMounted } = Vue;
     const LINE_HEIGHT = 20;
     const escapeHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const TOKEN = /(\\(?:[a-zA-Z]+@?|.))|(%.*$)|(\$[^$\n]*\$)|([{}])/g;
@@ -235,11 +249,15 @@
       setup() {
         const files = ref([]), busy = ref(false), error = ref(''), jobId = ref(''), tex = ref(''), sourceUrl = ref(''), compileResult = ref(null), pdfVersion = ref(0), suggestedTex = ref(''), fixSummary = ref(''), pages = ref([]), pageCount = ref(0);
         const tab = ref('pdf'), scrollTop = ref(0), flashLine = ref(0), activePage = ref(0), hasPdf = ref(false), dirty = ref(false);
+        const recentJobs = ref([]), selectedJob = ref('');
         const ta = ref(null), hl = ref(null);
         const sourceLines = computed(() => tex.value.split('\n'));
         const lineCount = computed(() => sourceLines.value.length);
         const errorLines = computed(() => new Set((compileResult.value?.errors || []).map(item => item.line).filter(Boolean)));
         const pdfUrl = computed(() => `/api/jobs/${jobId.value}/pdf?v=${pdfVersion.value}`);
+        const texUrl = computed(() => `/api/jobs/${jobId.value}/tex`);
+        const originalUrl = computed(() => `/api/jobs/${jobId.value}/original`);
+        const activePageData = computed(() => pages.value.find(page => page.page === activePage.value) || null);
         const highlighted = computed(() => sourceLines.value.map((line, index) => {
           const n = index + 1;
           const cls = errorLines.value.has(n) ? 'c-line err' : (flashLine.value === n ? 'c-line flash' : (reviewLines.value.has(n) ? 'c-line review' : 'c-line'));
@@ -324,7 +342,20 @@
         const reviewKinds = computed(() => [...new Set(reviewItems.value.map(item => item.label))].join('、'));
         const reviewedPages = ref({});
         const reviewedCount = computed(() => Object.values(reviewedPages.value).filter(Boolean).length);
-        const togglePage = page => { reviewedPages.value = { ...reviewedPages.value, [page]: !reviewedPages.value[page] }; };
+        const reviewedStorageKey = id => 'hand2latex:reviewed:' + id;
+        const loadReviewed = id => {
+          if (!id) return {};
+          try {
+            const value = JSON.parse(localStorage.getItem(reviewedStorageKey(id)) || '{}');
+            return value && typeof value === 'object' ? value : {};
+          } catch { return {}; }
+        };
+        const togglePage = page => {
+          reviewedPages.value = { ...reviewedPages.value, [page]: !reviewedPages.value[page] };
+          if (jobId.value) {
+            try { localStorage.setItem(reviewedStorageKey(jobId.value), JSON.stringify(reviewedPages.value)); } catch { /* 隐私模式下只保留当页状态 */ }
+          }
+        };
 
         // 每一页原图对应代码里的位置：多页之间用 \newpage 分隔。
         const pageAnchors = computed(() => {
@@ -340,8 +371,14 @@
           start,
           end: index + 1 < pageAnchors.value.length ? pageAnchors.value[index + 1] - 1 : lineCount.value,
         })));
-        const pageReviewCount = page => {
-          const range = pageRanges.value[page - 1];
+        // merged_page 是该原图页在合并 TeX 中的页序；失败页为 null，不能按原图页号硬跳。
+        const mergedPageNumber = page => page.merged_page || (page.error ? 0 : page.page);
+        const pageReviewCount = pageNumber => {
+          const page = pages.value.find(item => item.page === pageNumber);
+          if (!page) return 0;
+          const merged = mergedPageNumber(page);
+          if (!merged) return 0;
+          const range = pageRanges.value[merged - 1];
           if (!range) return 0;
           return reviewItems.value.filter(item => item.line >= range.start && item.line <= range.end).length;
         };
@@ -369,7 +406,9 @@
         };
         const jumpToPage = page => {
           activePage.value = page;
-          let anchor = pageAnchors.value[page - 1];
+          const merged = mergedPageNumber(pages.value.find(item => item.page === page) || { page, error: null });
+          if (!merged) return;
+          let anchor = pageAnchors.value[merged - 1];
           if (anchor === undefined) return;
           const lines = sourceLines.value;
           while (anchor < lines.length - 1 && !lines[anchor].trim()) anchor += 1;
@@ -385,6 +424,55 @@
             return typeof data.detail === 'string' ? data.detail : (data.detail?.message || `请求失败（${response.status}）`);
           } catch { return `请求失败（${response.status}）`; }
         };
+        const formatJobTime = value => (value || '').replace('T', ' ').slice(0, 16);
+        const applyJob = data => {
+          jobId.value = data.job_id;
+          tex.value = data.tex;
+          sourceUrl.value = data.source_url || '';
+          compileResult.value = data.compile || null;
+          pages.value = data.pages || [];
+          pageCount.value = data.page_count || 1;
+          pdfVersion.value += 1;
+          hasPdf.value = !!(data.compile && data.compile.success);
+          activePage.value = pages.value.length ? 1 : 0;
+          selectedJob.value = data.job_id;
+          reviewedPages.value = loadReviewed(data.job_id);
+          dirty.value = false;
+          suggestedTex.value = '';
+          fixSummary.value = '';
+          flashLine.value = 0;
+          tab.value = hasPdf.value ? 'pdf' : 'log';
+          location.hash = 'job=' + data.job_id;
+        };
+        const loadJobs = async () => {
+          try {
+            const response = await fetch('/api/jobs');
+            if (!response.ok) return;
+            const data = await response.json();
+            recentJobs.value = data.jobs || [];
+          } catch { recentJobs.value = []; }
+        };
+        const openJob = async id => {
+          if (!id) return;
+          busy.value = true; error.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${id}`);
+            if (!response.ok) throw new Error(await readError(response));
+            applyJob(await response.json());
+          } catch (err) { error.value = err.message; }
+          finally { busy.value = false; }
+        };
+        const retryPage = async pageNumber => {
+          if (!window.confirm(`重试第 ${pageNumber} 页会再调用一次整页识别（付费），成功页不会重跑。继续吗？`)) return;
+          busy.value = true; error.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/pages/${pageNumber}/retry`, { method:'POST' });
+            if (!response.ok) throw new Error(await readError(response));
+            applyJob(await response.json());
+            loadJobs();
+          } catch (err) { error.value = err.message; }
+          finally { busy.value = false; }
+        };
         const upload = async () => {
           if (!files.value.length) return;
           busy.value = true; error.value = ''; jobId.value = ''; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = ''; hasPdf.value = false; dirty.value = false; reviewedPages.value = {}; flashLine.value = 0;
@@ -395,9 +483,8 @@
             const response = await fetch(endpoint, { method:'POST', body:form });
             if (!response.ok) throw new Error(await readError(response));
             const data = await response.json();
-            jobId.value = data.job_id; tex.value = data.tex; sourceUrl.value = data.source_url; compileResult.value = data.compile; pages.value = data.pages || []; pageCount.value = data.page_count || 1; pdfVersion.value += 1;
-            hasPdf.value = !!(data.compile && data.compile.success);
-            activePage.value = pages.value.length > 1 ? 1 : 0;
+            applyJob(data);
+            loadJobs();
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
         };
@@ -408,6 +495,19 @@
             if (!response.ok) throw new Error(await readError(response));
             const data = await response.json();
             compileResult.value = data.compile; tex.value = data.tex; pdfVersion.value += 1;
+            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false;
+            if (data.compile && !data.compile.success) tab.value = 'log';
+          } catch (err) { error.value = err.message; }
+          finally { busy.value = false; }
+        };
+        const restoreOriginal = async () => {
+          if (!window.confirm('会用最初的识别原稿覆盖当前修改，确定继续吗？')) return;
+          busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/restore-original`, { method:'POST' });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            tex.value = data.tex; compileResult.value = data.compile; pdfVersion.value += 1;
             hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false;
             if (data.compile && !data.compile.success) tab.value = 'log';
           } catch (err) { error.value = err.message; }
@@ -435,7 +535,15 @@
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
         };
-        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, lineCount, errorLines, pdfUrl, highlighted, issues, reviewItems, reviewLines, reviewKinds, reviewedPages, reviewedCount, togglePage, pageReviewCount, pageAnchors, tab, scrollTop, flashLine, activePage, hasPdf, dirty, ta, hl, onScroll, jumpToLine, jumpToPage, selectFile, upload, recompile, onEdit, requestFix, applyFix };
+        onMounted(async () => {
+          await loadJobs();
+          const match = location.hash.match(/^#job=([0-9a-f]{32})$/);
+          if (match) await openJob(match[1]);
+        });
+        window.addEventListener('beforeunload', event => {
+          if (dirty.value) { event.preventDefault(); event.returnValue = ''; }
+        });
+        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, lineCount, errorLines, pdfUrl, texUrl, originalUrl, activePageData, highlighted, issues, reviewItems, reviewLines, reviewKinds, reviewedPages, reviewedCount, togglePage, pageReviewCount, pageAnchors, tab, scrollTop, flashLine, activePage, hasPdf, dirty, recentJobs, selectedJob, ta, hl, onScroll, jumpToLine, jumpToPage, selectFile, upload, openJob, retryPage, formatJobTime, recompile, restoreOriginal, onEdit, requestFix, applyFix };
       }
     }).mount('#app');
   </script>

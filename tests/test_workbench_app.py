@@ -128,6 +128,94 @@ class WorkbenchAppTests(unittest.TestCase):
         page_two_source = self.client.get(f"/api/jobs/{data['job_id']}/pages/2/source")
         self.assertEqual(page_two_source.content, b"second")
 
+    @patch("workbench.app.generate_document")
+    @patch("workbench.app.compile_tex")
+    def test_job_list_reopen_download_and_restore(self, compile_mock, generate_mock):
+        generate_mock.return_value = {
+            "title": "可恢复笔记",
+            "blocks": [{"type": "display_formula", "latex": "x^2"}],
+            "tex": "page one",
+            "model": "test-model",
+            "latency_ms": 1,
+            "human_review": "required",
+            "source_image": "test.png",
+        }
+
+        def fake_compile(tex_path):
+            Path(tex_path).with_suffix(".pdf").write_bytes(b"%PDF-test")
+            return {
+                "success": True,
+                "pdf_path": str(Path(tex_path).with_suffix(".pdf")),
+                "log": "compiled",
+                "errors": [],
+                "returncode": 0,
+            }
+
+        compile_mock.side_effect = fake_compile
+        response = self.client.post(
+            "/api/documents",
+            files={"image": ("note.png", b"image-bytes", "image/png")},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        original = response.json()["tex"]
+        job_id = response.json()["job_id"]
+        directory = Path("artifacts/jobs") / job_id
+        try:
+            self.assertTrue((directory / "job.json").is_file())
+            self.assertTrue((directory / "compile.json").is_file())
+
+            jobs = self.client.get("/api/jobs").json()["jobs"]
+            listed = next(job for job in jobs if job["job_id"] == job_id)
+            self.assertEqual(listed["title"], "可恢复笔记")
+            self.assertEqual(listed["page_count"], 1)
+
+            reopened = self.client.get(f"/api/jobs/{job_id}")
+            self.assertEqual(reopened.status_code, 200, reopened.text)
+            data = reopened.json()
+            self.assertEqual(data["tex"], original)
+            self.assertEqual(data["pages"][0]["merged_page"], 1)
+            self.assertTrue(data["compile"]["success"])
+
+            edited = "\\documentclass{article}\\begin{document}$y^2$\\end{document}\n"
+            self.client.post(f"/api/jobs/{job_id}/compile", json={"tex": edited})
+            self.assertEqual(self.client.get(f"/api/jobs/{job_id}/tex").text.replace("\r\n", "\n"), edited)
+            self.assertEqual(self.client.get(f"/api/jobs/{job_id}/original").text.replace("\r\n", "\n"), original)
+
+            restored = self.client.post(f"/api/jobs/{job_id}/restore-original")
+            self.assertEqual(restored.status_code, 200, restored.text)
+            self.assertEqual(restored.json()["tex"], original)
+            self.assertEqual((directory / "main.tex").read_text(encoding="utf-8"), original)
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
+    def test_legacy_job_reopen_reconstructs_pages_and_compile(self):
+        directory = Path("artifacts/jobs") / uuid.uuid4().hex
+        directory.mkdir(parents=True)
+        try:
+            tex = "\\title{老任务}\n\\begin{document}\n甲\n\\newpage\n丙\n\\end{document}\n"
+            (directory / "main.tex").write_text(tex, encoding="utf-8")
+            (directory / "original.tex").write_text(tex, encoding="utf-8")
+            (directory / "main.pdf").write_bytes(b"%PDF-old")
+            for page, succeeded in ((1, True), (2, False), (3, True)):
+                page_directory = directory / f"page_{page:02d}"
+                page_directory.mkdir()
+                (page_directory / "source.png").write_bytes(b"image")
+                if succeeded:
+                    (page_directory / "main.tex").write_text("page", encoding="utf-8")
+
+            response = self.client.get(f"/api/jobs/{directory.name}")
+
+            self.assertEqual(response.status_code, 200, response.text)
+            data = response.json()
+            self.assertEqual(data["title"], "老任务")
+            self.assertEqual(data["page_count"], 2)
+            self.assertEqual([page["merged_page"] for page in data["pages"]], [1, None, 2])
+            self.assertEqual(data["failed_pages"][0]["page"], 2)
+            self.assertTrue(data["compile"]["success"])
+            self.assertIn("早于编译记录保存", data["compile"]["log"])
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
     def test_rejects_unsupported_file_type(self):
         response = self.client.post(
             "/api/documents",
@@ -262,6 +350,7 @@ class WorkbenchAppTests(unittest.TestCase):
         self.assertEqual(data["pages"][1]["error"], "RuntimeError: page two exploded")
         self.assertIsNone(data["pages"][0]["error"])
         self.assertEqual(data["failed_pages"], [{"page": 2, "error": "RuntimeError: page two exploded"}])
+        self.assertEqual([page["merged_page"] for page in data["pages"]], [1, None, 2])
         # 源图三个目录都在（失败页的原图也保留），失败页没有 original.tex
         self.assertTrue((Path("artifacts/jobs") / job_id / "page_01" / "original.tex").is_file())
         self.assertFalse((Path("artifacts/jobs") / job_id / "page_02" / "original.tex").exists())
@@ -269,6 +358,71 @@ class WorkbenchAppTests(unittest.TestCase):
         page_two_source = self.client.get(f"/api/jobs/{job_id}/pages/2/source")
         self.assertEqual(page_two_source.content, b"second")
         self.assertTrue(data["compile"]["success"])
+
+    @patch("workbench.app.generate_document")
+    @patch("workbench.app.compile_tex")
+    def test_retry_failed_page_reuses_successful_pages(self, compile_mock, generate_mock):
+        def document(title, text, latency):
+            return {
+                "title": title,
+                "blocks": [{"type": "paragraph", "text": text}],
+                "tex": text,
+                "model": "test-model",
+                "latency_ms": latency,
+                "human_review": "required",
+                "source_image": "test.png",
+            }
+
+        generate_mock.side_effect = [
+            document("第一页", "甲", 10),
+            RuntimeError("page two exploded"),
+            document("第三页", "丙", 30),
+            document("第二页", "乙", 20),
+        ]
+
+        def fake_compile(tex_path):
+            Path(tex_path).with_suffix(".pdf").write_bytes(b"%PDF-retry")
+            return {
+                "success": True,
+                "pdf_path": str(Path(tex_path).with_suffix(".pdf")),
+                "log": "compiled",
+                "errors": [],
+                "returncode": 0,
+            }
+
+        compile_mock.side_effect = fake_compile
+        response = self.client.post(
+            "/api/documents/batch",
+            files=[
+                ("image", ("p1.png", b"first", "image/png")),
+                ("image", ("p2.png", b"second", "image/png")),
+                ("image", ("p3.png", b"third", "image/png")),
+            ],
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        job_id = response.json()["job_id"]
+        directory = Path("artifacts/jobs") / job_id
+        try:
+            retried = self.client.post(f"/api/jobs/{job_id}/pages/2/retry")
+
+            self.assertEqual(retried.status_code, 200, retried.text)
+            data = retried.json()
+            self.assertEqual(generate_mock.call_count, 4)
+            self.assertIn("page_02", generate_mock.call_args.args[0])
+            self.assertEqual(data["page_count"], 3)
+            self.assertNotIn("failed_pages", data)
+            self.assertEqual([page["merged_page"] for page in data["pages"]], [1, 2, 3])
+            self.assertIsNone(data["pages"][1]["error"])
+            self.assertEqual(data["pages"][1]["latency_ms"], 20)
+            self.assertIn("乙", data["tex"])
+            self.assertLess(data["tex"].index("甲"), data["tex"].index("乙"))
+            self.assertLess(data["tex"].index("乙"), data["tex"].index("丙"))
+
+            again = self.client.post(f"/api/jobs/{job_id}/pages/2/retry")
+            self.assertEqual(again.status_code, 409)
+            self.assertEqual(generate_mock.call_count, 4)
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
 
     @patch("workbench.app.generate_document")
     @patch("workbench.app.compile_tex")
