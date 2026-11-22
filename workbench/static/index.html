@@ -162,6 +162,7 @@
           <a class="button secondary" :href="texUrl" download>下载当前 .tex</a>
           <a class="button secondary" :href="originalUrl" download>下载识别原稿</a>
           <button class="secondary" :disabled="busy" @click="restoreOriginal">恢复识别原稿</button>
+          <button v-if="hasFigurePlaceholder" class="secondary" :disabled="busy" @click="rebuildFigures">图形页改用原图</button>
         </div>
       </section>
 
@@ -261,7 +262,7 @@
     createApp({
       setup() {
         const files = ref([]), busy = ref(false), error = ref(''), jobId = ref(''), tex = ref(''), sourceUrl = ref(''), compileResult = ref(null), pdfVersion = ref(0), suggestedTex = ref(''), fixSummary = ref(''), pages = ref([]), pageCount = ref(0);
-        const tab = ref('pdf'), scrollTop = ref(0), flashLine = ref(0), activePage = ref(0), hasPdf = ref(false), dirty = ref(false);
+        const tab = ref('pdf'), scrollTop = ref(0), flashLine = ref(0), activePage = ref(0), hasPdf = ref(false), hasFigures = ref(false), dirty = ref(false);
         const recentJobs = ref([]), selectedJob = ref(''), jobQuery = ref(''), jobOffset = ref(0), jobTotal = ref(0), jobLimit = 10;
         const jobPage = computed(() => Math.floor(jobOffset.value / jobLimit) + 1);
         const jobPages = computed(() => Math.max(1, Math.ceil(jobTotal.value / jobLimit)));
@@ -273,6 +274,7 @@
         const texUrl = computed(() => `/api/jobs/${jobId.value}/tex`);
         const originalUrl = computed(() => `/api/jobs/${jobId.value}/original`);
         const activePageData = computed(() => pages.value.find(page => page.page === activePage.value) || null);
+        const hasFigurePlaceholder = computed(() => hasFigures.value && tex.value.includes('原始示意图（未重新绘制）'));
         const highlighted = computed(() => sourceLines.value.map((line, index) => {
           const n = index + 1;
           const cls = errorLines.value.has(n) ? 'c-line err' : (flashLine.value === n ? 'c-line flash' : (reviewLines.value.has(n) ? 'c-line review' : 'c-line'));
@@ -449,6 +451,7 @@
           pageCount.value = data.page_count || 1;
           pdfVersion.value += 1;
           hasPdf.value = !!(data.compile && data.compile.success);
+          hasFigures.value = !!data.has_figures;
           activePage.value = pages.value.length ? 1 : 0;
           selectedJob.value = data.job_id;
           reviewedPages.value = loadReviewed(data.job_id);
@@ -536,6 +539,17 @@
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
         };
+        const rebuildFigures = async () => {
+          if (!window.confirm('会把图形页的文字描述替换成原图，并覆盖当前手动修改，确定继续吗？')) return;
+          busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/figures/use-source`, { method:'POST' });
+            if (!response.ok) throw new Error(await readError(response));
+            applyJob(await response.json());
+            loadJobs();
+          } catch (err) { error.value = err.message; }
+          finally { busy.value = false; }
+        };
         const onEdit = () => { dirty.value = true; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = ''; flashLine.value = 0; };
         const requestFix = async () => {
           busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = '';
@@ -560,7 +574,7 @@
         };
         const clearJob = () => {
           jobId.value = ''; tex.value = ''; sourceUrl.value = ''; compileResult.value = null;
-          pages.value = []; pageCount.value = 0; hasPdf.value = false; activePage.value = 0;
+          pages.value = []; pageCount.value = 0; hasPdf.value = false; hasFigures.value = false; activePage.value = 0;
           reviewedPages.value = {}; suggestedTex.value = ''; fixSummary.value = '';
           selectedJob.value = ''; dirty.value = false; error.value = '';
         };
@@ -580,7 +594,7 @@
         window.addEventListener('beforeunload', event => {
           if (dirty.value) { event.preventDefault(); event.returnValue = ''; }
         });
-        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, lineCount, errorLines, pdfUrl, texUrl, originalUrl, activePageData, highlighted, issues, reviewItems, reviewLines, reviewKinds, reviewedPages, reviewedCount, togglePage, pageReviewCount, pageAnchors, tab, scrollTop, flashLine, activePage, hasPdf, dirty, recentJobs, selectedJob, jobQuery, jobOffset, jobTotal, jobLimit, jobPage, jobPages, searchJobs, prevJobs, nextJobs, clearJob, ta, hl, onScroll, jumpToLine, jumpToPage, selectFile, upload, openJob, retryPage, formatJobTime, recompile, restoreOriginal, onEdit, requestFix, applyFix };
+        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, lineCount, errorLines, pdfUrl, texUrl, originalUrl, activePageData, hasFigurePlaceholder, highlighted, issues, reviewItems, reviewLines, reviewKinds, reviewedPages, reviewedCount, togglePage, pageReviewCount, pageAnchors, tab, scrollTop, flashLine, activePage, hasPdf, hasFigures, dirty, recentJobs, selectedJob, jobQuery, jobOffset, jobTotal, jobLimit, jobPage, jobPages, searchJobs, prevJobs, nextJobs, clearJob, ta, hl, onScroll, jumpToLine, jumpToPage, selectFile, upload, openJob, retryPage, formatJobTime, recompile, restoreOriginal, rebuildFigures, onEdit, requestFix, applyFix };
       }
     }).mount('#app');
   </script>

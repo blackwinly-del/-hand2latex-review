@@ -509,6 +509,76 @@ class WorkbenchAppTests(unittest.TestCase):
             for directory in directories:
                 shutil.rmtree(directory, ignore_errors=True)
 
+    @patch("workbench.app.compile_tex")
+    def test_use_source_figures_rebuilds_without_recognition(self, compile_mock):
+        directory = Path("artifacts/jobs") / uuid.uuid4().hex
+        page_directory = directory / "page_01"
+        page_directory.mkdir(parents=True)
+        try:
+            (page_directory / "source.png").write_bytes(b"image")
+            description = (
+                "A flowchart illustrating a psychological model. It shows Social Feedback "
+                "and Memory with arrows, plus a legend explaining the relationships."
+            )
+            document = {
+                "title": "图页",
+                "blocks": [
+                    {"type": "figure", "description": description},
+                    {"type": "paragraph", "text": "Social Feedback\n(e.g., acceptance)"},
+                    {"type": "paragraph", "text": "Memory\n(e.g., social events)"},
+                ],
+            }
+            (page_directory / "document.json").write_text(
+                json.dumps(document, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            placeholder = "\\fbox{原始示意图（未重新绘制）}\n"
+            (directory / "main.tex").write_text(placeholder, encoding="utf-8")
+            (directory / "original.tex").write_text(placeholder, encoding="utf-8")
+            (directory / "job.json").write_text(
+                json.dumps({
+                    "title": "图页",
+                    "page_count": 1,
+                    "pages": [{
+                        "page": 1,
+                        "source_url": f"/api/jobs/{directory.name}/pages/1/source",
+                        "latency_ms": 1,
+                        "human_review": True,
+                        "error": None,
+                        "merged_page": 1,
+                    }],
+                }, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            def fake_compile(tex_path):
+                Path(tex_path).with_suffix(".pdf").write_bytes(b"%PDF-figure")
+                return {
+                    "success": True,
+                    "pdf_path": str(Path(tex_path).with_suffix(".pdf")),
+                    "log": "compiled",
+                    "errors": [],
+                    "returncode": 0,
+                }
+
+            compile_mock.side_effect = fake_compile
+            response = self.client.post(f"/api/jobs/{directory.name}/figures/use-source")
+
+            self.assertEqual(response.status_code, 200, response.text)
+            data = response.json()
+            self.assertTrue(data["has_figures"])
+            tex = (directory / "main.tex").read_text(encoding="utf-8")
+            self.assertIn(r"\includegraphics", tex)
+            self.assertNotIn("原始示意图（未重新绘制）", tex)
+            self.assertNotIn("Social Feedback\n(e.g., acceptance)", tex)
+            saved_document = json.loads(
+                (page_directory / "document.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(Path(saved_document["blocks"][0]["source_image"]).is_file())
+            compile_mock.assert_called()
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
     def test_missing_job_returns_404(self):
         response = self.client.get("/api/jobs/00000000000000000000000000000000/pdf")
         self.assertEqual(response.status_code, 404)

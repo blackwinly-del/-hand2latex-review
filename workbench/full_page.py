@@ -222,6 +222,74 @@ def _escape_text(text: str) -> str:
     return "".join(parts)
 
 
+def _split_page_groups(blocks: list[dict]) -> list[list[dict]]:
+    groups: list[list[dict]] = [[]]
+    for block in blocks:
+        if isinstance(block, dict) and block.get("type") == "page_break":
+            groups.append([])
+        else:
+            groups[-1].append(block)
+    return groups
+
+
+def _paragraph_matches_caption(text: str, description: str) -> bool:
+    first_line = text.splitlines()[0].strip().lower()
+    return bool(first_line) and first_line in description.lower()
+
+
+def _figure_dominant_page(blocks: list[dict]) -> dict | None:
+    """判断一页是否基本就是一张图：一个 figure + 和图注重叠的短标签。"""
+    figures = [block for block in blocks if isinstance(block, dict) and block.get("type") == "figure"]
+    if len(figures) != 1:
+        return None
+    figure = figures[0]
+    description = figure.get("description")
+    source_image = figure.get("source_image")
+    if not isinstance(description, str) or len(description.strip()) < 120:
+        return None
+    if not isinstance(source_image, str) or not Path(source_image).is_file():
+        return None
+
+    others = [block for block in blocks if block is not figure]
+    if not others:
+        return figure
+    if any(not isinstance(block, dict) or block.get("type") != "paragraph" for block in others):
+        return None
+    labels = []
+    for block in others:
+        text = block.get("text")
+        if not isinstance(text, str) or not text.strip() or len(text) > 200:
+            return None
+        labels.append(text)
+    matched = sum(1 for text in labels if _paragraph_matches_caption(text, description))
+    if matched < max(1, len(labels) - 1):
+        return None
+    return figure
+
+
+def _figure_image_tex(block: dict) -> list[str]:
+    description = block["description"].strip()
+    caption = description.split(". ")[0].strip()[:160] or "原始示意图"
+    image_path = Path(block["source_image"]).resolve().as_posix()
+    return [
+        r"\begin{figure}[htbp]",
+        r"\centering",
+        r"\includegraphics[width=0.92\linewidth,height=0.78\textheight,keepaspectratio]{\detokenize{"
+        + image_path
+        + "}}",
+        r"\caption{" + _escape_text(caption) + "}",
+        r"\end{figure}",
+        "",
+    ]
+
+
+def _attach_figure_sources(document: dict, image_path: str) -> None:
+    source_image = str(Path(image_path).resolve())
+    for block in document.get("blocks", []):
+        if isinstance(block, dict) and block.get("type") == "figure":
+            block["source_image"] = source_image
+
+
 def build_tex(document: dict) -> str:
     title = document.get("title") or "手写笔记"
     blocks = document.get("blocks")
@@ -239,41 +307,46 @@ def build_tex(document: dict) -> str:
         r"\begin{document}",
         r"\maketitle",
     ]
-    for block in blocks:
-        if not isinstance(block, dict):
-            raise TypeError("each block must be a dict")
-        block_type = block.get("type")
-        if block_type == "page_break":
+    for page_index, group in enumerate(_split_page_groups(blocks)):
+        if page_index:
             parts.extend([r"\newpage", ""])
-        elif block_type == "blank_page":
-            parts.extend([r"\null", ""])
-        elif block_type == "paragraph":
-            text = block.get("text")
-            if not isinstance(text, str) or not text.strip():
-                raise ValueError("paragraph text must not be blank")
-            parts.extend([_escape_text(text), ""])
-        elif block_type == "display_formula":
-            latex = block.get("latex")
-            if not isinstance(latex, str) or not latex.strip():
-                raise ValueError("formula latex must not be blank")
-            parts.extend(["\\[", latex.strip(), "\\]", ""])
-        elif block_type == "figure":
-            description = block.get("description")
-            if not isinstance(description, str) or not description.strip():
-                raise ValueError("figure description must not be blank")
-            escaped = _escape_text(description)
-            parts.extend(
-                [
-                    r"\begin{figure}[htbp]",
-                    r"\centering",
-                    r"\fbox{\parbox{0.85\linewidth}{原始示意图（未重新绘制）：" + escaped + "}}",
-                    r"\caption{" + escaped + "}",
-                    r"\end{figure}",
-                    "",
-                ]
-            )
-        else:
-            raise ValueError(f"unsupported block type: {block_type}")
+        figure_page = _figure_dominant_page(group)
+        if figure_page is not None:
+            parts.extend(_figure_image_tex(figure_page))
+            continue
+        for block in group:
+            if not isinstance(block, dict):
+                raise TypeError("each block must be a dict")
+            block_type = block.get("type")
+            if block_type == "blank_page":
+                parts.extend([r"\null", ""])
+            elif block_type == "paragraph":
+                text = block.get("text")
+                if not isinstance(text, str) or not text.strip():
+                    raise ValueError("paragraph text must not be blank")
+                parts.extend([_escape_text(text), ""])
+            elif block_type == "display_formula":
+                latex = block.get("latex")
+                if not isinstance(latex, str) or not latex.strip():
+                    raise ValueError("formula latex must not be blank")
+                parts.extend(["\\[", latex.strip(), "\\]", ""])
+            elif block_type == "figure":
+                description = block.get("description")
+                if not isinstance(description, str) or not description.strip():
+                    raise ValueError("figure description must not be blank")
+                escaped = _escape_text(description)
+                parts.extend(
+                    [
+                        r"\begin{figure}[htbp]",
+                        r"\centering",
+                        r"\fbox{\parbox{0.85\linewidth}{原始示意图（未重新绘制）：" + escaped + "}}",
+                        r"\caption{" + escaped + "}",
+                        r"\end{figure}",
+                        "",
+                    ]
+                )
+            else:
+                raise ValueError(f"unsupported block type: {block_type}")
     parts.append(r"\end{document}")
     return "\n".join(parts) + "\n"
 
@@ -379,6 +452,7 @@ def _request_page(image_path: str) -> dict:
 def generate_document(image_path: str) -> dict:
     started = time.perf_counter()
     document = _request_page(image_path)
+    _attach_figure_sources(document, image_path)
     tex = build_tex(document)
     return {
         "title": document.get("title") or "手写笔记",

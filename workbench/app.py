@@ -17,7 +17,12 @@ from pydantic import BaseModel
 
 from workbench.compiler import compile_tex
 from workbench.fix import suggest_fix
-from workbench.full_page import build_tex, generate_document, merge_documents
+from workbench.full_page import (
+    _attach_figure_sources,
+    build_tex,
+    generate_document,
+    merge_documents,
+)
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -143,14 +148,33 @@ def _store_compile(directory: Path, public_result: dict) -> None:
     )
 
 
+def _has_figure_blocks(directory: Path) -> bool:
+    for document_path in directory.glob("page_*/document.json"):
+        try:
+            document = json.loads(document_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        blocks = document.get("blocks", [])
+        if any(isinstance(block, dict) and block.get("type") == "figure" for block in blocks):
+            return True
+    return False
+
+
 def _store_job_metadata(
     directory: Path,
     title: str,
     page_count: int,
     pages: list[dict],
     failures: list[dict],
+    *,
+    has_figures: bool = False,
 ) -> None:
-    metadata = {"title": title, "page_count": page_count, "pages": pages}
+    metadata = {
+        "title": title,
+        "page_count": page_count,
+        "pages": pages,
+        "has_figures": has_figures,
+    }
     if failures:
         metadata["failed_pages"] = failures
     (directory / "job.json").write_text(
@@ -178,6 +202,7 @@ def _job_metadata(directory: Path) -> dict:
         metadata.setdefault("title", _read_job_title(directory))
         metadata.setdefault("page_count", 1)
         metadata.setdefault("pages", [])
+        metadata.setdefault("has_figures", _has_figure_blocks(directory))
         return metadata
 
     pages = []
@@ -213,6 +238,7 @@ def _job_metadata(directory: Path) -> dict:
         "title": _read_job_title(directory),
         "page_count": merged_page,
         "pages": pages,
+        "has_figures": _has_figure_blocks(directory),
     }
     if failures:
         metadata["failed_pages"] = failures
@@ -247,6 +273,7 @@ def _job_payload(
     page_count: int = 1,
     pages: list[dict] | None = None,
     failures: list[dict] | None = None,
+    has_figures: bool = False,
 ) -> dict:
     payload = {
         "job_id": job_id,
@@ -257,6 +284,7 @@ def _job_payload(
         "human_review": True,
         "page_count": page_count,
         "pages": pages or [],
+        "has_figures": has_figures,
     }
     if failures:
         payload["failed_pages"] = failures
@@ -343,7 +371,19 @@ def _create_document(images: list[UploadFile]) -> dict:
         (directory / "original.tex").write_text(merged_tex, encoding="utf-8")
         _write_main_tex(directory, merged_tex)
         compile_result = compile_tex(directory / "main.tex")
-        _store_job_metadata(directory, merged["title"], len(documents), pages, failures)
+        has_figures = any(
+            isinstance(block, dict) and block.get("type") == "figure"
+            for document in documents
+            for block in document.get("blocks", [])
+        )
+        _store_job_metadata(
+            directory,
+            merged["title"],
+            len(documents),
+            pages,
+            failures,
+            has_figures=has_figures,
+        )
         _store_compile(directory, _public_compile(compile_result, job_id))
     except HTTPException:
         raise
@@ -361,6 +401,7 @@ def _create_document(images: list[UploadFile]) -> dict:
         page_count=len(documents),
         pages=pages,
         failures=failures,
+        has_figures=has_figures,
     )
     return payload
 
@@ -398,6 +439,7 @@ def list_jobs(limit: int = 20, offset: int = 0, q: str = "") -> dict:
                 "page_count": metadata["page_count"],
                 "page_total": len(metadata["pages"]),
                 "has_pdf": (entry / "main.pdf").is_file(),
+                "has_figures": metadata.get("has_figures", False),
                 "failed_pages": len(metadata.get("failed_pages", [])),
                 "_mtime": stat.st_mtime,
             }
@@ -422,6 +464,7 @@ def get_job(job_id: str) -> dict:
         page_count=metadata["page_count"],
         pages=metadata["pages"],
         failures=metadata.get("failed_pages"),
+        has_figures=metadata.get("has_figures", False),
     )
 
 
@@ -528,7 +571,19 @@ def retry_failed_page(job_id: str, page_number: int) -> dict:
         else:
             merged_page += 1
             page["merged_page"] = merged_page
-    _store_job_metadata(directory, merged["title"], len(documents), pages, failures)
+    has_figures = any(
+        isinstance(block, dict) and block.get("type") == "figure"
+        for document in documents
+        for block in document.get("blocks", [])
+    )
+    _store_job_metadata(
+        directory,
+        merged["title"],
+        len(documents),
+        pages,
+        failures,
+        has_figures=has_figures,
+    )
     _store_compile(directory, _public_compile(compile_result, job_id))
     return _job_payload(
         job_id,
@@ -538,6 +593,82 @@ def retry_failed_page(job_id: str, page_number: int) -> dict:
         page_count=len(documents),
         pages=pages,
         failures=failures,
+        has_figures=has_figures,
+    )
+
+
+@app.post("/api/jobs/{job_id}/figures/use-source")
+def use_source_figures(job_id: str) -> dict:
+    """把已有任务中的图形块改为嵌入原图，不重新调用识别模型。"""
+    directory = _job_dir(job_id)
+    metadata = _job_metadata(directory)
+    pages = metadata["pages"]
+    sources = _source_paths(directory) if pages else []
+    documents = []
+    found_figure = False
+    for page in sorted(pages, key=lambda item: item["page"]):
+        if page.get("error") is not None:
+            continue
+        document_path = directory / f"page_{page['page']:02d}" / "document.json"
+        if not document_path.is_file():
+            raise HTTPException(
+                status_code=409,
+                detail="该任务缺少页面结构，无法重建原图；请重新上传整批",
+            )
+        document = json.loads(document_path.read_text(encoding="utf-8"))
+        figure_blocks = [
+            block
+            for block in document.get("blocks", [])
+            if isinstance(block, dict) and block.get("type") == "figure"
+        ]
+        if figure_blocks:
+            if page["page"] > len(sources):
+                raise HTTPException(status_code=409, detail="缺少对应页的源图")
+            found_figure = True
+            _attach_figure_sources(document, str(sources[page["page"] - 1]))
+            document_path.write_text(
+                json.dumps(document, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        documents.append(document)
+
+    if not found_figure:
+        raise HTTPException(status_code=409, detail="这个任务没有可保留的图形块")
+    merged = merge_documents(documents)
+    merged_tex = build_tex(merged)
+    if r"\includegraphics" not in merged_tex:
+        raise HTTPException(status_code=409, detail="没有适合整页保留原图的图形页")
+    (directory / "original.tex").write_text(merged_tex, encoding="utf-8")
+    _write_main_tex(directory, merged_tex)
+    try:
+        compile_result = compile_tex(directory / "main.tex")
+    except Exception as error:
+        logger.exception("use-source-figures compilation failed")
+        raise HTTPException(status_code=500, detail=f"{type(error).__name__}: 原图编译失败") from error
+
+    failures = [
+        {"page": page["page"], "error": page["error"]}
+        for page in pages
+        if page.get("error") is not None
+    ]
+    _store_job_metadata(
+        directory,
+        merged["title"],
+        len(documents),
+        pages,
+        failures,
+        has_figures=True,
+    )
+    _store_compile(directory, _public_compile(compile_result, job_id))
+    return _job_payload(
+        job_id,
+        directory,
+        merged["title"],
+        compile_result,
+        page_count=len(documents),
+        pages=pages,
+        failures=failures,
+        has_figures=True,
     )
 
 

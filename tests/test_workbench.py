@@ -85,6 +85,70 @@ class FullPageDocumentTests(unittest.TestCase):
     def test_escape_text_keeps_display_math(self):
         self.assertEqual(_escape_text("$$x∈A$$"), r"\[x\in A\]")
 
+    def test_build_tex_embeds_source_image_for_figure_dominant_page(self):
+        with tempfile.TemporaryDirectory() as directory:
+            image_path = Path(directory) / "source.png"
+            image_path.write_bytes(b"image")
+            description = (
+                "A flowchart illustrating a psychological model. It shows Social Feedback "
+                "and Memory with arrows, plus a legend for causal and feedback paths."
+            )
+            tex = build_tex({
+                "title": "图页",
+                "blocks": [
+                    {"type": "figure", "description": description, "source_image": str(image_path)},
+                    {"type": "paragraph", "text": "Social Feedback\n(e.g., acceptance)"},
+                    {"type": "paragraph", "text": "Memory\n(e.g., social events)"},
+                ],
+            })
+
+            self.assertIn(r"\includegraphics", tex)
+            self.assertIn(r"\detokenize{", tex)
+            self.assertNotIn("原始示意图（未重新绘制）", tex)
+            self.assertNotIn("Social Feedback\n(e.g., acceptance)", tex)
+
+    def test_build_tex_keeps_description_for_mixed_figure_page(self):
+        with tempfile.TemporaryDirectory() as directory:
+            image_path = Path(directory) / "source.png"
+            image_path.write_bytes(b"image")
+            tex = build_tex({
+                "title": "图文混排",
+                "blocks": [
+                    {
+                        "type": "figure",
+                        "description": "A flowchart of a psychological model with Social Feedback and Memory.",
+                        "source_image": str(image_path),
+                    },
+                    {"type": "paragraph", "text": "这是一段不在图注里的正文，需要保留。"},
+                ],
+            })
+
+            self.assertIn("原始示意图（未重新绘制）", tex)
+            self.assertIn("这是一段不在图注里的正文，需要保留。", tex)
+            self.assertNotIn(r"\includegraphics", tex)
+
+    def test_generate_document_attaches_figure_source_image(self):
+        with tempfile.TemporaryDirectory() as directory:
+            image_path = Path(directory) / "source.png"
+            image_path.write_bytes(b"image")
+            document = {
+                "title": "图页",
+                "blocks": [
+                    {
+                        "type": "figure",
+                        "description": (
+                            "A flowchart illustrating a psychological model with several boxes, "
+                            "arrows, feedback loops, and a legend explaining each relationship."
+                        ),
+                    }
+                ],
+            }
+            with patch("workbench.full_page._request_page", return_value=document):
+                result = generate_document(str(image_path))
+
+            self.assertEqual(result["blocks"][0]["source_image"], str(image_path.resolve()))
+            self.assertIn(r"\includegraphics", result["tex"])
+
     def test_build_tex_keeps_inline_math_in_paragraph(self):
         tex = build_tex({
             "title": "行内公式",
@@ -199,6 +263,32 @@ class TectonicCompilerTests(unittest.TestCase):
 
             self.assertTrue(result["success"], result["log"])
             self.assertNotIn("Missing character", result["log"])
+
+    def test_compile_figure_dominant_page_with_source_image(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tex_path = Path(directory) / "main.tex"
+            source = (Path(__file__).resolve().parent.parent / "samples" / "sample_plus.png").resolve()
+            tex = build_tex({
+                "title": "图形页",
+                "blocks": [
+                    {
+                        "type": "figure",
+                        "description": (
+                            "A handwritten formula image used as a figure. It contains a polynomial "
+                            "expression and should be embedded as the original image."
+                        ),
+                        "source_image": str(source),
+                    }
+                ],
+            })
+            tex_path.write_text(tex, encoding="utf-8")
+
+            result = compile_tex(tex_path)
+
+            self.assertTrue(result["success"], result["log"])
+            with pymupdf.open(result["pdf_path"]) as document:
+                self.assertEqual(document.page_count, 1)
+                self.assertTrue(document[0].get_images())
 
     def test_compile_trailing_blank_page(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -799,3 +799,17 @@
 - **证据边界**：`recognizer.py` 的代码默认仍是 `cpu` 和 `PP-FormulaNet-L`，保证无 GPU 的克隆可运行；GPU 是本地配置而非公共默认。Web 工作台的整页转写仍调用远端 `deepseek-flash`，不会因为本机 GPU 而变快或本地化。
 - **Git 状态**：`.env.example`、启动脚本、文档和测试改动放在同一提交中；`.env` 含密钥且被忽略，只在本机生效，不进入提交。
 - **未完成事项**：真实鼠标书写到 GPU 识别的端到端延迟未重新计时；整页转录本地化仍未实现。
+
+## 2026-11-22 图形主导页保留原图
+
+**阶段状态：整页基本是图的页面现在自动嵌入原图并跳过重复标签；老任务可一键重建；图文混排页保持原描述框。**
+
+- **问题证据**：用户截图任务 `7bd4e97a3a494dd1b03a025a7547b17c` 的 `page_01/document.json` 有 13 块——1 个 figure 描述 + 12 个把图中标签逐条抄出的 paragraph。旧 `build_tex` 把 figure 渲染成“原始示意图（未重新绘制）”文字框，导致 PDF 既没有图，又重复了标签。
+- **判定规则**：`_figure_dominant_page` 仅在一页恰有一个 figure、描述不少于 120 字符、源图文件存在、其余全是长度不超过 200 的 paragraph，且至少除一条外的标签首行出现在图注中时，认定为图形主导页；图文混排或长正文页不触发。
+- **生成改动**：`generate_document` 给 figure 块写 `source_image` 绝对路径；`build_tex` 先按 `page_break` 分页，图形主导页用 `\includegraphics` 嵌入原图（`width=0.92\linewidth,height=0.78\textheight,keepaspectratio`）并只保留首句图注，其他标签不再输出；普通/混排 figure 仍走原描述框。
+- **老任务重建**：新增 `POST /api/jobs/{job_id}/figures/use-source`，读取已有 `document.json`、补 `source_image`、重建 TeX 和 PDF，不调用识别模型；任务返回 `has_figures`。前端只在当前 TeX 仍含“未重新绘制”占位时显示“图形页改用原图”按钮，重建后按钮隐藏。
+- **浏览器实测**：复制用户真实图形页为临时任务 `2222…`，打开后 `has_figures=true`、TeX 含占位、无 `\includegraphics`；点击按钮后 `\includegraphics` 出现、占位和重复标签消失、`hasPdf=true`，`pymupdf` 确认 PDF 第 1 页含 1 张嵌入图片；按钮随后隐藏。测试服务器已停止，临时任务已删除，原用户任务未被修改。
+- **实际测试**：新增 3 项 build_tex/generate 测试、1 项真实 Tectonic 图形页编译测试、1 项重建端点测试；`./.venv/Scripts/python.exe -m unittest discover -s tests -q` 为 `Ran 169 tests in 31.248s`、`OK`。
+- **证据边界**：仅图形主导页会嵌整页原图；图文混排仍需文字描述，因为模型没有返回图形裁剪框。嵌入的是图片，图内文字不再作为可搜索文本保留，这是“保留视觉原图”的代价。源图路径记录为本机绝对路径，任务目录移动后需点一次重建或重新上传。
+- **Git 状态**：本条目与代码、文档、测试改动放在同一提交中（哈希见 `git log -1`）；本次不推送远端。
+- **未完成事项**：图文混排页的精确裁剪区检测、图形页多图拆分、整页转录真值仍未完成。

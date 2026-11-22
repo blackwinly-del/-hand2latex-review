@@ -182,6 +182,9 @@ cp .env.example .env
 - 可下载当前 `.tex` 和最初识别原稿；“恢复识别原稿”会在确认后覆盖当前修改并重新编译。
 - 某页识别失败时，该页显示“重试这一页”：只重新识别失败页，成功页复用已保存的
   `document.json`，不重复调用模型。早期任务若没有这些结构文件，会明确提示整批重传。
+- **图形页保留原图**：一页基本就是一张图（一个 `figure` 块，其余是与图注重叠的短标签）时，
+  PDF 直接嵌入原始页面图片，跳过重复的标签文字；图文混排页仍保留“未重新绘制”的描述框。
+  老任务可点“图形页改用原图”重建，只读已有结构，不调用识别模型。
 
 ### 6.1 一键启动（Windows，推荐先试这个）
 
@@ -245,6 +248,7 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
 | `GET /api/jobs/{job_id}/original` | 下载最初识别原稿 |
 | `POST /api/jobs/{job_id}/restore-original` | 恢复原稿并重新编译 |
 | `POST /api/jobs/{job_id}/pages/{page}/retry` | 只重试失败页，成功页复用已保存结构 |
+| `POST /api/jobs/{job_id}/figures/use-source` | 图形主导页改用原始页面图，不调用识别模型 |
 | `POST /api/jobs/{job_id}/compile` | 手工改完 TeX 后重新编译 |
 | `POST /api/jobs/{job_id}/suggest-fix` | 让模型给出针对某个错误片段的修改建议 |
 | `POST /api/jobs/{job_id}/apply-fix` | 人工确认后应用建议（建议过期返回 HTTP 409） |
@@ -355,7 +359,7 @@ RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 \
 ## 八、测试
 
 ```bash
-# C + workbench 全量回归（14 个测试模块、164 项，含真实 Tectonic 编译，需要 tools/tectonic）
+# C + workbench 全量回归（14 个测试模块、169 项，含真实 Tectonic 编译，需要 tools/tectonic）
 ./.venv/Scripts/python.exe -m unittest discover -s tests -v
 
 # 单个模块
