@@ -2,7 +2,8 @@
 param(
     [int]$Port = 8501,
     [switch]$NoBrowser,
-    [switch]$Gpu
+    [switch]$Gpu,
+    [switch]$Cpu
 )
 
 # 画板演示的一键启动：检查环境 -> 缺包才装 -> 起 Streamlit -> 开浏览器。
@@ -75,14 +76,27 @@ function Test-DemoDeps {
 }
 
 Write-Step '检查虚拟环境'
-if ($Gpu) {
-    if (-not (Test-Path -LiteralPath $GpuPython)) {
-        Stop-WithHint '没有找到 GPU 虚拟环境 .venv\gpu-venv。' `
-            '请按 README 6.4 建好 GPU 环境，或不加 -Gpu 用 CPU 启动。'
-    }
+# 本机默认用 GPU；找不到 GPU 环境时自动退回 CPU。显式 -Cpu 可强制 CPU，
+# 显式 -Gpu 时若环境缺失则直接报错，避免“以为在用 GPU”却悄悄跑了 CPU。
+$WantGpu = -not $Cpu
+if ($Gpu) { $WantGpu = $true }
+$useGpu = $false
+if ($WantGpu -and (Test-Path -LiteralPath $GpuPython)) {
     $VenvPython = $GpuPython
     $env:RECOGNIZER_DEVICE = 'gpu:0'
+    $useGpu = $true
     Write-Line '使用 GPU 环境（RECOGNIZER_DEVICE=gpu:0）' 'ok'
+} elseif ($Gpu) {
+    Stop-WithHint '明确指定了 -Gpu，但没有找到 .venv\gpu-venv。' `
+        '请按 README 6.4 建好 GPU 环境；或改用 -Cpu 启动。'
+} else {
+    $VenvPython = $CpuPython
+    $env:RECOGNIZER_DEVICE = 'cpu'
+    if ($WantGpu) {
+        Write-Line '没有找到 .venv\gpu-venv，自动退回 CPU。' 'warn'
+    } else {
+        Write-Line '按 -Cpu 使用 CPU 环境。' 'ok'
+    }
 }
 if (-not (Test-Path -LiteralPath $VenvPython)) {
     Stop-WithHint '没有找到 .venv 虚拟环境，画板需要先装好项目环境。' `
@@ -107,7 +121,7 @@ if (-not $env:RECOGNIZER_MODEL) {
 Write-Step '检查画板依赖（streamlit + drawable-canvas）'
 $deps = Test-DemoDeps
 if (-not $deps.Ok) {
-    if ($Gpu) {
+    if ($useGpu) {
         Write-Line "GPU 环境缺少依赖：$($deps.Missing)，安装 demo/requirements-demo.txt" 'warn'
     } else {
         Write-Line "缺少依赖：$($deps.Missing)，开始安装 demo/requirements-demo.txt" 'warn'

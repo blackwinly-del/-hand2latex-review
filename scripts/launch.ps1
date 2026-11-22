@@ -528,18 +528,26 @@ if (Test-Path -LiteralPath $tectonicExe) {
     Write-Line '获取：tectonic-typesetting/tectonic 的 Releases 页下载 Windows 版，解压到 tools\tectonic\。' 'info'
 }
 
-$modelDir = Join-Path $Root 'models\PP-FormulaNet-L'
-if (Test-Path -LiteralPath $modelDir) {
+$modelFound = $false
+foreach ($candidate in @(
+    @{ Name = 'UniMERNet'; MinMb = 1000 },
+    @{ Name = 'PP-FormulaNet-L'; MinMb = 500 }
+)) {
+    $modelDir = Join-Path $Root "models\$($candidate.Name)"
+    if (-not (Test-Path -LiteralPath $modelDir)) { continue }
     $modelBytes = (Get-ChildItem -LiteralPath $modelDir -Recurse -File -ErrorAction SilentlyContinue |
         Measure-Object -Property Length -Sum).Sum
     $modelMb = [Math]::Round(($modelBytes / 1MB), 0)
-    if ($modelBytes -ge 500MB) {
-        Write-Line "本地公式模型就绪：models\PP-FormulaNet-L（约 $modelMb MB）" 'ok'
+    if ($modelBytes -ge ($candidate.MinMb * 1MB)) {
+        Write-Line "本地公式模型就绪：models\$($candidate.Name)（约 $modelMb MB）" 'ok'
     } else {
-        Write-Line "models\PP-FormulaNet-L 只有 $modelMb MB，可能下载不完整。删除该目录后重跑会自动重下。" 'warn'
+        Write-Line "models\$($candidate.Name) 只有 $modelMb MB，可能下载不完整。删除该目录后重跑会自动重下。" 'warn'
     }
-} else {
-    Write-Line '缺少 models\PP-FormulaNet-L：B 侧会返回明确的失败候选（不会崩，但没有识别结果）。' 'warn'
+    $modelFound = $true
+    break
+}
+if (-not $modelFound) {
+    Write-Line '缺少本地公式模型（models\UniMERNet 或 models\PP-FormulaNet-L）：B 侧会返回明确的失败候选（不会崩，但没有识别结果）。' 'warn'
     Write-Line '获取：装好 paddleocr 后首次运行自动下载，或在 .env 里设置 RECOGNIZER_MODEL_DIR 指向已有目录。' 'info'
 }
 

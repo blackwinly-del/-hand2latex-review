@@ -86,8 +86,8 @@ python recognizer.py samples/sample_plus.png --thorough    # 多视角，扩候�
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `RECOGNIZER_MODEL` | `PP-FormulaNet-L` | 可换 `PP-FormulaNet_plus-L` / `UniMERNet`；已知模型自动映射到独立引擎名（本机 12 样本对比见 README 9.2） |
-| `RECOGNIZER_MODEL_DIR` | 未设置 | 可选模型目录；默认优先使用项目内 `models/<模型名>` |
-| `RECOGNIZER_DEVICE` | `cpu` | 有显卡填 `gpu:0` |
+| `RECOGNIZER_MODEL_DIR` | 未设置 | 可选模型目录；默认优先使用项目内 `models/<模型名>`；本机 `.env` 指向 `models/UniMERNet` |
+| `RECOGNIZER_DEVICE` | `cpu` | 代码默认 CPU；本机 `.env` 已设 `gpu:0`，画板启动脚本默认 GPU，`-Cpu` 可强制 CPU |
 | `RECOGNIZER_BACKEND` | `paddle` | 填 `mock` 返回明确失败候选，仅用于联调失败回退，不得当作真实识别结果 |
 | `RECOGNIZER_ENGINES` | 按 `RECOGNIZER_MODEL` 映射 | 也可显式写 `pp_formulanet_l,unimernet` 同时跑两个独立模型 |
 | `RECOGNIZER_VIEWS` | `off` | 设 `on` 则默认多视角（慢 3~5 倍），一般用 `thorough=True` 按需触发 |

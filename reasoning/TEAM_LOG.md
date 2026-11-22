@@ -784,3 +784,18 @@
 - **实际回归**：`./.venv/Scripts/python.exe -m unittest discover -s tests -q` 为 `Ran 164 tests in 19.949s`、`OK`。
 - **Git 状态**：本条目与代码、文档改动放在同一提交中（哈希见 `git log -1`）；本次不推送远端。
 - **未完成事项**：整页转录真值与本地整页识别仍未完成；真实远端单页重试成功率未单独统计。
+
+## 2026-11-21 本地识别配置统一改为 GPU
+
+**阶段状态：本机 `.env`、`.env.example` 和画板启动默认路径已切到 UniMERNet + gpu:0；CPU 保留显式兜底。工作台整页识别仍走远端 API，不受影响。**
+
+- **本地 `.env`（Git 忽略）**：新增 `RECOGNIZER_MODEL=UniMERNet`、`RECOGNIZER_MODEL_DIR=D:/latex/models/UniMERNet`、`RECOGNIZER_DEVICE=gpu:0`、`PADDLE_PDX_CACHE_HOME=D:/latex/.paddlex`；实测 `reasoner` 加载后四项均生效。
+- **`.env.example`**：默认值同步改为 UniMERNet + gpu:0，并注明没有 NVIDIA GPU 时改回 PP-FormulaNet-L + cpu、画板用 `-Cpu`。
+- **画板启动**：`scripts/launch_demo.ps1` 默认优先 `.venv\gpu-venv`；GPU 环境缺失时自动退回 CPU，显式 `-Gpu` 缺失则报错，`-Cpu` 强制 CPU 并覆盖 `.env` 的 `gpu:0`。`启动画板.bat` 注释同步。
+- **工作台启动体检**：`scripts/launch.ps1` 的本地模型检查改为优先识别 `models/UniMERNet`，再检查 `PP-FormulaNet-L`，避免已有 UniMERNet 时误报缺模型。
+- **浏览器实测**：不带 `-Gpu` 启动画板，日志显示“使用 GPU 环境（RECOGNIZER_DEVICE=gpu:0）”，页面显示“识别模型：UniMERNet · 设备：GPU（gpu:0）”；加 `-Cpu` 启动后页面显示“设备：CPU”，证明本地 `.env` 的 GPU 值被显式覆盖。测试服务器已停止。
+- **测试隔离修复**：本地 `.env` 改变默认引擎后，`test_integration_bc.test_default_local_model_directory_is_used` 原先把 `DEFAULT_ENGINE` 当成 PP-L 写死；现改为显式传入 `ENGINE_PP_FORMULANET_L`，测试不再受本机 `.env` 影响。
+- **实际回归**：`./.venv/Scripts/python.exe -m unittest discover -s tests -q` 为 `Ran 164 tests in 17.002s`、`OK`。
+- **证据边界**：`recognizer.py` 的代码默认仍是 `cpu` 和 `PP-FormulaNet-L`，保证无 GPU 的克隆可运行；GPU 是本地配置而非公共默认。Web 工作台的整页转写仍调用远端 `deepseek-flash`，不会因为本机 GPU 而变快或本地化。
+- **Git 状态**：`.env.example`、启动脚本、文档和测试改动放在同一提交中；`.env` 含密钥且被忽略，只在本机生效，不进入提交。
+- **未完成事项**：真实鼠标书写到 GPU 识别的端到端延迟未重新计时；整页转录本地化仍未实现。

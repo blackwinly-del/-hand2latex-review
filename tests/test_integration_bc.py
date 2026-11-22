@@ -124,7 +124,7 @@ class BCIntegrationTests(unittest.TestCase):
             patch("recognizer._device", return_value="cpu"),
             patch("paddleocr.FormulaRecognition") as formula_recognition,
         ):
-            recognizer.get_model()
+            recognizer.get_model(recognizer.ENGINE_PP_FORMULANET_L)
 
         formula_recognition.assert_called_once_with(
             model_name="PP-FormulaNet-L",

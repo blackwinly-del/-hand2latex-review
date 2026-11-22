@@ -148,9 +148,9 @@ cp .env.example .env
 | `OPENAI_TIMEOUT_SECONDS` | 上下文选择超时，默认 30 |
 | `FULLPAGE_TIMEOUT_SECONDS` | 整页识别超时，默认 120 |
 | `FULLPAGE_MAX_TOKENS` | 整页识别输出上限，默认 24000 |
-| `RECOGNIZER_MODEL` | 默认 `PP-FormulaNet-L`，可换 `PP-FormulaNet_plus-L` |
-| `RECOGNIZER_MODEL_DIR` | 默认 `models/PP-FormulaNet-L` |
-| `RECOGNIZER_DEVICE` | `cpu`，有显卡填 `gpu:0` |
+| `RECOGNIZER_MODEL` | 代码默认 `PP-FormulaNet-L`，可换 `PP-FormulaNet_plus-L` / `UniMERNet`；本机 `.env` 已设 `UniMERNet` |
+| `RECOGNIZER_MODEL_DIR` | 代码默认 `models/<模型名>`；本机 `.env` 指向 `D:/latex/models/UniMERNet` |
+| `RECOGNIZER_DEVICE` | 代码默认 `cpu`；本机 `.env` 已设 `gpu:0`，画板启动脚本默认 GPU |
 | `RECOGNIZER_BACKEND` | 填 `mock` 返回明确失败候选，仅用于联调失败回退，**不能当作真实识别结果** |
 
 完整 B 侧变量表见 [README_B.md](README_B.md)。
@@ -263,9 +263,10 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
   依赖探测用 `find_spec`，不做裸 import——该组件脱离 Streamlit 运行时 import 会误报
   `asset_dir` 错误，真 import 会把好环境误判成缺包。
 - 端口被占用可换：`启动画板.bat -Port 8502`（等价于 `scripts/launch_demo.ps1 -Port 8502`）。
-- 用本机 GPU 识别：`启动画板.bat -Gpu`（等价于 `scripts/launch_demo.ps1 -Gpu`）。它会改用
-  `.venv\gpu-venv` 并设置 `RECOGNIZER_DEVICE=gpu:0`；GPU 环境缺画板依赖时，按
-  `demo/requirements-demo.txt` 安装到该环境。页面会显示当前识别设备。
+- **默认用本机 GPU**：直接双击 `启动画板.bat` 就会优先使用 `.venv\gpu-venv` 并设置
+  `RECOGNIZER_DEVICE=gpu:0`；本机 `.env` 也配置为 `UniMERNet` + `gpu:0`。找不到 GPU 环境时
+  自动退回 CPU；`-Cpu` 强制 CPU，`-Gpu` 在 GPU 环境缺失时直接报错。GPU 环境缺画板依赖时，
+  按 `demo/requirements-demo.txt` 安装到该环境。页面会显示当前模型和设备。
 - 识别模型：存在 `models/UniMERNet` 时启动脚本优先用它（12 样本实测 8/12，高于
   PP-FormulaNet-L 的 5/12，见 9.2）；显式设置 `RECOGNIZER_MODEL` 可切换，页面会显示模型名。
 
@@ -316,7 +317,7 @@ RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 PADDLE_PDX_CACHE_HOME=D:/late
 # 下载后把权重放到 models/UniMERNet，画板启动脚本就会优先使用它
 ```
 
-画板现在可以直接用 GPU 启动：`启动画板.bat -Gpu`。实测浏览器页面显示
+画板默认就用 GPU 启动（`启动画板.bat`，`-Cpu` 可强制 CPU）。实测浏览器页面显示
 “识别模型：UniMERNet · 设备：GPU（gpu:0）”，Streamlit 进程出现在 `nvidia-smi` 的 compute apps 中。
 默认 `.venv` 的 CPU 识别也已恢复：`recognizer.py samples/sample_plus.png` 实测模型加载 9.5 s、
 推理 26.02 s，输出与 GPU 相同。整页识别仍然走远端 `deepseek-flash`，本机 GPU 只覆盖
