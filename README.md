@@ -37,7 +37,8 @@
 | 逐页真实识别信号（`finish_reason`、真实 token 用量、是否接近输出上限、重试次数、块统计、耗时） | `workbench/full_page.py` | `tests/test_workbench.py` |
 | TeX 一字未改时复用上一次 PDF，不重跑 Tectonic | `workbench/app.py` | `tests/test_workbench_app.py` |
 | 改稿便捷性：`Ctrl+S` 编译、`F2` 跳下一处复核（带"第 N / M 处"计数）、浏览器草稿自动保存与恢复、历史版本回滚 | `workbench/static/index.html` | 2026-11-23 Playwright 实测 |
-| 打包成绿色 zip（随包带 Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描） | `scripts/package.ps1` | `dist/Hand2LaTeX-1.0.0-win64.zip`，20.4 MB，SHA256 `7A4C1099D9653629E05D493AB2538827D75EB6719A988084AE54CB39B8CA5941`；解压后在浏览器里实测可用 |
+| 打包成绿色 zip（随包带 Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描） | `scripts/package.ps1` | `dist/Hand2LaTeX-1.0.0-win64.zip`，20.4 MB，SHA256 `5A38761F4FB228CD434EB435FDED5872245B37D0B2F7E6663B3A34337CD461CD`；解压后在浏览器里实测可用 |
+| 编译出 setup.exe 安装器（免管理员、装到用户目录、中文安装界面、卸载时问要不要删任务产物） | `scripts/package.ps1 -BuildInstaller` + `installer/hand2latex.iss` | `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，15.5 MB，SHA256 `6C102726C542158089BBB562F7E4EEB6C96629B3FFD792E766D2798B80C5E745`；2026-11-23 静默装机 + 静默卸载实测通过 |
 
 ### 尚未实现或尚未证明（审阅时请重点看这里）
 
@@ -52,8 +53,9 @@
 - MLP 风险打分仅用于学习演示，`risk_score` 在生产路径恒为 `null`。
 - 远端整页识别已改成多页并行（2026-11-23 实测 2 页 2.0 s + 1.0 s 合计 2.0 s 完成），但**并行度上限没有压测**，
   也没测过 10 页以上的大批量；本地画板识别仍是单张串行，CPU 推理和 Tectonic 编译都慢。
-- `installer/hand2latex.iss` 只写好了脚本，**本机没有 Inno Setup，没有编译验证过**；已验证的只有 zip 绿色包
-  （从打包目录起服务，`/api/status` 报告"来源：安装包"、前端来自随包副本、Tectonic 在包内可用）。
+- 安装器只做过**静默安装 / 静默卸载**的验证（装到临时目录、跑通、卸干净）；带界面的安装向导
+  （选目录、勾桌面快捷方式、卸载时问要不要删 `artifacts`）**没有人工点过一遍**，只做了代码审阅。
+  安装包里不含 Python，目标机器没有 Python 3.10~3.12 时仍然跑不起来。
 - 状态面板、进度、逐页信号和改稿便捷性都是在 **mock 识别 + mock 编译**的浏览器实测里验证的，
   没有用真实付费 API 把安装包完整跑一遍。
 
@@ -102,7 +104,9 @@
 │   └── package.ps1            打包成 dist/ 下的绿色 zip（可选 -BuildInstaller 编 setup.exe）
 ├── installer/
 │   ├── 安装说明.txt            给最终用户看的中文说明（会随包分发）
-│   └── hand2latex.iss         Inno Setup 6 脚本（本机没装 Inno Setup，未编译验证）
+│   ├── hand2latex.iss         Inno Setup 6 脚本（2026-11-23 用 ISCC 6.7.3 编译并实装验证过）
+│   └── languages/
+│       └── ChineseSimplified.isl  官方简体中文安装界面消息（Inno Setup 安装器不自带，随仓库带一份）
 ├── 启动工作台.bat              双击入口（ASCII 内容，中文界面由 launch.ps1 输出）
 ├── 启动画板.bat                双击打开画板演示（Streamlit，默认 8501 端口）
 ├── 关闭工作台.bat              双击停止服务
@@ -370,12 +374,20 @@ RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 PADDLE_PDX_CACHE_HOME=D:/late
 # 只打绿色 zip（默认）
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1
 
-# 打 zip，并在本机装了 Inno Setup 6 时顺便编出 setup.exe
+# 打 zip，并顺便编出 setup.exe（本机装了 Inno Setup 6 才行）
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -BuildInstaller
+
+# Inno Setup 装在非默认目录、也没进 PATH 时，直接指定 ISCC.exe
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -BuildInstaller -Iscc "D:\API\Inno Setup 6\ISCC.exe"
 
 # 保留 dist/staging 里的解压态目录，方便自己先跑一遍看看
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -KeepStaging
 ```
+
+`-BuildInstaller` 找 ISCC 的顺序：`-Iscc` 参数 → PATH 里的 `iscc` → 三个默认安装目录 →
+注册表卸载项里的 `InstallLocation`（本机就装在 `D:\API\Inno Setup 6`，靠这一步才找到）。
+安装界面用的简体中文消息文件随仓库带在 `installer/languages/ChineseSimplified.isl`，
+因为 Inno Setup 官方安装器**不含**简体中文，不这样做编出来就是英文向导。
 
 脚本只读仓库、只往 `dist/` 写，不改源码也不碰 `.env`。它做的事：按第十节的排除清单复制仓库 →
 把 `node_modules/vue/dist/vue.global.js` 复制进包里（目标机器**不需要装 Node.js**）→ 写
@@ -384,14 +396,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -KeepSta
 `OPENAI_API_KEY` 值没有混进包里（扫到就中止）→ 压成 zip 并打印 SHA256。zip 里是一个
 `Hand2LaTeX-<版本>-win64` 顶层文件夹，"解压到当前文件夹"也不会把文件撒得到处都是。
 
-2026-11-23 实测产出：`dist/Hand2LaTeX-1.0.0-win64.zip`（20.4 MB，SHA256
-`7A4C1099D9653629E05D493AB2538827D75EB6719A988084AE54CB39B8CA5941`）。把这个 zip 解压到临时目录、
-从解压目录起服务（8014 端口）后实测：`/api/status` 报告 `build.source = 安装包`、`commit = 30cc4f9`、
-构建时间有值、前端来自随包副本、Tectonic 0.17.0 在包内可用、任务数为 0；无头浏览器打开首页，
-Vue 正常挂载（10 个状态条 chip、上传控件在、`pageErrors` 为空），状态详情里显示“来源 安装包”
-“vue.global.js 来自随安装包携带的副本”“API 密钥 未配置：上传识别、修复建议都用不了”——
-最后一条是如实报告，因为包里不带 `.env`。
-**Inno Setup 未在本机安装，`installer/hand2latex.iss` 没有编译验证过。**
+2026-11-23 实测产出（提交 `fd1592d` 之后的工作区）：
+
+- `dist/Hand2LaTeX-1.0.0-win64.zip`，20.4 MB，SHA256 `5A38761F4FB228CD434EB435FDED5872245B37D0B2F7E6663B3A34337CD461CD`。
+  解压到临时目录、从解压目录起服务（8014 端口）：`/api/status` 报告 `build.source = 安装包`、`commit = fd1592d`、
+  构建时间有值、前端来自随包副本、Tectonic 0.17.0 在包内可用、任务数 0、`openai.configured = false`
+  （包里不带 `.env`，如实报未配置）；无头浏览器打开首页 Vue 正常挂载（10 个状态 chip、上传控件在、
+  `pageErrors` 为空），详情里显示“来源 安装包”“vue.global.js 来自随安装包携带的副本”
+  “API 密钥 未配置：上传识别、修复建议都用不了”，页面上没有出现任何密钥长度数字。
+- `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，15.5 MB，SHA256 `6C102726C542158089BBB562F7E4EEB6C96629B3FFD792E766D2798B80C5E745`。
+  用 ISCC 6.7.3 编译（`Successful compile`，约 28 s）。静默装到临时目录后核对：启动/关闭脚本、`安装说明.txt`、
+  `BUILD_INFO.json`、`tools\tectonic\tectonic.exe`、随包 `vue.global.js`、`unins000.exe` 都在，
+  `.env`/`.venv`/`node_modules`/`models`/`artifacts`/`.git` 都没被带进去；从安装目录起服务（8015 端口），
+  `/api/status` 报告 `build.source = 安装包`、前端与 Tectonic 都指向安装目录、任务目录也在安装目录内。
+  静默卸载（`/VERYSILENT`）退出码 0：程序文件、`.venv`、各层 `__pycache__`、开始菜单组、注册表卸载项全部清掉，
+  事先放进去的 `artifacts\jobs\keepme.txt` **按设计保留**；`[Run]` 两条都带 `skipifsilent`，静默安装不会自动启动工作台。
+- 验证过程中真找到并修掉两个缺陷：① 卸载阶段的弹框判断误用了 `WizardSilent`（安装阶段专用），
+  静默卸载直接以退出码 1 失败，日志写明 `Cannot call "WizardSilent" function during Uninstall`，改用 `UninstallSilent`；
+  ② `[UninstallDelete]` 只删了顶层 `__pycache__`，`workbench\` 和 `reasoning\` 下的没删，卸载后留垃圾。
+- 没验证的：带界面的安装向导（选目录、勾桌面图标、卸载时问要不要删 `artifacts`）**没有人工点过**，只做了代码审阅；
+  也没在没装过 Python 依赖的干净机器上跑过首次启动。
 
 ## 七、命令行单模块运行
 

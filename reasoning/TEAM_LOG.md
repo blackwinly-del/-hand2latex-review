@@ -833,3 +833,21 @@
 - **边界遵守**：`schemas.py` 未被修改（公共契约不动）；未越界改 A、B 的文件；`raw_latex` 与识别原稿保留；未编造置信度或测试结果，上面每条数字都来自本次实际运行的输出。
 - **Git 状态**：本条目与代码、文档、测试改动放在同一提交中；`.env` 含密钥且被 git 忽略，不进入提交；`dist/` 被忽略，zip 只在本机。本次不推送远端。
 - **未完成事项**：`installer/hand2latex.iss` 的真实编译验证；真实付费 API 下的并行提速倍数与限流表现；10 页以上大批量的并行压测；整页转录真值集仍缺；安装包在"干净机器"（没装过 Python 依赖、没有 `.env`）上的首次启动全流程未实测。
+
+## 2026-11-23（晚）安装器真的编出来并实装实卸验证过了
+
+**阶段状态：上一条里"未编译验证"的 `installer/hand2latex.iss` 现在编译通过、装得上、跑得起来、卸得干净。上面那条未完成事项里的"安装器真实编译验证"已完成，其余仍未做。**
+
+- **装 Inno Setup 的过程（含网络受阻的真实处理）**：`winget install JRSoftware.InnoSetup` 失败，报 `InternetOpenUrl() failed 0x80072efd`——winget 的安装器 URL 指向 GitHub，本机 `github.com` 直连不通（curl 返回 000），本机那个 127.0.0.1:7897 代理端口也没在监听。jrsoftware.org 官方站可通，但 `files.jrsoftware.org/is/6/` 下只有 `.issig` 签名文件，官方下载页的 exe 链接同样指向 GitHub。改走镜像 `ghfast.top` 下载 `innosetup-6.7.3.exe`，**下载后用 winget 清单里公布的官方 SHA256 `9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732` 核对，一致才运行**（另一个镜像 `ghproxy.net` 下载不完整、哈希不符，已丢弃）。安装器留在 `.venv/innosetup-6.7.3.exe`（git 忽略）。
+- **安装位置与开关踩坑**：第一次静默安装"退出码 0 但什么都没装"，日志显示 Git Bash 把 `/VERYSILENT` 之类开关转成了路径（`C:/Program Files/Git/VERYSILENT`）；改用 PowerShell `Start-Process -ArgumentList` 传参才生效。安装器按注册表里旧的安装位置装到了 `D:\API\Inno Setup 6`（不在 PATH，也不在脚本原来探测的三个默认目录里）。
+- **因此改了 `package.ps1` 的 ISCC 查找顺序**：`-Iscc` 参数 → PATH → 三个默认目录 → **注册表卸载项的 `InstallLocation`**（本机靠这一步才找到）。顺手修了两个自相矛盾/不好用的地方：① 原来"清理临时目录"排在"编安装器"之前，导致 `-BuildInstaller` 不加 `-KeepStaging` 必然失败，现在清理挪到最后；② 安装器的 SHA256 也一起打印出来。
+- **简体中文安装界面**：Inno Setup 6.7.3 的 `Languages\` 里**没有** ChineseSimplified.isl（官方安装器不带简体中文），原脚本引用 `compiler:Languages\ChineseSimplified.isl` 必然编译失败。改为把官方翻译（标注适用 6.5.0+，取自 jrsoftware.org/files/istrans 指向的仓库，经镜像下载）随仓库放在 `installer/languages/ChineseSimplified.isl`，补上 UTF-8 BOM，`.iss` 引用相对路径，这样换一台构建机也不需要动 Inno Setup 的安装目录。
+- **编译结果**：`ISCC 6.7.3` 报 `Successful compile`（约 28 s），产出 `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，15.5 MB，SHA256 `6C102726C542158089BBB562F7E4EEB6C96629B3FFD792E766D2798B80C5E745`；同一次运行的 zip 为 20.4 MB，SHA256 `5A38761F4FB228CD434EB435FDED5872245B37D0B2F7E6663B3A34337CD461CD`。
+- **实装验证（装到 git 忽略的 `.venv\installtest`，不是用户目录）**：静默安装退出码 0；核对启动/关闭脚本、`安装说明.txt`、`BUILD_INFO.json`、`tools\tectonic\tectonic.exe`、随包 `vue.global.js`、`unins000.exe` 都在，`.env`/`.venv`/`node_modules`/`models`/`artifacts`/`.git` 都没被带进去；安装日志里没有 `-- Run entry --`，证明 `[Run]` 的 `skipifsilent` 生效、静默安装不会自己把工作台启起来。从安装目录起服务（8015 端口）实测：`build.source = 安装包`、`commit = fd1592d`、前端与 Tectonic 路径都在安装目录内、任务目录也在安装目录内、`openai.configured = false`（不带 `.env`，如实报未配置）。
+- **实卸验证**：先塞进 `artifacts\jobs\keepme.txt` 和 `workbench\__pycache__`、`reasoning\__pycache__`，再 `/VERYSILENT` 卸载：退出码 0，程序文件、`.venv`、各层 `__pycache__`、开始菜单组、HKCU 卸载项全部清掉，`artifacts\jobs\keepme.txt` **按设计保留**。临时安装目录已删除。
+- **验证过程中真找到并修掉的两个缺陷**：① 我给"卸载时问要不要删 artifacts"加的弹框判断误用了 `WizardSilent`——那是安装阶段的函数，卸载阶段调用会抛 `内部错误：Cannot call "WizardSilent" function during Uninstall`，静默卸载直接退出码 1、什么都没删（日志抓到的原文），改用 `UninstallSilent`；同时给安装阶段"没检测到 Python"的提示也加了静默判断，避免静默安装被弹框卡住。② `[UninstallDelete]` 只删顶层 `__pycache__`，`workbench\` 与 `reasoning\` 下的没删，卸载后留 12 个垃圾条目，已逐条补上。另外发现原脚本注释和 `安装说明.txt` 都写着"卸载向导会问要不要保留任务产物"，但当时**根本没有这段代码**——这次把 `InitializeUninstall` 真写出来了，文档才不是假承诺。
+- **实际回归**：`./.venv/Scripts/python.exe -m unittest discover -s tests -q` 为 `Ran 180 tests in 30.926s`、`OK`（本轮没改 Python 代码，只改了打包脚本、安装脚本和文档）。最终那个 zip 也重新解压跑了一遍：`/api/status` 与无头浏览器检查全过（`PACKAGE PAGE CHECK OK`，`pageErrors: []`，页面上没有任何密钥长度数字）。
+- **证据边界**：只验证了**静默**安装与**静默**卸载；带界面的向导（选目录、勾桌面快捷方式、卸载时那个"要不要删 artifacts"的对话框）**没有人工点过一遍**，只做了代码审阅，所以对话框的实际文案与按钮行为没有实测证据。安装包里不含 Python，干净机器上的首次启动全流程仍未实测。ISCC 是从镜像下载后按官方 SHA256 核对的，核对通过才运行；但镜像本身不是官方分发点，这一点如实记下。
+- **边界遵守**：未改 `schemas.py`，未越界改 A、B 的文件，未编造测试结果；本机新装的 Inno Setup 6 在 `D:\API\Inno Setup 6`（用户级、非仓库内），仓库里只多了 `installer/languages/ChineseSimplified.isl` 这一个第三方文件。
+- **Git 状态**：本条目与打包脚本、安装脚本、语言文件、文档改动放在同一提交中；`dist/` 与 `.venv/` 都被忽略，zip、setup.exe 和下载的安装器只在本机。本次不推送远端。
+- **未完成事项**：带界面安装向导的人工走查；干净机器（无 Python 依赖、无 `.env`）上的首次启动全流程；真实付费 API 下的并行提速倍数与限流表现；10 页以上大批量压测；整页转录真值集仍缺。

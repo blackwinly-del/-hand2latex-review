@@ -51,9 +51,9 @@ SetupLogging=yes
 WizardStyle=modern
 
 [Languages]
-; 如果你的 Inno Setup 6 里没有 ChineseSimplified.isl（少数精简安装会缺），
-; 把下面这一行删掉即可，安装界面会变成英文，功能不受影响。
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+; Inno Setup 6 的官方安装器不带简体中文消息文件，所以把官方翻译（适用于 6.5.0+，
+; 来自 jrsoftware.org/files/istrans 指向的仓库）随本仓库一起带上，编译时不依赖本机安装目录。
+Name: "chinesesimplified"; MessagesFile: "languages\ChineseSimplified.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加任务："
@@ -74,9 +74,12 @@ Filename: "{app}\.env"; Description: "打开 .env 填写 OPENAI_API_KEY（不填
 
 [UninstallDelete]
 ; 虚拟环境和缓存是安装后生成的、体积很大，卸载时直接删掉。
+; __pycache__ 会在每个 Python 包目录下各生成一份，所以逐个列出来。
 ; artifacts\jobs 是用户自己的历史任务，不在这里删——卸载向导会单独问要不要保留。
 Type: filesandordirs; Name: "{app}\.venv"
 Type: filesandordirs; Name: "{app}\__pycache__"
+Type: filesandordirs; Name: "{app}\workbench\__pycache__"
+Type: filesandordirs; Name: "{app}\reasoning\__pycache__"
 Type: filesandordirs; Name: "{app}\node_modules"
 
 [Code]
@@ -92,11 +95,32 @@ end;
 function InitializeSetup(): Boolean;
 begin
   Result := True;
-  if not IsPythonAvailable() then
+  // 静默安装时弹框会把安装卡住，所以只在有界面的安装里提示。
+  if (not IsPythonAvailable()) and (not WizardSilent) then
     MsgBox('没有检测到可用的 python 命令。' + #13#10 + #13#10 +
            'Hand2LaTeX 需要 Python 3.10 / 3.11 / 3.12（安装包里不含 Python）。' + #13#10 +
            '下载地址：https://www.python.org/downloads/windows/' + #13#10 +
            '安装时请勾选 "Add python.exe to PATH"。' + #13#10 + #13#10 +
            '现在可以继续安装，但装完要先装好 Python 才能启动。',
            mbInformation, MB_OK);
+end;
+
+// artifacts\jobs 是用户自己跑出来的任务，卸载时不当默认垃圾删掉，问一下再决定。
+function InitializeUninstall(): Boolean;
+var
+  ArtifactsDir: String;
+begin
+  Result := True;
+  ArtifactsDir := ExpandConstant('{app}\artifacts');
+  // 静默卸载时弹框会把卸载卡住；这种情况下不动用户产物，只卸载程序。
+  // 注意：卸载阶段不能用 WizardSilent（那是安装阶段的函数），要用 UninstallSilent。
+  if DirExists(ArtifactsDir) and (not UninstallSilent) then
+  begin
+    if MsgBox('安装目录里还留着你之前跑出来的任务产物（artifacts 文件夹，含识别原稿、TeX 和 PDF）。' + #13#10 + #13#10 +
+              '要一起删掉吗？' + #13#10 + #13#10 +
+              '选"是"：连任务产物一起删干净。' + #13#10 +
+              '选"否"：只卸载程序，任务产物留在原处。',
+              mbConfirmation, MB_YESNO) = IDYES then
+      DelTree(ArtifactsDir, True, True, True);
+  end;
 end;

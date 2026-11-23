@@ -23,11 +23,16 @@
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -BuildInstaller
     打 zip，并在找到 Inno Setup 时顺便编出安装器。
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -BuildInstaller -Iscc "D:\API\Inno Setup 6\ISCC.exe"
+    Inno Setup 装在非默认目录、也没加进 PATH 时，直接指定 ISCC.exe。
 #>
 [CmdletBinding()]
 param(
     [switch]$BuildInstaller,
-    [switch]$KeepStaging
+    [switch]$KeepStaging,
+    [string]$Iscc
 )
 
 $ErrorActionPreference = 'Stop'
@@ -255,19 +260,24 @@ $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash
 Write-Ok "已生成 dist\$PackageName.zip（$zipMb MB）"
 Write-Ok "SHA256 $zipHash"
 
-if (-not $KeepStaging) {
-    Remove-Item -LiteralPath $Staging -Recurse -Force
-    Write-Ok '已清理临时目录（想留着看就加 -KeepStaging）'
-}
-
 # ---------------------------------------------------------------------------
 # 7. 可选：编 Inno Setup 安装器
 # ---------------------------------------------------------------------------
+$setupMb = $null
+$setupHash = $null
 if ($BuildInstaller) {
     Write-Step '编译安装器（Inno Setup）'
     $issPath = Join-Path $Root 'installer\hand2latex.iss'
     if (-not (Test-Path -LiteralPath $issPath)) { Stop-WithMessage "找不到 $issPath" }
-    $iscc = Get-Command iscc -ErrorAction SilentlyContinue
+    $iscc = $null
+    if ($Iscc) {
+        if (-not (Test-Path -LiteralPath $Iscc)) { Stop-WithMessage "指定的 ISCC.exe 不存在：$Iscc" }
+        $iscc = $Iscc
+    }
+    if (-not $iscc) {
+        $command = Get-Command iscc -ErrorAction SilentlyContinue
+        if ($command) { $iscc = $command.Source }
+    }
     if (-not $iscc) {
         foreach ($candidate in @(
             "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
@@ -276,32 +286,51 @@ if ($BuildInstaller) {
         )) {
             if ($candidate -and (Test-Path -LiteralPath $candidate)) { $iscc = $candidate; break }
         }
-    } else {
-        $iscc = $iscc.Source
+    }
+    if (-not $iscc) {
+        # 安装时可以自选目录（本机就装在 D:\API\Inno Setup 6），所以再问一次注册表。
+        foreach ($hive in @('HKCU:', 'HKLM:')) {
+            $key = Join-Path $hive 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1'
+            $location = (Get-ItemProperty -Path $key -Name InstallLocation -ErrorAction SilentlyContinue).InstallLocation
+            if ($location) {
+                $candidate = Join-Path $location 'ISCC.exe'
+                if (Test-Path -LiteralPath $candidate) { $iscc = $candidate; break }
+            }
+        }
     }
     if (-not $iscc) {
         Write-Warn '这台机器上没有 Inno Setup 6，安装器没有编出来（zip 绿色包已经好了）。'
-        Write-Warn '安装：winget install JRSoftware.InnoSetup，然后重跑并加 -BuildInstaller。'
+        Write-Warn '安装：winget install JRSoftware.InnoSetup；GitHub 连不上时可从镜像下载官方安装器，'
+        Write-Warn '并用 winget show --id JRSoftware.InnoSetup 里的 SHA256 核对后再运行。'
+        Write-Warn '装在非默认目录时，用 -Iscc "路径\ISCC.exe" 直接指定。'
     } else {
-        # 安装器要连临时目录一起打包，所以这一步需要 -KeepStaging 的产物。
-        $stagingForInstaller = Join-Path $StagingParent $PackageName
-        if (-not (Test-Path -LiteralPath $stagingForInstaller)) {
-            Stop-WithMessage '临时目录已被清理，无法编安装器：请加 -KeepStaging 重跑'
-        }
-        & $iscc "/DAppVersion=$Version" "/DSourceDir=$stagingForInstaller" "/DOutputDir=$DistRoot" $issPath
+        Write-Ok "用 $iscc 编译"
+        # 临时目录要留给安装器用，所以清理动作放到这一步之后。
+        & $iscc "/DAppVersion=$Version" "/DSourceDir=$Staging" "/DOutputDir=$DistRoot" $issPath
         if ($LASTEXITCODE -ne 0) { Stop-WithMessage "Inno Setup 编译失败（退出码 $LASTEXITCODE）" }
         $setupPath = Join-Path $DistRoot "Hand2LaTeX-$Version-win64-setup.exe"
         if (Test-Path -LiteralPath $setupPath) {
             $setupMb = [math]::Round((Get-Item -LiteralPath $setupPath).Length / 1MB, 1)
+            $setupHash = (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash
             Write-Ok "已生成 dist\Hand2LaTeX-$Version-win64-setup.exe（$setupMb MB）"
+            Write-Ok "SHA256 $setupHash"
         } else {
             Write-Warn "Inno Setup 退出码 0，但没找到预期的 $setupPath"
         }
     }
 }
 
+if (-not $KeepStaging) {
+    Remove-Item -LiteralPath $Staging -Recurse -Force
+    Write-Ok '已清理临时目录（想留着看就加 -KeepStaging）'
+}
+
 Write-Host ''
 Write-Host '打包完成。' -ForegroundColor Green
 Write-Host "    绿色包：dist\$PackageName.zip（$zipMb MB）"
 Write-Host "    SHA256：$zipHash"
+if ($setupHash) {
+    Write-Host "    安装器：dist\Hand2LaTeX-$Version-win64-setup.exe（$setupMb MB）"
+    Write-Host "    SHA256：$setupHash"
+}
 Write-Host '    用法：解压到任意可写目录（别放 Program Files），双击 启动工作台.bat，按 安装说明.txt 填 .env 里的密钥。'
