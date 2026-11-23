@@ -53,6 +53,39 @@ function Stop-WithMessage {
     exit 1
 }
 
+# 排除清单（和 README 第十节的口径一致）：复制仓库时用它，报告未跟踪文件时也用它，
+# 免得把本来就不会进包的东西说成"会被带进安装包"。
+# /XD 排除目录（robocopy 里写目录名就是"任何层级都排除"），/XF 排除文件。
+# tools 在 git 里被忽略，但安装包必须带 tectonic，所以不排除 tools。
+$excludeDirs = @(
+    '.git',
+    '.qoder',
+    '.venv',
+    '.venv-check',
+    'node_modules',
+    'models',
+    '.paddlex',
+    'artifacts',
+    'dist',
+    '__pycache__',
+    '.pytest_cache',
+    '.ruff_cache',
+    '.qoder-office-docx-locks'
+)
+$excludeFiles = @('.env', '*.pyc', '*.pyo', 'workbench.log', 'workbench.pid')
+
+function Test-ExcludedPath {
+    param([string]$RelativePath)
+    $parts = $RelativePath -split '/'
+    foreach ($part in $parts) { if ($excludeDirs -contains $part) { return $true } }
+    $leaf = $parts[-1]
+    # -like 对不含通配符的模式等同于相等比较，所以字面名和 *.pyc 这种都能一起处理。
+    foreach ($pattern in $excludeFiles) {
+        if ($leaf -like $pattern) { return $true }
+    }
+    return $false
+}
+
 # ---------------------------------------------------------------------------
 # 1. 版本与提交号
 # ---------------------------------------------------------------------------
@@ -80,8 +113,11 @@ if ($git) {
             Write-Warn '已跟踪的文件还有未提交的改动：安装包里会带上这些改动，但 BUILD_INFO 里的提交号对不上'
         }
         if ($untracked) {
-            $untrackedCount = @($untracked).Count
-            Write-Warn "有 $untrackedCount 个未跟踪文件（不在 git 里）也会被复制进安装包，例如：$(@($untracked)[0])"
+            # 只报真的会进包的：排除清单里的目录/文件不会进包，说了反而误导。
+            $bundled = @($untracked | Where-Object { -not (Test-ExcludedPath $_) })
+            if ($bundled.Count -gt 0) {
+                Write-Warn "有 $($bundled.Count) 个未跟踪文件（不在 git 里）也会被复制进安装包，例如：$($bundled[0])"
+            }
         }
     }
 } else {
@@ -97,25 +133,6 @@ $Staging = Join-Path $StagingParent $PackageName
 Write-Step "复制文件到临时目录 dist\staging\$PackageName"
 if (Test-Path -LiteralPath $Staging) { Remove-Item -LiteralPath $Staging -Recurse -Force }
 New-Item -ItemType Directory -Path $Staging -Force | Out-Null
-
-# /XD 排除目录（robocopy 里写目录名就是"任何层级都排除"），/XF 排除文件。
-# tools 在 git 里被忽略，但安装包必须带 tectonic，所以不排除 tools。
-$excludeDirs = @(
-    '.git',
-    '.qoder',
-    '.venv',
-    '.venv-check',
-    'node_modules',
-    'models',
-    '.paddlex',
-    'artifacts',
-    'dist',
-    '__pycache__',
-    '.pytest_cache',
-    '.ruff_cache',
-    '.qoder-office-docx-locks'
-)
-$excludeFiles = @('.env', '*.pyc', '*.pyo', 'workbench.log', 'workbench.pid')
 
 $robocopyArgs = @($Root, $Staging, '/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:1', '/W:1')
 $robocopyArgs += '/XD'
