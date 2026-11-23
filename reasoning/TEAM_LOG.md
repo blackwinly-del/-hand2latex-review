@@ -851,3 +851,17 @@
 - **边界遵守**：未改 `schemas.py`，未越界改 A、B 的文件，未编造测试结果；本机新装的 Inno Setup 6 在 `D:\API\Inno Setup 6`（用户级、非仓库内），仓库里只多了 `installer/languages/ChineseSimplified.isl` 这一个第三方文件。
 - **Git 状态**：本条目与打包脚本、安装脚本、语言文件、文档改动放在同一提交中；`dist/` 与 `.venv/` 都被忽略，zip、setup.exe 和下载的安装器只在本机。本次不推送远端。
 - **未完成事项**：带界面安装向导的人工走查；干净机器（无 Python 依赖、无 `.env`）上的首次启动全流程；真实付费 API 下的并行提速倍数与限流表现；10 页以上大批量压测；整页转录真值集仍缺。
+
+## 2026-11-23（更晚）打包告警说准话，并在干净提交上重打、重验两个产物
+
+**阶段状态：`package.ps1` 的两处告警改成如实描述；在提交 `8ea79e6` 的干净工作区上重打了 zip 与 setup.exe，两个产物都重新走了一遍完整验证。**
+
+- **告警修正一**：原来只要 `git status --porcelain` 非空就报"安装包里会带上这些改动，但提交号对不上"。实际触发它的是未跟踪文件（`artifacts/compile_smoke/`、`docs/assets/repair_pdf_page_*.png`），已跟踪文件当时是干净的，提交号并没有对不上。现在分开报：`--untracked-files=no` 的结果才触发"提交号对不上"，未跟踪文件单独报数量和第一个例子。
+- **告警修正二**：未跟踪文件那条最初把 `artifacts/compile_smoke/error.tex` 当成例子，但 `artifacts` 本来就在 robocopy 排除清单里，根本不会进包。把排除清单提到脚本开头并抽出 `Test-ExcludedPath`，未跟踪文件先按同一份清单过滤再报告；现在报的是 2 个真会进包的文件（`docs/assets/repair_pdf_page_1.png`、`_2.png`）。
+- **重打与重验**：在提交 `8ea79e6` 上重跑 `package.ps1 -BuildInstaller`，`BUILD_INFO.json` 记的提交号就是 `8ea79e6`，已跟踪文件无未提交改动。产物：`dist/Hand2LaTeX-1.0.0-win64.zip` 20.4 MB、SHA256 `C30DFA363D75E565B74A08B849EF3EFBBF5B2ED639D7D9520698BD93B6D80E37`；`dist/Hand2LaTeX-1.0.0-win64-setup.exe` 15.5 MB、SHA256 `7BDC80C048D857556142235906065E22BF8D4AE97BF2ACED2BC4985A4C6A8D71`（ISCC 6.7.3，`Successful compile` 约 17 s）。
+- **zip 验证**：解压到临时目录、从解压目录起服务（8014）：`build.source = 安装包`、`commit = 8ea79e6`、前端来自随包副本、Tectonic 可用、任务数 0、`openai.configured = false`；无头浏览器首页检查 `PACKAGE PAGE CHECK OK`（10 个状态 chip、上传控件在、详情显示"来源 安装包"与"API 密钥 未配置"、`pageErrors: []`、页面无任何密钥长度数字）。
+- **setup.exe 验证**：静默装到 `.venv\installtest`（退出码 0），关键文件齐（启动脚本、`BUILD_INFO.json`、`tools\tectonic\tectonic.exe`、随包 `vue.global.js`、`unins000.exe`）；从安装目录起服务（8015）实测 `build.source = 安装包`、`commit = 8ea79e6`、前端/Tectonic/任务目录全在安装目录内、云端识别如实报未配置；塞入 `artifacts\jobs\keepme.txt` 与 `workbench\__pycache__\app.pyc` 后静默卸载退出码 0，程序文件、`__pycache__`、开始菜单组、HKCU 卸载项全清，`keepme.txt` 按设计保留。临时安装目录与解压目录都已删除，测试服务已停止。
+- **实际回归**：本轮只改了 `scripts/package.ps1` 与文档，没动 Python 代码；上一次全量回归（`Ran 180 tests`、`OK`）对应的 Python 代码与现在完全一致，本轮未重跑。
+- **证据边界**：仍然只验证了静默安装/静默卸载，带界面的向导没有人工点过。两个 SHA256 只对这一次构建有效——`README.md` 与 `TEAM_LOG.md` 本身也在包里，本条目提交后再打包哈希必然变，这一点已写进 README 6.5，避免以后拿旧哈希去核对新包。
+- **Git 状态**：`fcc2d52`（告警分开报）、`8ea79e6`（告警按排除清单过滤）为代码提交；本条目与 README 的哈希更新为随后的文档提交。`dist/` 与 `.venv/` 均被忽略，产物只在本机。本次不推送远端。
+- **未完成事项**：带界面安装向导的人工走查；干净机器上的首次启动全流程；真实付费 API 下的并行提速与限流表现；10 页以上压测；整页转录真值集仍缺。
