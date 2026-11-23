@@ -428,11 +428,15 @@ if ($venvReady) {
     Write-Line '虚拟环境不可用，跳过 Python 依赖检查' 'warn'
 }
 
-$frontendReady = Test-Path -LiteralPath (Join-Path $Root 'node_modules\vue\dist')
+$frontendReady = Test-Path -LiteralPath (Join-Path $Root 'node_modules\vue\dist\vue.global.js')
 if ($frontendReady) {
     Write-Line '前端依赖已就绪（node_modules\vue\dist）' 'ok'
+} elseif (Test-Path -LiteralPath (Join-Path $Root 'workbench\static\vendor\vue\vue.global.js')) {
+    # 安装包会随包带一份 vue.global.js，这样目标机器不装 Node.js 也能打开网页。
+    $frontendReady = $true
+    Write-Line '前端依赖已就绪（安装包自带副本 workbench\static\vendor\vue）' 'ok'
 } else {
-    Write-Line '缺少 node_modules\vue\dist，打开页面会报 "Vue is not defined"' 'warn'
+    Write-Line '缺少 vue.global.js，打开页面会报 "Vue is not defined"' 'warn'
 }
 
 $needsPythonInstall = $venvReady -and (-not $webDepsReady -or (-not $Lite -and -not $paddleReady))

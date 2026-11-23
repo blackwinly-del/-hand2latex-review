@@ -372,7 +372,25 @@ class _PageResponseError(ValueError):
     """整页响应为空、被截断或不是合法 JSON——值得放宽 token 预算重试一次。"""
 
 
-def _call_page_model(image_path: str, max_tokens: int) -> dict:
+def _usage_signal(completion, max_tokens: int) -> dict:
+    """从响应里取出真实的 token 用量与结束原因；取不到就如实留空。"""
+    usage = getattr(completion, "usage", None)
+    signal = {
+        "finish_reason": getattr(completion.choices[0], "finish_reason", None),
+        "max_tokens": max_tokens,
+        "prompt_tokens": getattr(usage, "prompt_tokens", None),
+        "completion_tokens": getattr(usage, "completion_tokens", None),
+        "total_tokens": getattr(usage, "total_tokens", None),
+    }
+    # 输出预算几乎用满时，内容很可能被截断——这是能核对的事实，不是猜测的分数。
+    completion_tokens = signal["completion_tokens"]
+    signal["near_token_budget"] = bool(
+        isinstance(completion_tokens, int) and max_tokens > 0 and completion_tokens >= max_tokens * 0.95
+    )
+    return signal
+
+
+def _call_page_model(image_path: str, max_tokens: int) -> tuple[dict, dict]:
     completion = _client().chat.completions.create(
         model=_model_name(),
         messages=[
@@ -418,10 +436,10 @@ def _call_page_model(image_path: str, max_tokens: int) -> dict:
         ) from error
     if not isinstance(document, dict):
         raise TypeError("full-page response must be a JSON object")
-    return document
+    return document, _usage_signal(completion, max_tokens)
 
 
-def _request_page(image_path: str) -> dict:
+def _request_page(image_path: str) -> tuple[dict, dict]:
     """整页识别请求，带一次放宽 token 预算的重试。
 
     背景：真实多页评估中 page_3 曾因推理 token 耗尽输出预算而返回空内容，
@@ -432,9 +450,15 @@ def _request_page(image_path: str) -> dict:
     base_tokens = int(os.environ.get("FULLPAGE_MAX_TOKENS", "24000"))
     budget = base_tokens
     last_error: _PageResponseError | None = None
+    attempts = 0
     for attempt in (1, 2):
+        attempts = attempt
         try:
-            return _call_page_model(image_path, max_tokens=budget)
+            document, signal = _call_page_model(image_path, max_tokens=budget)
+            signal["attempts"] = attempts
+            signal["retried"] = attempts > 1
+            signal["base_max_tokens"] = base_tokens
+            return document, signal
         except _PageResponseError as error:
             last_error = error
             if attempt == 1:
@@ -449,9 +473,24 @@ def _request_page(image_path: str) -> dict:
     raise last_error
 
 
+def _block_stats(blocks) -> dict:
+    """统计各类块的数量，用于在界面上如实展示这一页识别出了什么。"""
+    stats = {"paragraph": 0, "display_formula": 0, "figure": 0, "blank_page": 0, "other": 0}
+    for block in blocks if isinstance(blocks, list) else []:
+        if not isinstance(block, dict):
+            stats["other"] += 1
+            continue
+        key = block.get("type")
+        if key in stats:
+            stats[key] += 1
+        else:
+            stats["other"] += 1
+    return stats
+
+
 def generate_document(image_path: str) -> dict:
     started = time.perf_counter()
-    document = _request_page(image_path)
+    document, signals = _request_page(image_path)
     _attach_figure_sources(document, image_path)
     tex = build_tex(document)
     return {
@@ -462,4 +501,5 @@ def generate_document(image_path: str) -> dict:
         "latency_ms": round((time.perf_counter() - started) * 1000, 3),
         "human_review": "required",
         "source_image": str(Path(image_path)),
+        "signals": {**signals, "block_stats": _block_stats(document.get("blocks"))},
     }

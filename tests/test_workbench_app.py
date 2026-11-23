@@ -1,15 +1,19 @@
 import json
 import os
 import shutil
+import tempfile
+import threading
 import time
 import unittest
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from workbench.app import app
+from workbench.app import _build_info, _tectonic_status, app
+from workbench.version import VERSION
 
 
 class WorkbenchAppTests(unittest.TestCase):
@@ -582,6 +586,241 @@ class WorkbenchAppTests(unittest.TestCase):
     def test_missing_job_returns_404(self):
         response = self.client.get("/api/jobs/00000000000000000000000000000000/pdf")
         self.assertEqual(response.status_code, 404)
+
+    @patch("workbench.app.generate_document")
+    @patch("workbench.app.compile_tex")
+    def test_pages_are_recognized_in_parallel_and_keep_order(self, compile_mock, generate_mock):
+        barrier = threading.Barrier(2, timeout=15)
+
+        def fake_generate(source_path):
+            page_number = int(Path(source_path).parent.name.split("_")[1])
+            # 两页必须同时到达这里，否则 barrier 超时——这就证明是并行等待的。
+            barrier.wait()
+            return {
+                "title": f"第{page_number}页",
+                "blocks": [{"type": "paragraph", "text": f"内容{page_number}"}],
+                "tex": f"page {page_number}",
+                "model": "test-model",
+                "latency_ms": page_number,
+                "human_review": "required",
+                "source_image": source_path,
+                "signals": {"attempts": 1, "retried": False, "block_stats": {"paragraph": 1}},
+            }
+
+        generate_mock.side_effect = fake_generate
+        compile_mock.side_effect = self._fake_compile
+        run_id = uuid.uuid4().hex
+        started = time.perf_counter()
+        with patch.dict(os.environ, {"WORKBENCH_PAGE_CONCURRENCY": "2"}):
+            response = self.client.post(
+                "/api/documents/batch",
+                files=[
+                    ("image", ("p1.png", b"first", "image/png")),
+                    ("image", ("p2.png", b"second", "image/png")),
+                ],
+                data={"run_id": run_id},
+            )
+        elapsed = time.perf_counter() - started
+
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()
+        directory = Path("artifacts/jobs") / data["job_id"]
+        try:
+            self.assertEqual(data["run_id"], run_id)
+            self.assertEqual([page["page"] for page in data["pages"]], [1, 2])
+            self.assertEqual([page["merged_page"] for page in data["pages"]], [1, 2])
+            self.assertLess(data["tex"].index("内容1"), data["tex"].index("内容2"))
+            self.assertEqual(data["pages"][0]["signals"]["retried"], False)
+            self.assertLess(elapsed, 15)
+
+            progress = self.client.get(f"/api/runs/{run_id}")
+            self.assertEqual(progress.status_code, 200, progress.text)
+            run = progress.json()
+            self.assertEqual(run["status"], "done")
+            self.assertEqual(run["job_id"], data["job_id"])
+            self.assertEqual(run["done_pages"], 2)
+            self.assertEqual([page["state"] for page in run["pages"]], ["done", "done"])
+            self.assertEqual([page["latency_ms"] for page in run["pages"]], [1, 2])
+
+            stored = json.loads((directory / "job.json").read_text(encoding="utf-8"))
+            self.assertEqual(stored["pages"][1]["signals"]["block_stats"]["paragraph"], 1)
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
+    def _fake_compile(self, tex_path):
+        Path(tex_path).with_suffix(".pdf").write_bytes(b"%PDF-test")
+        return {
+            "success": True,
+            "pdf_path": str(Path(tex_path).with_suffix(".pdf")),
+            "log": "compiled",
+            "errors": [],
+            "returncode": 0,
+        }
+
+    @patch("workbench.app.generate_document")
+    @patch("workbench.app.compile_tex")
+    def test_run_progress_records_failed_page(self, compile_mock, generate_mock):
+        def fake_generate(source_path):
+            page_number = int(Path(source_path).parent.name.split("_")[1])
+            if page_number == 2:
+                raise RuntimeError("page two exploded")
+            return {
+                "title": "第一页",
+                "blocks": [{"type": "paragraph", "text": "甲"}],
+                "tex": "page one",
+                "model": "test-model",
+                "latency_ms": 5,
+                "human_review": "required",
+                "source_image": source_path,
+                "signals": {"attempts": 1, "retried": False},
+            }
+
+        generate_mock.side_effect = fake_generate
+        compile_mock.side_effect = self._fake_compile
+        run_id = uuid.uuid4().hex
+        response = self.client.post(
+            "/api/documents/batch",
+            files=[
+                ("image", ("p1.png", b"first", "image/png")),
+                ("image", ("p2.png", b"second", "image/png")),
+            ],
+            data={"run_id": run_id},
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()
+        directory = Path("artifacts/jobs") / data["job_id"]
+        try:
+            self.assertEqual(data["page_count"], 1)
+            self.assertEqual(data["pages"][1]["merged_page"], None)
+            run = self.client.get(f"/api/runs/{run_id}").json()
+            self.assertEqual(run["pages"][0]["state"], "done")
+            self.assertEqual(run["pages"][1]["state"], "failed")
+            self.assertIn("page two exploded", run["pages"][1]["error"])
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
+    def test_unknown_or_malformed_run_returns_404(self):
+        self.assertEqual(self.client.get("/api/runs/" + "a" * 32).status_code, 404)
+        self.assertEqual(self.client.get("/api/runs/not-a-run-id").status_code, 404)
+
+    @patch("workbench.app.generate_document")
+    @patch("workbench.app.compile_tex")
+    def test_compile_is_reused_when_tex_unchanged(self, compile_mock, generate_mock):
+        generate_mock.return_value = {
+            "title": "测试笔记",
+            "blocks": [{"type": "paragraph", "text": "甲"}],
+            "tex": "page one",
+            "model": "test-model",
+            "latency_ms": 1,
+            "human_review": "required",
+            "source_image": "p1.png",
+        }
+        compile_mock.side_effect = self._fake_compile
+        response = self.client.post("/api/documents", files={"image": ("note.png", b"bytes", "image/png")})
+        data = response.json()
+        directory = Path("artifacts/jobs") / data["job_id"]
+        try:
+            calls_after_upload = compile_mock.call_count
+            first = self.client.post(f"/api/jobs/{data['job_id']}/compile", json={"tex": data["tex"]})
+            self.assertEqual(first.status_code, 200, first.text)
+            self.assertTrue(first.json()["reused"])
+            self.assertEqual(compile_mock.call_count, calls_after_upload)
+
+            second = self.client.post(f"/api/jobs/{data['job_id']}/compile", json={"tex": "改过的内容"})
+            self.assertEqual(second.status_code, 200, second.text)
+            self.assertNotIn("reused", second.json())
+            self.assertEqual(compile_mock.call_count, calls_after_upload + 1)
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
+    @patch("workbench.app.generate_document")
+    @patch("workbench.app.compile_tex")
+    def test_history_can_be_listed_and_restored(self, compile_mock, generate_mock):
+        generate_mock.return_value = {
+            "title": "测试笔记",
+            "blocks": [{"type": "paragraph", "text": "甲"}],
+            "tex": "page one",
+            "model": "test-model",
+            "latency_ms": 1,
+            "human_review": "required",
+            "source_image": "p1.png",
+        }
+        compile_mock.side_effect = self._fake_compile
+        response = self.client.post("/api/documents", files={"image": ("note.png", b"bytes", "image/png")})
+        data = response.json()
+        job_id = data["job_id"]
+        directory = Path("artifacts/jobs") / job_id
+        try:
+            edited = "我手动改过的版本"
+            self.assertEqual(
+                self.client.post(f"/api/jobs/{job_id}/compile", json={"tex": edited}).status_code, 200
+            )
+
+            listing = self.client.get(f"/api/jobs/{job_id}/history")
+            self.assertEqual(listing.status_code, 200, listing.text)
+            history = listing.json()["history"]
+            self.assertGreaterEqual(len(history), 2)
+            current = next(entry for entry in history if entry["is_current"])
+            older = next(entry for entry in history if not entry["is_current"])
+            self.assertEqual(current["first_line"], edited)
+
+            restored = self.client.post(f"/api/jobs/{job_id}/restore-history", json={"name": older["name"]})
+            self.assertEqual(restored.status_code, 200, restored.text)
+            self.assertEqual(restored.json()["tex"], data["tex"])
+            self.assertEqual((directory / "main.tex").read_text(encoding="utf-8"), data["tex"])
+
+            self.assertEqual(
+                self.client.post(f"/api/jobs/{job_id}/restore-history", json={"name": "../main.tex"}).status_code,
+                400,
+            )
+            self.assertEqual(
+                self.client.post(
+                    f"/api/jobs/{job_id}/restore-history", json={"name": "f" * 32 + ".tex"}
+                ).status_code,
+                404,
+            )
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
+    def test_status_reports_real_environment_facts_without_leaking_secrets(self):
+        response = self.client.get("/api/status")
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()
+        self.assertEqual(data["version"], VERSION)
+        self.assertIn(data["build"]["source"], {"开发仓库", "安装包"})
+        self.assertIsInstance(data["page_concurrency"], int)
+        self.assertTrue(data["jobs"]["directory"].endswith(os.path.join("artifacts", "jobs")))
+        self.assertIn("checks", data)
+        self.assertTrue({check["level"] for check in data["checks"]} <= {"ok", "warn", "bad"})
+        self.assertIn("used_by", data["recognizer"])
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        if api_key:
+            self.assertNotIn(api_key, response.text)
+        self.assertEqual(data["openai"]["configured"], bool(api_key.strip()))
+
+    def test_tectonic_version_reports_whole_first_line(self):
+        completed = SimpleNamespace(stdout="Tectonic 0.15.0\n", stderr="")
+        with patch("workbench.app._cached_status", side_effect=lambda key, producer: producer()), patch(
+            "workbench.app._find_tectonic", return_value=Path("tools/tectonic/tectonic.exe")
+        ), patch("workbench.app.subprocess.run", return_value=completed):
+            status = _tectonic_status()
+        self.assertTrue(status["available"])
+        self.assertEqual(status["version"], "Tectonic 0.15.0")
+
+    def test_build_info_reads_bom_prefixed_json(self):
+        payload = json.dumps(
+            {"version": "1.0.0", "commit": "abc1234", "built_at": "2026-11-23 10:00:00 +08:00", "source": "安装包"},
+            ensure_ascii=False,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            build_info = Path(tmp) / "BUILD_INFO.json"
+            build_info.write_text(payload, encoding="utf-8-sig")
+            with patch("workbench.app._BUILD_INFO_PATH", build_info):
+                info = _build_info()
+        self.assertEqual(info["source"], "安装包")
+        self.assertEqual(info["commit"], "abc1234")
+        self.assertEqual(info["built_at"], "2026-11-23 10:00:00 +08:00")
 
 
 if __name__ == "__main__":

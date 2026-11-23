@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pymupdf
@@ -9,6 +10,7 @@ import pymupdf
 from workbench.compiler import _find_tectonic, compile_tex, parse_compile_errors
 from workbench.full_page import (
     _PageResponseError,
+    _call_page_model,
     _ctex_documentclass,
     _ctex_fontset,
     _escape_text,
@@ -143,7 +145,7 @@ class FullPageDocumentTests(unittest.TestCase):
                     }
                 ],
             }
-            with patch("workbench.full_page._request_page", return_value=document):
+            with patch("workbench.full_page._request_page", return_value=(document, {"attempts": 1})):
                 result = generate_document(str(image_path))
 
             self.assertEqual(result["blocks"][0]["source_image"], str(image_path.resolve()))
@@ -180,16 +182,49 @@ class FullPageDocumentTests(unittest.TestCase):
 
     @patch("workbench.full_page._request_page")
     def test_generate_document_returns_editable_tex_and_review_status(self, request_mock):
-        request_mock.return_value = {
-            "title": "手写笔记",
-            "blocks": [{"type": "display_formula", "latex": "x^2"}],
-        }
+        request_mock.return_value = (
+            {
+                "title": "手写笔记",
+                "blocks": [{"type": "display_formula", "latex": "x^2"}],
+            },
+            {"attempts": 1, "retried": False, "finish_reason": "stop", "completion_tokens": 12},
+        )
 
         result = generate_document("unused.png")
 
         self.assertIn("x^2", result["tex"])
         self.assertEqual(result["human_review"], "required")
         self.assertGreaterEqual(result["latency_ms"], 0)
+        self.assertEqual(result["signals"]["finish_reason"], "stop")
+        self.assertFalse(result["signals"]["retried"])
+        self.assertEqual(result["signals"]["block_stats"]["display_formula"], 1)
+
+    def test_near_token_budget_flag_uses_real_usage(self):
+        completion = SimpleNamespace(
+            choices=[SimpleNamespace(finish_reason="stop", message=SimpleNamespace(content="{}"))],
+            usage=SimpleNamespace(prompt_tokens=100, completion_tokens=950, total_tokens=1050),
+        )
+        with patch("workbench.full_page._client") as client_mock:
+            client_mock.return_value.chat.completions.create.return_value = completion
+            with patch("workbench.full_page._read_image_data_url", return_value="data:,"):
+                _, signal = _call_page_model("unused.png", max_tokens=1000)
+
+        self.assertEqual(signal["completion_tokens"], 950)
+        self.assertTrue(signal["near_token_budget"])
+        self.assertEqual(signal["finish_reason"], "stop")
+
+    def test_missing_usage_is_reported_as_unknown_not_invented(self):
+        completion = SimpleNamespace(
+            choices=[SimpleNamespace(finish_reason="stop", message=SimpleNamespace(content="{}"))],
+            usage=None,
+        )
+        with patch("workbench.full_page._client") as client_mock:
+            client_mock.return_value.chat.completions.create.return_value = completion
+            with patch("workbench.full_page._read_image_data_url", return_value="data:,"):
+                _, signal = _call_page_model("unused.png", max_tokens=1000)
+
+        self.assertIsNone(signal["completion_tokens"])
+        self.assertFalse(signal["near_token_budget"])
 
 
 class PageRequestRetryTests(unittest.TestCase):
@@ -199,16 +234,32 @@ class PageRequestRetryTests(unittest.TestCase):
     def test_transient_response_error_is_retried_with_relaxed_budget(self, call_mock):
         call_mock.side_effect = [
             _PageResponseError("full-page response content is empty (finish_reason=None)"),
-            {"title": "手写笔记", "blocks": [{"type": "paragraph", "text": "甲"}]},
+            ({"title": "手写笔记", "blocks": [{"type": "paragraph", "text": "甲"}]}, {"finish_reason": "stop"}),
         ]
 
-        result = _request_page("unused.png")
+        result, signals = _request_page("unused.png")
 
         self.assertEqual(result["title"], "手写笔记")
+        self.assertTrue(signals["retried"])
+        self.assertEqual(signals["attempts"], 2)
+        self.assertEqual(signals["finish_reason"], "stop")
         self.assertEqual(call_mock.call_count, 2)
         base = int(os.environ.get("FULLPAGE_MAX_TOKENS", "24000"))
         self.assertEqual(call_mock.call_args_list[0].kwargs["max_tokens"], base)
         self.assertEqual(call_mock.call_args_list[1].kwargs["max_tokens"], int(base * 1.5))
+
+    @patch("workbench.full_page._call_page_model")
+    def test_first_attempt_success_is_not_marked_retried(self, call_mock):
+        call_mock.return_value = (
+            {"title": "手写笔记", "blocks": [{"type": "paragraph", "text": "甲"}]},
+            {"finish_reason": "stop"},
+        )
+
+        _, signals = _request_page("unused.png")
+
+        self.assertFalse(signals["retried"])
+        self.assertEqual(signals["attempts"], 1)
+        self.assertEqual(call_mock.call_count, 1)
 
     @patch("workbench.full_page._call_page_model")
     def test_second_failure_propagates_after_retry(self, call_mock):

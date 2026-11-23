@@ -31,6 +31,13 @@
 | 编译失败片段定位 + AI 建议 + 人工确认局部修正 | `/api/jobs/{id}/suggest-fix`、`/apply-fix` | `tests/test_workbench_app.py` |
 | Tectonic + ctex 真实中文 PDF 编译与预览、下载 | `workbench/compiler.py` | `tests/test_workbench.py` |
 | 显式空白页（`blank_page` → `\null`）忠实排版 | `workbench/full_page.py` | `tests/test_workbench.py` |
+| 多页整页识别并行执行（默认 3 路，`WORKBENCH_PAGE_CONCURRENCY` 可调） | `workbench/app.py` | `tests/test_workbench_app.py`；2026-11-23 浏览器实测 2 页（2.0 s + 1.0 s）合计 2036 ms 完成，小于串行的 3000 ms |
+| 运行进度登记与轮询（逐页状态、逐页耗时、总耗时） | `GET /api/runs/{run_id}` | `tests/test_workbench_app.py` |
+| 系统状态面板，只报可核查事实（版本/提交、Python、密钥是否配置、Tectonic 版本、字体集、前端来源、任务目录） | `GET /api/status` | `tests/test_workbench_app.py` |
+| 逐页真实识别信号（`finish_reason`、真实 token 用量、是否接近输出上限、重试次数、块统计、耗时） | `workbench/full_page.py` | `tests/test_workbench.py` |
+| TeX 一字未改时复用上一次 PDF，不重跑 Tectonic | `workbench/app.py` | `tests/test_workbench_app.py` |
+| 改稿便捷性：`Ctrl+S` 编译、`F2` 跳下一处复核（带"第 N / M 处"计数）、浏览器草稿自动保存与恢复、历史版本回滚 | `workbench/static/index.html` | 2026-11-23 Playwright 实测 |
+| 打包成绿色 zip（随包带 Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描） | `scripts/package.ps1` | `dist/Hand2LaTeX-1.0.0-win64.zip`，20.4 MB，SHA256 `7A4C1099D9653629E05D493AB2538827D75EB6719A988084AE54CB39B8CA5941`；解压后在浏览器里实测可用 |
 
 ### 尚未实现或尚未证明（审阅时请重点看这里）
 
@@ -43,7 +50,12 @@
 - 手绘图形只输出文字描述占位，不重绘。
 - 第二个识别引擎（UniMERNet）只在 `recognizer.py` 里留了槽位，未接入，因此没有跨引擎投票。
 - MLP 风险打分仅用于学习演示，`risk_score` 在生产路径恒为 `null`。
-- 没有做部署、并发和性能优化；CPU 推理和 Tectonic 编译都比较慢。
+- 远端整页识别已改成多页并行（2026-11-23 实测 2 页 2.0 s + 1.0 s 合计 2.0 s 完成），但**并行度上限没有压测**，
+  也没测过 10 页以上的大批量；本地画板识别仍是单张串行，CPU 推理和 Tectonic 编译都慢。
+- `installer/hand2latex.iss` 只写好了脚本，**本机没有 Inno Setup，没有编译验证过**；已验证的只有 zip 绿色包
+  （从打包目录起服务，`/api/status` 报告"来源：安装包"、前端来自随包副本、Tectonic 在包内可用）。
+- 状态面板、进度、逐页信号和改稿便捷性都是在 **mock 识别 + mock 编译**的浏览器实测里验证的，
+  没有用真实付费 API 把安装包完整跑一遍。
 
 ## 二、项目结构
 
@@ -71,9 +83,10 @@
 │   ├── compiler.py            Tectonic + ctex 编译，PDF 页数与空白页判定
 │   ├── fix.py                 编译错误片段定位、建议与会话校验（防止过期建议覆盖）
 │   ├── multipage_eval.py      可恢复的真实多页评估器（带响应缓存）
+│   ├── version.py             版本号（打包脚本从这里读，也写进 BUILD_INFO.json）
 │   └── static/index.html      Vue 3 前端单页
 │
-├── tests/                     13 个 unittest 测试模块 + test_recognizer.py 契约自检脚本（`python -m unittest discover -s tests`）
+├── tests/                     14 个 unittest 测试模块（180 项）+ test_recognizer.py 契约自检脚本（`python -m unittest discover -s tests`）
 ├── data/
 │   ├── handwritten/           12 张真实手写公式样本 sample_1 ~ sample_12
 │   ├── pdf_pages/             真实笔记分页图 page_1 ~ page_5（多页评估素材）
@@ -85,7 +98,11 @@
 ├── artifacts/                 真实运行产物（评估 JSON、验收 JSON、编译样例）
 ├── scripts/
 │   ├── launch.ps1             一键体检 / 装环境 / 启动 / 重启 / 停止的实际逻辑
-│   └── launch_demo.ps1        画板演示的启动逻辑（前台窗口运行，关窗即停）
+│   ├── launch_demo.ps1        画板演示的启动逻辑（前台窗口运行，关窗即停）
+│   └── package.ps1            打包成 dist/ 下的绿色 zip（可选 -BuildInstaller 编 setup.exe）
+├── installer/
+│   ├── 安装说明.txt            给最终用户看的中文说明（会随包分发）
+│   └── hand2latex.iss         Inno Setup 6 脚本（本机没装 Inno Setup，未编译验证）
 ├── 启动工作台.bat              双击入口（ASCII 内容，中文界面由 launch.ps1 输出）
 ├── 启动画板.bat                双击打开画板演示（Streamlit，默认 8501 端口）
 ├── 关闭工作台.bat              双击停止服务
@@ -148,6 +165,8 @@ cp .env.example .env
 | `OPENAI_TIMEOUT_SECONDS` | 上下文选择超时，默认 30 |
 | `FULLPAGE_TIMEOUT_SECONDS` | 整页识别超时，默认 120 |
 | `FULLPAGE_MAX_TOKENS` | 整页识别输出上限，默认 24000 |
+| `WORKBENCH_PAGE_CONCURRENCY` | 多页整页识别的并行页数，默认 3，取值范围 1~10（再和实际页数取小）；调大更快，但更容易撞网关限流 |
+| `WORKBENCH_JOB_MAX_AGE_DAYS` | 过期任务保留天数，默认 7，填 0 表示永不清理 |
 | `RECOGNIZER_MODEL` | 代码默认 `PP-FormulaNet-L`，可换 `PP-FormulaNet_plus-L` / `UniMERNet`；本机 `.env` 已设 `UniMERNet` |
 | `RECOGNIZER_MODEL_DIR` | 代码默认 `models/<模型名>`；本机 `.env` 指向 `D:/latex/models/UniMERNet` |
 | `RECOGNIZER_DEVICE` | 代码默认 `cpu`；本机 `.env` 已设 `gpu:0`，画板启动脚本默认 GPU |
@@ -185,6 +204,24 @@ cp .env.example .env
 - **图形页保留原图**：一页基本就是一张图（一个 `figure` 块，其余是与图注重叠的短标签）时，
   PDF 直接嵌入原始页面图片，跳过重复的标签文字；图文混排页仍保留“未重新绘制”的描述框。
   老任务可点“图形页改用原图”重建，只读已有结构，不调用识别模型。
+
+状态与可信度信号（2026-11-23 补齐）：
+
+- **顶部状态条**：页面加载时读 `GET /api/status`，用圆点显示每一项是好是坏；点“查看详情”看具体值
+  （版本与提交号、Python 与平台、云端识别配置、Tectonic 路径与版本、ctex 字体集、本地识别模型、
+  并行页数、前端 `vue.global.js` 来自哪里、任务目录与占用空间）。**只显示密钥长度，不显示密钥本身。**
+- **识别进行中的实时进度**：每页一行，显示排队/识别中/成功/失败和已用时间；多页是并行发出的，
+  所以总耗时接近最慢的那一页，不是各页相加。
+- **每页的“识别过程记录”**：只放模型真实返回的东西——`finish_reason`、真实 token 用量、
+  输出是否接近上限（≥95% 时标红提示可能截断）、是否重试过及重试次数、各类块的数量、这一页耗时。
+  界面同时明说：**系统不给“识别可信度分数”**，因为无法验证，不给假数字。
+- **编译复用**：TeX 一字未改就点编译时，直接复用上一份 PDF 并提示“没有再跑一遍 Tectonic”。
+
+改稿便捷性（2026-11-23 补齐）：
+
+- `Ctrl+S` 编译当前代码；`F2` 跳到下一处待复核，界面上会写“正在看第 N / M 处待复核（第 X 行）”，看完回到第一处。
+- 编辑内容每 1.2 秒自动存进浏览器 localStorage；和服务器版本不一致时，顶部给出“恢复我的修改 / 丢弃，用服务器版本”。
+- “历史版本”标签列出每次写入留下的快照，点一下就回滚（每次写 `main.tex` 都会存一份 `history/<uuid>.tex`，所以这是真的撤销）。
 
 ### 6.1 一键启动（Windows，推荐先试这个）
 
@@ -327,6 +364,35 @@ RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 PADDLE_PDX_CACHE_HOME=D:/late
 推理 26.02 s，输出与 GPU 相同。整页识别仍然走远端 `deepseek-flash`，本机 GPU 只覆盖
 单张公式图（B 的 `recognizer.py`），两者不是同一条链路。
 
+### 6.5 打包成安装包（发给不用 git 的人）
+
+```bash
+# 只打绿色 zip（默认）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1
+
+# 打 zip，并在本机装了 Inno Setup 6 时顺便编出 setup.exe
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -BuildInstaller
+
+# 保留 dist/staging 里的解压态目录，方便自己先跑一遍看看
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -KeepStaging
+```
+
+脚本只读仓库、只往 `dist/` 写，不改源码也不碰 `.env`。它做的事：按第十节的排除清单复制仓库 →
+把 `node_modules/vue/dist/vue.global.js` 复制进包里（目标机器**不需要装 Node.js**）→ 写
+`BUILD_INFO.json`（无 BOM 的 UTF-8；网页状态里因此显示“来源：安装包”和打包时的提交号）→
+放入 `installer/安装说明.txt` → 逐项核对该在的在、不该带的没带 → 扫描所有文本文件确认本机的
+`OPENAI_API_KEY` 值没有混进包里（扫到就中止）→ 压成 zip 并打印 SHA256。zip 里是一个
+`Hand2LaTeX-<版本>-win64` 顶层文件夹，"解压到当前文件夹"也不会把文件撒得到处都是。
+
+2026-11-23 实测产出：`dist/Hand2LaTeX-1.0.0-win64.zip`（20.4 MB，SHA256
+`7A4C1099D9653629E05D493AB2538827D75EB6719A988084AE54CB39B8CA5941`）。把这个 zip 解压到临时目录、
+从解压目录起服务（8014 端口）后实测：`/api/status` 报告 `build.source = 安装包`、`commit = 30cc4f9`、
+构建时间有值、前端来自随包副本、Tectonic 0.17.0 在包内可用、任务数为 0；无头浏览器打开首页，
+Vue 正常挂载（10 个状态条 chip、上传控件在、`pageErrors` 为空），状态详情里显示“来源 安装包”
+“vue.global.js 来自随安装包携带的副本”“API 密钥 未配置：上传识别、修复建议都用不了”——
+最后一条是如实报告，因为包里不带 `.env`。
+**Inno Setup 未在本机安装，`installer/hand2latex.iss` 没有编译验证过。**
+
 ## 七、命令行单模块运行
 
 ```bash
@@ -359,7 +425,7 @@ RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 \
 ## 八、测试
 
 ```bash
-# C + workbench 全量回归（14 个测试模块、169 项，含真实 Tectonic 编译，需要 tools/tectonic）
+# C + workbench 全量回归（14 个测试模块、180 项，含真实 Tectonic 编译，需要 tools/tectonic）
 ./.venv/Scripts/python.exe -m unittest discover -s tests -v
 
 # 单个模块
@@ -449,11 +515,17 @@ sample_6/7/10 在已试模型的多视角候选里都没有正确答案；zoom2/
 
 - `.env`（密钥）
 - `.venv/`、`node_modules/`
-- `models/`（PP-FormulaNet-L 权重，约 695 MB）
+- `models/`（本地公式模型：PP-FormulaNet-L 约 695 MB，UniMERNet 约 1.6 GB，本机整个目录 3.0 GB）
 - `tools/`（Tectonic 可执行文件）
 - `artifacts/jobs/`（上传产生的临时任务目录）
 - `dist/`（本地审阅用 ZIP）
 - `data/pdf_pages/page_1.png`（笔记封面页，被显式排除；`page_2` ~ `page_5` 已保留为多页评估素材）
+
+`scripts/package.ps1` 的排除清单和上面基本一致（`.git`、`.qoder`、`.venv`、`.venv-check`、`node_modules`、
+`models`、`.paddlex`、`artifacts`、`dist`、各种缓存目录，以及 `.env`、`*.pyc`、`workbench.log`、`workbench.pid`），
+但**两处故意不同**：`tools/tectonic/tectonic.exe` 和一份 `vue.global.js` 会随包带上，
+这样对方不用装 Tectonic 也不用装 Node.js；`.env` 和 `models/` 绝不随包分发。
+打包脚本会在压缩前扫描包内所有文本文件，一旦发现本机 `OPENAI_API_KEY` 的值就中止。
 
 ## 十一、协作约定（给参与开发的审阅者）
 

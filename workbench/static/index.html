@@ -81,12 +81,67 @@
     details.rawlog pre { max-height:260px; overflow:auto; background:#111a2b; color:#dbe6ff; padding:10px; border-radius:8px; font:11px/1.5 Consolas,monospace; white-space:pre-wrap; }
     .fix-panel { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; margin-top:18px; }
     .fix-panel textarea { width:100%; min-height:280px; border:1px solid #cfd5df; border-radius:10px; padding:12px; background:#111a2b; color:#e9f0ff; font:13px/20px Consolas,monospace; }
+    .statusbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .chip { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px; font-size:12px; background:#fff; color:#4a5468; border:1px solid var(--line); }
+    button.chip { cursor:pointer; font-weight:600; color:#24447e; background:#e9eef8; }
+    .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+    .dot.ok { background:#2fa84f; } .dot.warn { background:#d99b00; } .dot.bad { background:#d92d20; }
+    .status-detail { margin-top:12px; background:#fbf9f4; border:1px solid var(--line); border-radius:12px; padding:12px; font-size:13px; line-height:1.7; }
+    .status-detail table { border-collapse:collapse; }
+    .status-detail td { padding:3px 0; vertical-align:top; word-break:break-all; }
+    .status-detail td.k { color:var(--muted); white-space:nowrap; width:130px; padding-right:10px; }
+    .progress { margin-top:12px; border:1px dashed var(--accent); border-radius:12px; padding:12px; background:#eef3ff; }
+    .progress-head { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:center; }
+    .bar { height:6px; background:#d8e2f5; border-radius:999px; overflow:hidden; margin:8px 0; }
+    .bar > i { display:block; height:100%; background:var(--accent); transition:width .4s; }
+    .progress-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; padding:2px 0; }
+    .st { width:74px; font-weight:600; }
+    .st.pending { color:var(--muted); } .st.running { color:var(--accent); } .st.done { color:#16703b; } .st.failed { color:var(--danger); }
+    .signals { display:flex; flex-wrap:wrap; gap:4px; justify-content:center; margin-top:5px; }
+    .sig { font-size:11px; padding:2px 7px; border-radius:999px; background:#f1eee6; color:#5b6472; border:1px solid var(--line); }
+    .sig.warn { background:#fff2c7; color:#785400; border-color:#e6c667; }
+    .draft-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:#eef3ff; border:1px solid #b9cdf5; border-radius:10px; padding:8px 12px; margin-bottom:10px; font-size:13px; }
+    .draft-bar button { padding:6px 12px; font-size:13px; }
+    .history-item { border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-bottom:8px; background:#fbf9f4; }
+    .history-item.current { border-color:#16703b; background:#f2fbf5; }
+    .history-item .meta { font-size:12px; color:var(--muted); }
+    .history-item .preview { font:12px/1.5 Consolas,monospace; color:#4a5468; word-break:break-all; margin:4px 0; }
+    .history-item button { padding:5px 10px; font-size:12px; }
+    .kbd { font:11px/1.4 Consolas,monospace; background:#00000010; border:1px solid #00000022; border-radius:4px; padding:1px 5px; }
     @media (max-width:1200px) { .ide { grid-template-columns:1fr; } .editor { height:460px; } iframe { height:560px; } .thumb img { height:220px; } }
   </style>
 </head>
 <body>
   <header><h1>Hand2LaTeX 智能工作台</h1><p>手写笔记照片 → 可编辑的 LaTeX → 中文 PDF。左边看原图，中间改代码，右边看效果。</p></header>
   <main id="app">
+    <section class="card" style="padding:14px 18px">
+      <div class="statusbar">
+        <strong style="font-size:14px">系统状态</strong>
+        <span class="chip" v-for="check in statusChecks" :key="check.id" :title="check.detail"><i class="dot" :class="check.level"></i>{{ check.label }}</span>
+        <span class="chip" v-if="status">版本 {{ status.version }}<template v-if="status.build && status.build.commit"> · {{ status.build.commit }}</template></span>
+        <span class="chip" v-if="status">最多同时识别 {{ status.page_concurrency }} 页</span>
+        <span class="chip" v-if="status">{{ status.jobs.count }} 个任务 · {{ formatBytes(status.jobs.total_bytes) }}</span>
+        <button class="chip" @click="statusOpen = !statusOpen">{{ statusOpen ? '收起详情' : '查看详情' }}</button>
+        <button class="chip" @click="loadStatus">刷新</button>
+        <span class="chip" v-if="statusError" style="color:var(--danger);border-color:#e7a49c">{{ statusError }}</span>
+      </div>
+      <div class="status-detail" v-if="statusOpen && status">
+        <table>
+          <tr><td class="k">整页识别</td><td>{{ status.openai.model || '未配置模型' }} · 单次超时 {{ status.openai.timeout_seconds }} 秒 · 输出预算 {{ status.openai.max_tokens }} token</td></tr>
+          <tr><td class="k">API 密钥</td><td>{{ status.openai.configured ? '已配置（长度 ' + status.openai.key_length + '，不显示内容）' : '未配置：上传识别、修复建议都用不了' }}</td></tr>
+          <tr><td class="k">接口地址</td><td>{{ status.openai.base_url || '未设置（直连 OpenAI 官方接口，国内网络通常连不上）' }}</td></tr>
+          <tr><td class="k">PDF 编译器</td><td>{{ status.tectonic.available ? ((status.tectonic.version || '可用') + ' · ' + status.tectonic.path) : '未找到 Tectonic：能识别和改代码，但排不出 PDF' }}</td></tr>
+          <tr><td class="k">中文字体</td><td>{{ status.fontset ? 'ctex fontset=' + status.fontset : 'LATEX_FONTSET 配置有误' }}</td></tr>
+          <tr><td class="k">多页并发</td><td>最多同时识别 {{ status.page_concurrency }} 页（环境变量 WORKBENCH_PAGE_CONCURRENCY 可调；页数越多提速越明显）</td></tr>
+          <tr><td class="k">本地公式后端</td><td>{{ status.recognizer.model || '未指定（用默认引擎）' }} · 设备 {{ status.recognizer.device || 'cpu' }} · 已下载模型 {{ status.recognizer.local_models.join('、') || '无' }}<br>{{ status.recognizer.used_by }}</td></tr>
+          <tr><td class="k">运行环境</td><td>Python {{ status.python }} · {{ status.platform }} · 来源 {{ status.build.source }}<template v-if="status.build.built_at"> · 构建于 {{ status.build.built_at }}</template></td></tr>
+          <tr><td class="k">网页前端资源</td><td>{{ status.frontend.available ? 'vue.global.js 来自' + status.frontend.source : '缺少 vue.global.js：网页会白屏，请运行 npm install 或重新安装' }}</td></tr>
+          <tr><td class="k">任务目录</td><td>{{ status.jobs.directory }}</td></tr>
+        </table>
+        <div class="hint" style="margin-top:8px">这里只列<strong>能当场核对的事实</strong>：文件在不在、配置有没有填、编译器能不能跑。<strong>系统不给"识别可信度分数"</strong>——那种分数没法验证，只会误导。真正能用来判断"哪里可能有问题"的是下面每页的<strong>识别过程记录</strong>和中间栏的<strong>黄色复核行</strong>。</div>
+      </div>
+    </section>
+
     <section class="card">
       <h2>第一步：上传手写笔记照片</h2>
       <div class="hint">支持 png / jpg / webp，一次可以选多张（会按你选的顺序合成一份 PDF）。识别要调用模型，整页可能要一两分钟。</div>
@@ -114,7 +169,21 @@
       <div class="hint" v-else-if="jobTotal">共 {{ jobTotal }} 个任务</div>
       <div class="hint" v-else>没有找到任务</div>
       <div class="hint" v-if="jobId">当前任务 {{ jobId }}；刷新页面会自动恢复，已核对的页也会保留。</div>
-      <div class="status" v-if="busy">正在识别和排版，请稍等，别重复点按钮。</div>
+      <div class="progress" v-if="busy && run">
+        <div class="progress-head">
+          <strong>正在识别 {{ run.total_pages }} 页（最多同时 {{ run.concurrency }} 页）</strong>
+          <span class="hint">已用 {{ formatSeconds(run.elapsed_ms) }} · 完成 {{ run.done_pages }} / {{ run.total_pages }}</span>
+        </div>
+        <div class="bar"><i :style="{width: (100 * run.done_pages / Math.max(1, run.total_pages)) + '%'}"></i></div>
+        <div class="progress-row" v-for="page in run.pages" :key="page.page">
+          <span>第 {{ page.page }} 页</span>
+          <span class="st" :class="page.state">{{ stateText(page.state) }}</span>
+          <span class="hint" v-if="page.latency_ms">识别耗时 {{ formatSeconds(page.latency_ms) }}</span>
+          <span class="hint" v-if="page.error" style="color:var(--danger)">{{ page.error }}</span>
+        </div>
+        <div class="hint" style="margin-top:6px">全部页识别完后还要合并 + 排版（Tectonic 编译），这一步没有逐页进度，请别关窗口。</div>
+      </div>
+      <div class="status" v-else-if="busy">正在处理，请稍等，别重复点按钮。</div>
       <div class="error-text" v-if="error">{{ error }}</div>
       <div class="success-text" v-if="jobId">好了。下面三栏：左边原图、中间代码、右边效果。<strong>黄色行＝可能缺字/编码问题，需要你对照原图确认</strong>；每页原图下面的“标为已核对”用来记录你已经核对过哪几页。</div>
     </section>
@@ -133,9 +202,17 @@
             <button v-if="page.error" class="check" :disabled="busy" @click.stop="retryPage(page.page)">重试这一页</button>
             <button v-else class="check" :class="{done:reviewedPages[page.page]}" @click.stop="togglePage(page.page)">{{ reviewedPages[page.page] ? '已核对 ✓' : '标为已核对' }}</button>
           </div>
+          <div class="signals" v-if="page.latency_ms || page.signals">
+            <span class="sig" v-if="page.latency_ms" title="这一页从发出请求到拿到结果的真实耗时">识别 {{ formatSeconds(page.latency_ms) }}</span>
+            <span class="sig warn" v-if="page.signals && page.signals.retried" title="第一次输出为空或被截断，系统放宽 token 预算重试了一次">第一次输出被截断，重试过</span>
+            <span class="sig warn" v-else-if="page.signals && page.signals.near_token_budget" title="模型输出的 token 数已经接近上限，内容可能没写完">输出接近 token 预算，可能没写完</span>
+            <span class="sig" v-if="page.signals && page.signals.completion_tokens" title="模型这一页实际输出了多少 token">输出 {{ page.signals.completion_tokens }} token</span>
+            <span class="sig" v-if="page.signals && blockSummary(page.signals.block_stats)" title="这一页识别出的内容构成">{{ blockSummary(page.signals.block_stats) }}</span>
+          </div>
         </figure>
         <div class="hint" v-if="activePageData && activePageData.error">这一页识别失败，没有对应代码；中间只包含成功识别的页面。</div>
         <div class="hint" v-if="!pages.length">只有一页，直接对照中间代码即可。</div>
+        <div class="hint" v-if="pages.length">每页下面的小标签是<strong>识别过程的真实记录</strong>：耗时、模型输出了多少 token、这一页识别出几段文字/几个公式/几张图。系统<strong>不给"可信度百分比"</strong>——那种数字无法验证。判断抄得对不对，只能对照原图，用"标为已核对"记录你看过哪几页。</div>
       </aside>
 
       <section class="pane">
@@ -146,6 +223,11 @@
           系统只能标出"很可能抄错、缺字或编码出错"的位置，<strong>不能替你判断识别内容对不对</strong>——最终要对照左边原图确认。
           <span v-if="pages.length">已核对 {{ reviewedCount }} / {{ pages.length }} 页。</span>
           <button @click="tab='log'">查看复核清单</button>
+        </div>
+        <div class="draft-bar" v-if="draft">
+          <span>这个任务有一份<strong>上次没提交的修改</strong>（{{ formatClock(draft.savedAt) }} 存在这台电脑的浏览器里），和服务器上的版本不一样。</span>
+          <button @click="restoreDraft">恢复我的修改</button>
+          <button class="secondary" @click="discardDraft">丢弃，用服务器版本</button>
         </div>
         <div class="editor">
           <div class="gutter"><div class="gutter-inner" :style="{transform:'translateY(' + (-scrollTop) + 'px)'}">
@@ -158,18 +240,24 @@
         </div>
         <div class="actions" style="margin-top:12px">
           <button :disabled="busy" @click="recompile">重新排版（编译）</button>
+          <button class="secondary" :disabled="busy || !reviewItems.length" @click="nextReview">下一处待复核（F2）</button>
           <a v-if="hasPdf" class="button secondary" :href="pdfUrl" target="_blank" download>下载 PDF</a>
           <a class="button secondary" :href="texUrl" download>下载当前 .tex</a>
           <a class="button secondary" :href="originalUrl" download>下载识别原稿</a>
           <button class="secondary" :disabled="busy" @click="restoreOriginal">恢复识别原稿</button>
           <button v-if="hasFigurePlaceholder" class="secondary" :disabled="busy" @click="rebuildFigures">图形页改用原图</button>
         </div>
+        <div class="hint" v-if="reviewCursor >= 0 && reviewItems.length" style="margin-top:6px">正在看第 {{ reviewCursor + 1 }} / {{ reviewItems.length }} 处待复核（第 {{ reviewItems[reviewCursor].line }} 行）。再按 <span class="kbd">F2</span> 看下一处，看完会回到第一处。</div>
+        <div class="hint" style="margin-top:8px">快捷键：<span class="kbd">Ctrl+S</span> 重新排版（代码没变时会直接复用上次结果，不再白等一遍编译）· <span class="kbd">F2</span> 跳到下一处待复核 · <span class="kbd">Ctrl+Z</span> 撤销输入。改动会自动存到这台电脑的浏览器里，误关页面还能找回。</div>
+        <div class="hint" v-if="reused" style="color:#16703b">代码没变，直接复用了上一次的编译结果，没有再跑一遍 Tectonic。</div>
+        <div class="hint" v-else-if="dirty">有未提交的修改（<span class="kbd">Ctrl+S</span> 重新排版后才会更新右边的 PDF）。</div>
       </section>
 
       <aside class="pane">
         <div class="tabs">
           <button class="tab" :class="{on:tab==='pdf'}" @click="tab='pdf'">排版效果</button>
           <button class="tab" :class="{on:tab==='log'}" @click="tab='log'">问题与复核<span class="count">{{ issues.length + reviewItems.length }}</span></button>
+          <button class="tab" :class="{on:tab==='history'}" @click="openHistory">历史版本<span class="count">{{ history.length }}</span></button>
         </div>
         <div v-show="tab==='pdf'">
           <iframe v-if="hasPdf" :src="pdfUrl" :key="pdfVersion" title="排版后的 PDF"></iframe>
@@ -207,6 +295,20 @@
             <summary>完整编译日志（给懂 LaTeX 的人看）</summary>
             <pre>{{ compileResult.log }}</pre>
           </details>
+        </div>
+        <div v-show="tab==='history'">
+          <div class="review-summary">
+            <strong>历史版本（改坏了可以退回来）</strong><br>
+            每次"重新排版 / 恢复识别原稿 / 应用 AI 修改 / 恢复历史版本"都会在服务器上存一份。这里最多显示最近 50 份，点"恢复到这一版"会覆盖中间代码并重新排版。
+          </div>
+          <div class="error-text" v-if="historyError">{{ historyError }}</div>
+          <div class="hint" v-if="historyLoading">正在读取历史版本…</div>
+          <div class="history-item" v-for="entry in history" :key="entry.name" :class="{current:entry.is_current}">
+            <div class="meta">{{ formatClock(entry.saved_at) }} · {{ entry.lines }} 行 · {{ formatBytes(entry.bytes) }}<template v-if="entry.is_current"> · <strong>当前版本</strong></template></div>
+            <div class="preview">{{ entry.first_line }}</div>
+            <button class="secondary" v-if="!entry.is_current" :disabled="busy" @click="restoreHistory(entry.name)">恢复到这一版</button>
+          </div>
+          <div class="empty-note" v-if="!history.length && !historyLoading && !historyError">还没有历史版本记录。</div>
         </div>
       </aside>
     </div>
@@ -264,6 +366,10 @@
         const files = ref([]), busy = ref(false), error = ref(''), jobId = ref(''), tex = ref(''), sourceUrl = ref(''), compileResult = ref(null), pdfVersion = ref(0), suggestedTex = ref(''), fixSummary = ref(''), pages = ref([]), pageCount = ref(0);
         const tab = ref('pdf'), scrollTop = ref(0), flashLine = ref(0), activePage = ref(0), hasPdf = ref(false), hasFigures = ref(false), dirty = ref(false);
         const recentJobs = ref([]), selectedJob = ref(''), jobQuery = ref(''), jobOffset = ref(0), jobTotal = ref(0), jobLimit = 10;
+        const status = ref(null), statusOpen = ref(false), statusError = ref('');
+        const run = ref(null), draft = ref(null), reused = ref(false), reviewCursor = ref(-1);
+        const history = ref([]), historyLoading = ref(false), historyError = ref('');
+        let runTimer = null, draftTimer = null;
         const jobPage = computed(() => Math.floor(jobOffset.value / jobLimit) + 1);
         const jobPages = computed(() => Math.max(1, Math.ceil(jobTotal.value / jobLimit)));
         const ta = ref(null), hl = ref(null);
@@ -442,6 +548,114 @@
           } catch { return `请求失败（${response.status}）`; }
         };
         const formatJobTime = value => (value || '').replace('T', ' ').slice(0, 16);
+        const formatBytes = value => {
+          if (value === null || value === undefined) return '未知';
+          const units = ['B', 'KB', 'MB', 'GB'];
+          let size = value, index = 0;
+          while (size >= 1024 && index < units.length - 1) { size /= 1024; index += 1; }
+          return (index ? size.toFixed(1) : String(Math.round(size))) + ' ' + units[index];
+        };
+        const formatSeconds = ms => {
+          if (ms === null || ms === undefined || ms === '') return '';
+          return ms >= 1000 ? (ms / 1000).toFixed(1) + ' 秒' : Math.round(ms) + ' 毫秒';
+        };
+        const formatClock = value => { try { return new Date(value).toLocaleString(); } catch { return value || ''; } };
+        const stateText = state => ({ pending:'排队中', running:'识别中…', done:'已完成', failed:'失败' }[state] || state);
+        const blockSummary = stats => {
+          if (!stats) return '';
+          const parts = [];
+          if (stats.paragraph) parts.push(stats.paragraph + ' 段文字');
+          if (stats.display_formula) parts.push(stats.display_formula + ' 个公式');
+          if (stats.figure) parts.push(stats.figure + ' 张图');
+          if (stats.blank_page) parts.push(stats.blank_page + ' 空白页');
+          if (stats.other) parts.push(stats.other + ' 个未支持的块');
+          return parts.join(' · ');
+        };
+        const statusChecks = computed(() => status.value?.checks || []);
+        const loadStatus = async () => {
+          try {
+            const response = await fetch('/api/status');
+            if (!response.ok) throw new Error('状态接口返回 ' + response.status);
+            status.value = await response.json();
+            statusError.value = '';
+          } catch (err) { statusError.value = '读不到系统状态：' + err.message; }
+        };
+        const newRunId = () => (window.crypto && crypto.randomUUID
+          ? crypto.randomUUID().replace(/-/g, '')
+          : (Date.now().toString(16) + Math.random().toString(16).slice(2)).slice(0, 32).padEnd(32, '0'));
+        const stopRunPolling = () => { if (runTimer) { clearInterval(runTimer); runTimer = null; } };
+        // 上传请求是一次性阻塞的，进度靠轮询这条只读接口拿；轮询失败不影响上传本身。
+        const fetchRun = async runId => {
+          try {
+            const response = await fetch('/api/runs/' + runId);
+            if (response.ok) run.value = await response.json();
+          } catch { /* 网络抖动时保留上一次进度 */ }
+          return run.value;
+        };
+        const startRunPolling = runId => {
+          stopRunPolling();
+          const tick = async () => {
+            const snapshot = await fetchRun(runId);
+            if (snapshot && snapshot.status !== 'running') stopRunPolling();
+          };
+          tick();
+          runTimer = setInterval(tick, 1200);
+        };
+        const draftKey = id => 'hand2latex:draft:' + id;
+        const readDraft = (id, serverTex) => {
+          if (!id) return null;
+          try {
+            const stored = JSON.parse(localStorage.getItem(draftKey(id)) || 'null');
+            return stored && typeof stored.tex === 'string' && stored.tex !== serverTex ? stored : null;
+          } catch { return null; }
+        };
+        const saveDraft = () => {
+          if (!jobId.value) return;
+          try {
+            localStorage.setItem(draftKey(jobId.value), JSON.stringify({ tex: tex.value, savedAt: new Date().toISOString() }));
+          } catch { /* 隐私模式下存不了就算了，不影响编辑 */ }
+        };
+        const discardDraft = () => {
+          if (jobId.value) { try { localStorage.removeItem(draftKey(jobId.value)); } catch { /* 同上 */ } }
+          draft.value = null;
+        };
+        const restoreDraft = () => {
+          if (!draft.value) return;
+          tex.value = draft.value.tex;
+          draft.value = null;
+          onEdit();
+        };
+        const loadHistory = async () => {
+          if (!jobId.value) return;
+          historyLoading.value = true; historyError.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/history`);
+            if (!response.ok) throw new Error(await readError(response));
+            history.value = (await response.json()).history || [];
+          } catch (err) { historyError.value = err.message; history.value = []; }
+          finally { historyLoading.value = false; }
+        };
+        const openHistory = () => { tab.value = 'history'; loadHistory(); };
+        const restoreHistory = async name => {
+          if (!window.confirm('会用这个历史版本覆盖中间代码并重新排版。当前版本也留在历史里，可以再换回来。继续吗？')) return;
+          busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = ''; reused.value = false;
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/restore-history`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name }) });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            tex.value = data.tex; compileResult.value = data.compile; pdfVersion.value += 1;
+            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false; discardDraft();
+            await loadHistory();
+            if (data.compile && !data.compile.success) tab.value = 'log';
+          } catch (err) { error.value = err.message; }
+          finally { busy.value = false; }
+        };
+        const nextReview = () => {
+          const items = reviewItems.value;
+          if (!items.length) return;
+          reviewCursor.value = (reviewCursor.value + 1) % items.length;
+          jumpToLine(items[reviewCursor.value].line);
+        };
         const applyJob = data => {
           jobId.value = data.job_id;
           tex.value = data.tex;
@@ -455,6 +669,8 @@
           activePage.value = pages.value.length ? 1 : 0;
           selectedJob.value = data.job_id;
           reviewedPages.value = loadReviewed(data.job_id);
+          draft.value = readDraft(data.job_id, data.tex);
+          history.value = []; historyError.value = ''; reviewCursor.value = -1; reused.value = false;
           dirty.value = false;
           suggestedTex.value = '';
           fixSummary.value = '';
@@ -500,41 +716,47 @@
         };
         const upload = async () => {
           if (!files.value.length) return;
-          busy.value = true; error.value = ''; jobId.value = ''; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = ''; hasPdf.value = false; dirty.value = false; reviewedPages.value = {}; flashLine.value = 0;
+          busy.value = true; error.value = ''; jobId.value = ''; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = ''; hasPdf.value = false; dirty.value = false; reviewedPages.value = {}; flashLine.value = 0; reused.value = false;
+          run.value = null;
+          const runId = newRunId();
           try {
             const form = new FormData();
             files.value.forEach(item => form.append('image', item));
+            form.append('run_id', runId);
             const endpoint = files.value.length > 1 ? '/api/documents/batch' : '/api/documents';
+            startRunPolling(runId);
             const response = await fetch(endpoint, { method:'POST', body:form });
             if (!response.ok) throw new Error(await readError(response));
             const data = await response.json();
             applyJob(data);
             jobOffset.value = 0;
             loadJobs();
+            loadStatus();
           } catch (err) { error.value = err.message; }
-          finally { busy.value = false; }
+          finally { await fetchRun(runId); stopRunPolling(); busy.value = false; }
         };
         const recompile = async () => {
-          busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = '';
+          busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = ''; reused.value = false;
           try {
             const response = await fetch(`/api/jobs/${jobId.value}/compile`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tex:tex.value}) });
             if (!response.ok) throw new Error(await readError(response));
             const data = await response.json();
             compileResult.value = data.compile; tex.value = data.tex; pdfVersion.value += 1;
             hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false;
+            reused.value = !!data.reused; discardDraft();
             if (data.compile && !data.compile.success) tab.value = 'log';
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
         };
         const restoreOriginal = async () => {
-          if (!window.confirm('会用最初的识别原稿覆盖当前修改，确定继续吗？')) return;
-          busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = '';
+          if (!window.confirm('会用最初的识别原稿覆盖当前修改，确定继续吗？当前版本会留在“历史版本”里，可以退回来。')) return;
+          busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = ''; reused.value = false;
           try {
             const response = await fetch(`/api/jobs/${jobId.value}/restore-original`, { method:'POST' });
             if (!response.ok) throw new Error(await readError(response));
             const data = await response.json();
             tex.value = data.tex; compileResult.value = data.compile; pdfVersion.value += 1;
-            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false;
+            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false; discardDraft();
             if (data.compile && !data.compile.success) tab.value = 'log';
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
@@ -550,7 +772,11 @@
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
         };
-        const onEdit = () => { dirty.value = true; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = ''; flashLine.value = 0; };
+        const onEdit = () => {
+          dirty.value = true; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = ''; flashLine.value = 0; reused.value = false;
+          if (draftTimer) clearTimeout(draftTimer);
+          draftTimer = setTimeout(saveDraft, 1200);
+        };
         const requestFix = async () => {
           busy.value = true; error.value = ''; suggestedTex.value = ''; fixSummary.value = '';
           try {
@@ -562,13 +788,13 @@
           finally { busy.value = false; }
         };
         const applyFix = async () => {
-          busy.value = true; error.value = '';
+          busy.value = true; error.value = ''; reused.value = false;
           try {
             const response = await fetch(`/api/jobs/${jobId.value}/apply-fix`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tex:suggestedTex.value, summary:fixSummary.value}) });
             if (!response.ok) throw new Error(await readError(response));
             const data = await response.json();
             tex.value = data.tex; compileResult.value = data.compile; suggestedTex.value = ''; fixSummary.value = ''; pdfVersion.value += 1;
-            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false;
+            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false; discardDraft();
           } catch (err) { error.value = err.message; }
           finally { busy.value = false; }
         };
@@ -577,6 +803,17 @@
           pages.value = []; pageCount.value = 0; hasPdf.value = false; hasFigures.value = false; activePage.value = 0;
           reviewedPages.value = {}; suggestedTex.value = ''; fixSummary.value = '';
           selectedJob.value = ''; dirty.value = false; error.value = '';
+          draft.value = null; history.value = []; historyError.value = ''; reused.value = false;
+          stopRunPolling(); run.value = null;
+        };
+        const onKeydown = event => {
+          const key = (event.key || '').toLowerCase();
+          if ((event.ctrlKey || event.metaKey) && key === 's') {
+            event.preventDefault();
+            if (jobId.value && !busy.value && (dirty.value || !hasPdf.value)) recompile();
+            return;
+          }
+          if (event.key === 'F2') { event.preventDefault(); nextReview(); }
         };
         window.addEventListener('hashchange', () => {
           const match = location.hash.match(/^#job=([0-9a-f]{32})$/);
@@ -587,14 +824,18 @@
           }
         });
         onMounted(async () => {
+          loadStatus();
+          window.addEventListener('keydown', onKeydown);
           await loadJobs();
           const match = location.hash.match(/^#job=([0-9a-f]{32})$/);
           if (match) await openJob(match[1]);
         });
         window.addEventListener('beforeunload', event => {
-          if (dirty.value) { event.preventDefault(); event.returnValue = ''; }
+          if (dirty.value) { saveDraft(); event.preventDefault(); event.returnValue = ''; }
         });
-        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, lineCount, errorLines, pdfUrl, texUrl, originalUrl, activePageData, hasFigurePlaceholder, highlighted, issues, reviewItems, reviewLines, reviewKinds, reviewedPages, reviewedCount, togglePage, pageReviewCount, pageAnchors, tab, scrollTop, flashLine, activePage, hasPdf, hasFigures, dirty, recentJobs, selectedJob, jobQuery, jobOffset, jobTotal, jobLimit, jobPage, jobPages, searchJobs, prevJobs, nextJobs, clearJob, ta, hl, onScroll, jumpToLine, jumpToPage, selectFile, upload, openJob, retryPage, formatJobTime, recompile, restoreOriginal, rebuildFigures, onEdit, requestFix, applyFix };
+        return { files, busy, error, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary, pages, pageCount, sourceLines, lineCount, errorLines, pdfUrl, texUrl, originalUrl, activePageData, hasFigurePlaceholder, highlighted, issues, reviewItems, reviewLines, reviewKinds, reviewedPages, reviewedCount, togglePage, pageReviewCount, pageAnchors, tab, scrollTop, flashLine, activePage, hasPdf, hasFigures, dirty, recentJobs, selectedJob, jobQuery, jobOffset, jobTotal, jobLimit, jobPage, jobPages, loadJobs, searchJobs, prevJobs, nextJobs, clearJob, ta, hl, onScroll, jumpToLine, jumpToPage, selectFile, upload, openJob, retryPage, formatJobTime, recompile, restoreOriginal, rebuildFigures, onEdit, requestFix, applyFix,
+          status, statusOpen, statusError, statusChecks, loadStatus, formatBytes, formatSeconds, formatClock, stateText, blockSummary,
+          run, draft, restoreDraft, discardDraft, reused, reviewCursor, history, historyLoading, historyError, openHistory, loadHistory, restoreHistory, nextReview };
       }
     }).mount('#app');
   </script>

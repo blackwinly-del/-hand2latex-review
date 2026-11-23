@@ -813,3 +813,23 @@
 - **证据边界**：仅图形主导页会嵌整页原图；图文混排仍需文字描述，因为模型没有返回图形裁剪框。嵌入的是图片，图内文字不再作为可搜索文本保留，这是“保留视觉原图”的代价。源图路径记录为本机绝对路径，任务目录移动后需点一次重建或重新上传。
 - **Git 状态**：本条目与代码、文档、测试改动放在同一提交中（哈希见 `git log -1`）；本次不推送远端。
 - **未完成事项**：图文混排页的精确裁剪区检测、图形页多图拆分、整页转录真值仍未完成。
+
+## 2026-11-23 提速、可信度信号、改稿便捷性与独立安装包
+
+**阶段状态：本轮按用户要求"不要再死磕正确率，重点是速度、可操作便捷性、打包成软件、把状态和可信度都摆出来让人判断哪里可能有问题"做。已完成并行识别、真实信号落盘、系统状态面板、改稿便捷性、打包脚本与安装器脚本；全量回归 180 项通过，zip 包已解压实跑验证。准确率相关代码本轮未改。**
+
+- **速度：多页并行识别**。`workbench/app.py` 的 `_page_concurrency()` 读 `WORKBENCH_PAGE_CONCURRENCY`（默认 3，夹在 1~10，再和实际页数取小），`_create_document` 用 `ThreadPoolExecutor` 并发发每页的云端请求。实测（mock 两页延迟 2.0 s / 1.0 s）浏览器端总耗时 2036 ms，小于串行的 3000 ms；服务端探针显示两页起始时刻相同、合计 2017 ms。
+- **速度：编译复用**。TeX 与上次逐字节相同且 `main.pdf`、`compile.json` 都在时直接返回 `reused: true`，不再跑 Tectonic；前端提示"代码没变，直接复用了上一次的编译结果"。
+- **可信度信号只记真实值**。`workbench/full_page.py` 新增 `_usage_signal()`：落盘 `finish_reason`、真实 `prompt/completion/total_tokens`、`max_tokens`、`near_token_budget`（输出达到预算 95% 以上才为真）、`attempts`、`retried`，再加 `_block_stats()` 的块数量统计和该页 `latency_ms`。**没有引入任何自造分数**；界面明写"系统不给识别可信度分数"，理由是无法验证。`raw_latex` 与原始识别结果未被覆盖。
+- **运行进度登记**。`_RUNS` 是加锁的内存字典，最多留 20 条；客户端生成 32 位十六进制 `run_id` 随 multipart 上传，不合法就退回用 `job_id`；`GET /api/runs/{run_id}` 供前端每 1.2 秒轮询逐页状态与耗时。修掉一处真实缺陷：客户端最后一次轮询晚于任务完成，导致总耗时记不上，改为 `fetchRun()` 并在 `upload()` 的 `finally` 里 await 一次。
+- **系统状态面板**。`GET /api/status` 只报可核查事实：版本与提交号（`BUILD_INFO.json` 或 git）、Python 与平台、OpenAI 配置（**只报密钥长度**）、Tectonic 路径与版本、ctex 字体集、本地识别配置与已下载模型、并行页数、前端 `vue.global.js` 来源、任务目录与占用。子进程与目录扫描结果缓存 30 秒。顺手修了 `_tectonic_status()` 把版本读成 `"T"` 的 bug（原来在遍历字符串而不是按行切分），并补了单测。
+- **改稿便捷性**。`Ctrl+S` 编译；`F2` 跳下一处待复核并显示"正在看第 N / M 处待复核（第 X 行）"；编辑内容每 1.2 秒存进 localStorage，与服务器版本不一致时给出"恢复我的修改 / 丢弃"；新增 `GET /api/jobs/{id}/history` 与 `POST /api/jobs/{id}/restore-history`，因为每次写 `main.tex` 都会留一份 `history/<uuid>.tex`，所以回滚是真的撤销（最多列 50 份）。修掉两个前端缺陷：`loadJobs` 没从 `setup()` 返回（"最近任务"的刷新按钮点了没反应）、`reviewCursor` 没暴露。
+- **打包脚本**。新增 `scripts/package.ps1`：按第十节口径的排除清单 robocopy 复制 → 把 `node_modules/vue/dist/vue.global.js` 复制进包（目标机器不需要 Node.js）→ 写 `BUILD_INFO.json` → 放入 `installer/安装说明.txt` → 逐项核对该在的在、不该带的没带 → 扫描包内全部文本文件确认本机 `OPENAI_API_KEY` 的值没混进去（扫到即中止）→ 压 zip 并打印 SHA256 → `-BuildInstaller` 时若本机有 Inno Setup 6 就编 `setup.exe`。脚本只读仓库、只往 `dist/` 写。
+- **安装器脚本**。新增 `installer/hand2latex.iss`（`PrivilegesRequired=lowest`，装到 `{localappdata}\Programs\Hand2LaTeX`，卸载时删 `.venv`/`__pycache__`/`node_modules`，`artifacts` 交给卸载提示决定）和中文 `installer/安装说明.txt`。**本机没有安装 Inno Setup，`.iss` 没有编译验证过**，`package.ps1` 在这种情况下会如实告警而不是假装成功。
+- **打包过程中真找到并修掉的两个缺陷**：① PowerShell 5.1 的 `Set-Content -Encoding UTF8` 会给 `BUILD_INFO.json` 写 BOM，`json.loads(read_text(encoding="utf-8"))` 解析失败后静默回退到 git，安装包状态里错报"来源：开发仓库"；改为用 .NET 写无 BOM UTF-8，同时 `_build_info()` 用 `utf-8-sig` 读以兼容旧包，并补了带 BOM 的单测。② `Compress-Archive -Path $Staging\*` 让 zip 里没有顶层文件夹，用户"解压到当前文件夹"会把几百个文件撒出来；改为压缩整个暂存目录，`安装说明.txt` 的措辞同步改。
+- **实际验证（针对最终那个 zip 本体，不是暂存目录）**：`dist/Hand2LaTeX-1.0.0-win64.zip`，20.4 MB，SHA256 `7A4C1099D9653629E05D493AB2538827D75EB6719A988084AE54CB39B8CA5941`。解压到临时目录后从解压目录起服务（8014 端口）：`/api/status` 报告 `build.source = 安装包`、`commit = 30cc4f9`、`built_at` 有值、前端来自随包副本、Tectonic 0.17.0 在包内可用、任务数 0、`openai.configured = false`（包里不带 `.env`，如实报未配置）；`/vendor/vue/vue.global.js` 返回 200、609371 字节；无头浏览器打开首页 Vue 正常挂载（10 个状态 chip、上传控件存在、`pageErrors` 为空），状态详情显示"来源 安装包""vue.global.js 来自随安装包携带的副本""API 密钥 未配置：上传识别、修复建议都用不了"，页面文本里没有出现任何密钥长度数字。核对 `/api/status` 响应体不含本机 `OPENAI_API_KEY` 的值。测试服务已停止，解压目录已删除。
+- **实际回归**：`./.venv/Scripts/python.exe -m unittest discover -s tests -q` 为 `Ran 180 tests in 27.170s`、`OK`（14 个模块有测试项，`tests/test_recognizer.py` 是契约自检脚本，unittest 收 0 项）。浏览器实测用 mock 识别 + mock 编译的临时服务器（8012 端口）跑完整流程，结果 `STATUS CHECK OK`、`pageErrors: []`，覆盖：状态条与详情表、逐页实时进度、每页真实信号 chip、编译复用提示、草稿保存/刷新/恢复、`Ctrl+S`、历史版本列表与回滚、`F2` 跳转与位置计数。mock 服务器已停止，临时任务目录已清理。
+- **证据边界**：本轮**没有用真实付费 API 跑过任何识别**，速度结论来自 mock 延迟（2.0 s / 1.0 s）下的并发行为，证明的是"请求确实并行发出"，不是真实网关下的提速倍数；真实网关可能限流，并行度调大后未实测。状态面板、进度、信号、便捷性同样是在 mock 下验证的。安装器 `.iss` 未编译验证。准确率相关的评估口径与真值集本轮未动，整页转录仍然没有逐字真值。
+- **边界遵守**：`schemas.py` 未被修改（公共契约不动）；未越界改 A、B 的文件；`raw_latex` 与识别原稿保留；未编造置信度或测试结果，上面每条数字都来自本次实际运行的输出。
+- **Git 状态**：本条目与代码、文档、测试改动放在同一提交中；`.env` 含密钥且被 git 忽略，不进入提交；`dist/` 被忽略，zip 只在本机。本次不推送远端。
+- **未完成事项**：`installer/hand2latex.iss` 的真实编译验证；真实付费 API 下的并行提速倍数与限流表现；10 页以上大批量的并行压测；整页转录真值集仍缺；安装包在"干净机器"（没装过 Python 依赖、没有 `.env`）上的首次启动全流程未实测。

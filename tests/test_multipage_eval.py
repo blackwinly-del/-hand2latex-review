@@ -67,7 +67,7 @@ class MultipageEvaluationTests(unittest.TestCase):
             "two.png": {"title": "二", "blocks": [{"type": "paragraph", "text": "乙"}]},
             "three.png": {"title": "三", "blocks": [{"type": "paragraph", "text": "丙"}]},
         }
-        request.side_effect = lambda image: documents[Path(image).name]
+        request.side_effect = lambda image: (documents[Path(image).name], {"attempts": 1})
         compile_mock.side_effect = self._compile
         pdf_pages.side_effect = self._pdf_pages
 
@@ -101,8 +101,8 @@ class MultipageEvaluationTests(unittest.TestCase):
         }
         manifest = self._manifest(pages, [{"id": "blank_case", "page_ids": ["content", "blank"]}])
         request.side_effect = [
-            {"title": "内容", "blocks": [{"type": "paragraph", "text": "甲"}]},
-            {"title": "空白", "blocks": []},
+            ({"title": "内容", "blocks": [{"type": "paragraph", "text": "甲"}]}, {"attempts": 1}),
+            ({"title": "空白", "blocks": []}, {"attempts": 1}),
         ]
         compile_mock.side_effect = self._compile
         pdf_pages.side_effect = self._pdf_pages
@@ -141,8 +141,8 @@ class MultipageEvaluationTests(unittest.TestCase):
         }
         manifest = self._manifest(pages, [{"id": "blank_case", "page_ids": ["content", "blank"]}])
         request.side_effect = [
-            {"title": "内容", "blocks": [{"type": "paragraph", "text": "甲"}]},
-            {"title": "空白", "blocks": [{"type": "paragraph", "text": "这是一张空白页"}]},
+            ({"title": "内容", "blocks": [{"type": "paragraph", "text": "甲"}]}, {"attempts": 1}),
+            ({"title": "空白", "blocks": [{"type": "paragraph", "text": "这是一张空白页"}]}, {"attempts": 1}),
         ]
         compile_mock.side_effect = self._compile
         pdf_pages.side_effect = self._pdf_pages

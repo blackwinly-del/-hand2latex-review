@@ -75,7 +75,7 @@ def recognize_page(
     _write_json(cache_path, {**base, "status": "pending"})
     started = time.perf_counter()
     try:
-        document = _request_page(str(image_path))
+        document, page_signals = _request_page(str(image_path))
     except Exception as error:  # noqa: BLE001 - 评估器必须记录每页失败原因并继续跑其余页
         result = {
             **base,
@@ -93,6 +93,7 @@ def recognize_page(
         **base,
         "status": "response_saved",
         "document": document,
+        "signals": page_signals,
         "latency_ms": round((time.perf_counter() - started) * 1000, 3),
     }
     if document is not raw_document:

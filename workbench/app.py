@@ -2,46 +2,75 @@ import hashlib
 import json
 import logging
 import os
+import platform
 import re
 import shutil
+import subprocess
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from workbench.compiler import compile_tex
+from workbench.compiler import _find_tectonic, compile_tex
 from workbench.fix import suggest_fix
 from workbench.full_page import (
     _attach_figure_sources,
+    _ctex_fontset,
     build_tex,
     generate_document,
     merge_documents,
 )
+from workbench.version import VERSION
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _STATIC_ROOT = _PROJECT_ROOT / "workbench" / "static"
 _JOBS_ROOT = _PROJECT_ROOT / "artifacts" / "jobs"
 _JOB_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+_RUN_ID_PATTERN = re.compile(r"^[0-9a-f]{8,64}$")
+_HISTORY_NAME_PATTERN = re.compile(r"^[0-9a-f]{32}\.tex$")
 _SUPPORTED_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 _MAX_IMAGE_BYTES = 20 * 1024 * 1024
 _MAX_BATCH_IMAGE_BYTES = 50 * 1024 * 1024
 _MAX_PAGE_COUNT = 10
 _MAX_TEX_CHARS = 200_000
 _MAX_LOG_CHARS = 200_000
+_BUILD_INFO_PATH = _PROJECT_ROOT / "BUILD_INFO.json"
 
 # 过期 job 清理：默认保留 7 天，可用 WORKBENCH_JOB_MAX_AGE_DAYS 调整（0 = 永不清理）
 _JOB_MAX_AGE_SECONDS = float(os.environ.get("WORKBENCH_JOB_MAX_AGE_DAYS", "7")) * 86400.0
 
 logger = logging.getLogger("workbench")
 app = FastAPI(title="Hand2LaTeX 智能工作台")
-app.mount("/vendor/vue", StaticFiles(directory=_PROJECT_ROOT / "node_modules" / "vue" / "dist"), name="vue")
+
+
+def _vue_asset_dir() -> tuple[Path | None, str | None]:
+    """定位 Vue 全局构建：开发仓库用 node_modules，安装包用随包携带的副本。"""
+    candidates = (
+        (_PROJECT_ROOT / "node_modules" / "vue" / "dist", "node_modules（npm install 装的）"),
+        (_STATIC_ROOT / "vendor" / "vue", "随安装包携带的副本"),
+    )
+    for directory, source in candidates:
+        if (directory / "vue.global.js").is_file():
+            return directory, source
+    return None, None
+
+
+_VUE_DIR, _VUE_SOURCE = _vue_asset_dir()
+if _VUE_DIR is not None:
+    app.mount("/vendor/vue", StaticFiles(directory=_VUE_DIR), name="vue")
+else:
+    logger.warning(
+        "找不到 vue.global.js，网页会白屏：请运行 npm install，"
+        "或把 vue.global.js 放到 workbench/static/vendor/vue/"
+    )
 _JOBS_ROOT.mkdir(parents=True, exist_ok=True)
 
 
@@ -97,6 +126,262 @@ _start_job_cleanup_scheduler()
 
 class CompileRequest(BaseModel):
     tex: str
+
+
+class RestoreHistoryRequest(BaseModel):
+    name: str
+
+
+# ---------------------------------------------------------------------------
+# 运行进度：整页识别一次要几十秒到几分钟，前端需要知道"现在卡在哪一页"。
+# 只记录真实发生的状态（排队/识别中/完成/失败、开始与结束时间、耗时），
+# 不估算剩余时间，也不给任何"可信度分数"。
+# ---------------------------------------------------------------------------
+_RUNS_LOCK = threading.Lock()
+_RUNS: dict[str, dict] = {}
+_MAX_STORED_RUNS = 20
+
+
+def _page_concurrency(page_count: int) -> int:
+    """整页识别的并发页数。每页是一次独立的云端请求，可以并行等待。"""
+    raw = os.environ.get("WORKBENCH_PAGE_CONCURRENCY", "3")
+    try:
+        configured = int(raw)
+    except ValueError:
+        configured = 3
+    configured = max(1, min(configured, _MAX_PAGE_COUNT))
+    return min(configured, max(1, page_count))
+
+
+def _new_run(run_id: str, total_pages: int) -> None:
+    concurrency = _page_concurrency(total_pages)
+    run = {
+        "run_id": run_id,
+        "status": "running",
+        "started_at": time.time(),
+        "finished_at": None,
+        "job_id": None,
+        "error": None,
+        "total_pages": total_pages,
+        "concurrency": concurrency,
+        "pages": [
+            {
+                "page": number,
+                "state": "pending",
+                "started_at": None,
+                "finished_at": None,
+                "latency_ms": None,
+                "retried": None,
+                "error": None,
+            }
+            for number in range(1, total_pages + 1)
+        ],
+    }
+    with _RUNS_LOCK:
+        _RUNS[run_id] = run
+        if len(_RUNS) > _MAX_STORED_RUNS:
+            for key in sorted(_RUNS, key=lambda item: _RUNS[item]["started_at"])[: len(_RUNS) - _MAX_STORED_RUNS]:
+                _RUNS.pop(key, None)
+
+
+def _set_page_state(run_id: str, page_number: int, **fields) -> None:
+    with _RUNS_LOCK:
+        run = _RUNS.get(run_id)
+        if run is None:
+            return
+        for page in run["pages"]:
+            if page["page"] == page_number:
+                page.update(fields)
+                return
+
+
+def _finish_run(run_id: str, status: str, *, job_id: str | None = None, error: str | None = None) -> None:
+    with _RUNS_LOCK:
+        run = _RUNS.get(run_id)
+        if run is None:
+            return
+        run.update(status=status, finished_at=time.time(), job_id=job_id, error=error)
+
+
+def _run_snapshot(run_id: str) -> dict | None:
+    with _RUNS_LOCK:
+        run = _RUNS.get(run_id)
+        if run is None:
+            return None
+        snapshot = json.loads(json.dumps(run))
+    finished = snapshot["finished_at"] or time.time()
+    snapshot["elapsed_ms"] = round((finished - snapshot["started_at"]) * 1000)
+    snapshot["done_pages"] = sum(1 for page in snapshot["pages"] if page["state"] in {"done", "failed"})
+    snapshot["running_pages"] = [page["page"] for page in snapshot["pages"] if page["state"] == "running"]
+    return snapshot
+
+
+# ---------------------------------------------------------------------------
+# 系统状态：只报告能当场核对的事实（文件在不在、配置有没有填、编译器能不能跑）。
+# ---------------------------------------------------------------------------
+_STATUS_LOCK = threading.Lock()
+_STATUS_CACHE: dict[str, tuple[float, object]] = {}
+_STATUS_CACHE_SECONDS = 30.0
+
+
+def _cached_status(key: str, producer):
+    """状态接口会被前端轮询，子进程探测与目录统计按 30 秒缓存。"""
+    now = time.time()
+    with _STATUS_LOCK:
+        entry = _STATUS_CACHE.get(key)
+        if entry is not None and now - entry[0] < _STATUS_CACHE_SECONDS:
+            return entry[1]
+    value = producer()
+    with _STATUS_LOCK:
+        _STATUS_CACHE[key] = (now, value)
+    return value
+
+
+def _build_info() -> dict:
+    """安装包会写入 BUILD_INFO.json；开发仓库则如实报告 git 短提交号。"""
+    if _BUILD_INFO_PATH.is_file():
+        try:
+            # Windows 上写出来的 JSON 可能带 BOM，用 utf-8-sig 才读得动。
+            info = json.loads(_BUILD_INFO_PATH.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            info = None
+        if isinstance(info, dict):
+            return {"source": "安装包", "version": VERSION, "commit": None, "built_at": None, **info}
+    commit = None
+    if (_PROJECT_ROOT / ".git").exists():
+        try:
+            completed = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=_PROJECT_ROOT,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=5,
+                check=False,
+            )
+            if completed.returncode == 0:
+                commit = completed.stdout.strip() or None
+        except (OSError, subprocess.SubprocessError):
+            commit = None
+    return {"source": "开发仓库", "version": VERSION, "commit": commit, "built_at": None}
+
+
+def _tectonic_status() -> dict:
+    def probe() -> dict:
+        path = _find_tectonic()
+        if path is None:
+            return {"available": False, "path": None, "version": None}
+        try:
+            completed = subprocess.run(
+                [str(path), "--version"],
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return {"available": True, "path": str(path), "version": None}
+        output = (completed.stdout or "") + (completed.stderr or "")
+        lines = [line.strip() for line in output.splitlines() if line.strip()]
+        return {"available": True, "path": str(path), "version": lines[0] if lines else None}
+
+    return _cached_status("tectonic", probe)
+
+
+def _jobs_status() -> dict:
+    def probe() -> dict:
+        count = 0
+        total_bytes = 0
+        try:
+            entries = list(_JOBS_ROOT.iterdir())
+        except OSError:
+            entries = []
+        for entry in entries:
+            if not entry.is_dir() or not _JOB_ID_PATTERN.fullmatch(entry.name):
+                continue
+            count += 1
+            for path in entry.rglob("*"):
+                try:
+                    if path.is_file():
+                        total_bytes += path.stat().st_size
+                except OSError:
+                    continue
+        return {"count": count, "total_bytes": total_bytes, "directory": str(_JOBS_ROOT)}
+
+    return _cached_status("jobs", probe)
+
+
+def _recognizer_status() -> dict:
+    """本地公式后端的配置事实。整页识别走云端多模态模型，这里只说明配置。"""
+    models_root = _PROJECT_ROOT / "models"
+    local_models = []
+    if models_root.is_dir():
+        for entry in sorted(models_root.iterdir()):
+            try:
+                if entry.is_dir() and (entry / "inference.json").is_file():
+                    local_models.append(entry.name)
+            except OSError:
+                continue
+    return {
+        "model": (os.environ.get("RECOGNIZER_MODEL") or "").strip() or None,
+        "device": (os.environ.get("RECOGNIZER_DEVICE") or "").strip() or None,
+        "model_dir": (os.environ.get("RECOGNIZER_MODEL_DIR") or "").strip() or None,
+        "local_models": local_models,
+        "used_by": "画板与单公式识别；整页识别使用云端多模态模型，不调用本地公式模型",
+    }
+
+
+def _openai_status() -> dict:
+    api_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    return {
+        "configured": bool(api_key),
+        "key_length": len(api_key) or None,
+        "model": (os.environ.get("OPENAI_MODEL") or "").strip() or None,
+        "base_url": (os.environ.get("OPENAI_BASE_URL") or "").strip() or None,
+        "timeout_seconds": os.environ.get("FULLPAGE_TIMEOUT_SECONDS", "120"),
+        "max_tokens": os.environ.get("FULLPAGE_MAX_TOKENS", "24000"),
+    }
+
+
+def _status_checks(openai_status: dict, tectonic: dict, fontset: str | None, fontset_error: str | None) -> list[dict]:
+    """把上面的事实翻译成"能用/要注意/不能用"，每条都说明依据。"""
+    checks = []
+    if openai_status["configured"] and openai_status["model"]:
+        checks.append(
+            {
+                "id": "openai",
+                "label": "云端整页识别",
+                "level": "ok",
+                "detail": f"已配置模型 {openai_status['model']}（密钥长度 {openai_status['key_length']}，不显示内容）",
+            }
+        )
+    elif openai_status["configured"]:
+        checks.append({"id": "openai", "label": "云端整页识别", "level": "warn", "detail": "密钥已填，但 OPENAI_MODEL 为空，识别会失败"})
+    else:
+        checks.append({"id": "openai", "label": "云端整页识别", "level": "bad", "detail": "OPENAI_API_KEY 未配置：上传识别、修复建议都用不了"})
+    if not openai_status["base_url"]:
+        checks.append({"id": "base_url", "label": "接口地址", "level": "warn", "detail": "OPENAI_BASE_URL 未设置，将直连 OpenAI 官方接口（国内网络通常连不上）"})
+    if tectonic["available"]:
+        checks.append({"id": "tectonic", "label": "PDF 编译器", "level": "ok", "detail": tectonic["version"] or tectonic["path"]})
+    else:
+        checks.append({"id": "tectonic", "label": "PDF 编译器", "level": "bad", "detail": "找不到 Tectonic：能识别和改代码，但排不出 PDF"})
+    if fontset_error:
+        checks.append({"id": "fontset", "label": "中文字体配置", "level": "bad", "detail": fontset_error})
+    else:
+        checks.append({"id": "fontset", "label": "中文字体配置", "level": "ok", "detail": f"ctex fontset={fontset}"})
+    if _VUE_DIR is not None:
+        checks.append({"id": "frontend", "label": "网页前端资源", "level": "ok", "detail": f"vue.global.js 来自{_VUE_SOURCE}"})
+    else:
+        checks.append(
+            {
+                "id": "frontend",
+                "label": "网页前端资源",
+                "level": "bad",
+                "detail": "找不到 vue.global.js：打开网页会白屏。运行 npm install，或把该文件放到 workbench/static/vendor/vue/",
+            }
+        )
+    return checks
 
 
 class FixSuggestionRequest(BaseModel):
@@ -306,7 +591,7 @@ def _read_image(image: UploadFile) -> tuple[str, bytes]:
     return suffix, content
 
 
-def _create_document(images: list[UploadFile]) -> dict:
+def _create_document(images: list[UploadFile], run_id: str = "") -> dict:
     if not images or len(images) > _MAX_PAGE_COUNT:
         raise HTTPException(status_code=400, detail="每次上传 1 至 10 页图片")
     uploads = [_read_image(image) for image in images]
@@ -316,22 +601,62 @@ def _create_document(images: list[UploadFile]) -> dict:
     job_id = uuid.uuid4().hex
     directory = _JOBS_ROOT / job_id
     directory.mkdir()
+    candidate_run_id = run_id.strip().lower()
+    run_key = candidate_run_id if _RUN_ID_PATTERN.fullmatch(candidate_run_id) else job_id
+    _new_run(run_key, len(uploads))
+
+    # 源图先全部落盘再识别：某页识别失败时，原图与已成功页面都保留下来，
+    # 不让第 N 页的失败把前 N-1 页的成果全部丢掉。
+    source_paths: list[Path] = []
+    for page_number, (suffix, content) in enumerate(uploads, start=1):
+        page_directory = directory / f"page_{page_number:02d}"
+        page_directory.mkdir()
+        source_path = page_directory / f"source{suffix}"
+        source_path.write_bytes(content)
+        source_paths.append(source_path)
+
+    results: list[dict | None] = [None] * len(uploads)
+    page_errors: dict[int, str] = {}
+
+    def recognize(page_number: int) -> None:
+        _set_page_state(run_key, page_number, state="running", started_at=time.time())
+        try:
+            document = generate_document(str(source_paths[page_number - 1]))
+        except Exception as error:  # noqa: BLE001 - 单页失败要记录下来，其余页继续
+            logger.exception("第 %d 页整页识别失败", page_number)
+            message = f"{type(error).__name__}: {error}"
+            page_errors[page_number] = message
+            _set_page_state(run_key, page_number, state="failed", finished_at=time.time(), error=message)
+            return
+        signals = document.get("signals") or {}
+        results[page_number - 1] = document
+        _set_page_state(
+            run_key,
+            page_number,
+            state="done",
+            finished_at=time.time(),
+            latency_ms=document.get("latency_ms"),
+            retried=signals.get("retried"),
+        )
+
+    # 每页是一次独立的云端请求，串行等待会把多页任务的耗时按页数放大。
+    concurrency = _page_concurrency(len(uploads))
+    if concurrency <= 1:
+        for page_number in range(1, len(uploads) + 1):
+            recognize(page_number)
+    else:
+        with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="page") as pool:
+            list(pool.map(recognize, range(1, len(uploads) + 1)))
+
     documents = []
     pages = []
     failures = []
+    has_figures = False
     try:
-        for page_number, (suffix, content) in enumerate(uploads, start=1):
+        for page_number, document in enumerate(results, start=1):
             page_directory = directory / f"page_{page_number:02d}"
-            page_directory.mkdir()
-            source_path = page_directory / f"source{suffix}"
-            source_path.write_bytes(content)
-            # 源图先落盘再识别：某页识别失败时，原图与已成功页面都保留下来，
-            # 不让第 N 页的失败把前 N-1 页的成果全部丢掉。
-            try:
-                document = generate_document(str(source_path))
-            except Exception as error:
-                logger.exception("第 %d 页整页识别失败", page_number)
-                message = f"{type(error).__name__}: {error}"
+            if document is None:
+                message = page_errors.get(page_number, "该页识别失败")
                 failures.append({"page": page_number, "error": message})
                 pages.append(
                     {
@@ -351,6 +676,11 @@ def _create_document(images: list[UploadFile]) -> dict:
                 encoding="utf-8",
             )
             documents.append(document)
+            if any(
+                isinstance(block, dict) and block.get("type") == "figure"
+                for block in document.get("blocks", [])
+            ):
+                has_figures = True
             pages.append(
                 {
                     "page": page_number,
@@ -359,6 +689,7 @@ def _create_document(images: list[UploadFile]) -> dict:
                     "human_review": document["human_review"],
                     "error": None,
                     "merged_page": len(documents),
+                    "signals": document.get("signals"),
                 }
             )
 
@@ -371,11 +702,6 @@ def _create_document(images: list[UploadFile]) -> dict:
         (directory / "original.tex").write_text(merged_tex, encoding="utf-8")
         _write_main_tex(directory, merged_tex)
         compile_result = compile_tex(directory / "main.tex")
-        has_figures = any(
-            isinstance(block, dict) and block.get("type") == "figure"
-            for document in documents
-            for block in document.get("blocks", [])
-        )
         _store_job_metadata(
             directory,
             merged["title"],
@@ -385,14 +711,17 @@ def _create_document(images: list[UploadFile]) -> dict:
             has_figures=has_figures,
         )
         _store_compile(directory, _public_compile(compile_result, job_id))
-    except HTTPException:
+    except HTTPException as error:
+        _finish_run(run_key, "failed", error=error.detail)
         raise
     except Exception as error:
         logger.exception("full-page generation failed")
+        _finish_run(run_key, "failed", error=f"{type(error).__name__}: {error}")
         raise HTTPException(
             status_code=502,
             detail=f"{type(error).__name__}: 整页识别或编译失败，请检查服务配置后重试",
         ) from error
+    _finish_run(run_key, "done", job_id=job_id)
     payload = _job_payload(
         job_id,
         directory,
@@ -403,17 +732,63 @@ def _create_document(images: list[UploadFile]) -> dict:
         failures=failures,
         has_figures=has_figures,
     )
+    payload["run_id"] = run_key
     return payload
 
 
 @app.post("/api/documents")
-def create_document(images: list[UploadFile] = File(..., alias="image")) -> dict:
-    return _create_document(images)
+def create_document(
+    images: list[UploadFile] = File(..., alias="image"),
+    run_id: str = Form(""),
+) -> dict:
+    return _create_document(images, run_id)
 
 
 @app.post("/api/documents/batch")
-def create_batch_documents(images: list[UploadFile] = File(..., alias="image")) -> dict:
-    return _create_document(images)
+def create_batch_documents(
+    images: list[UploadFile] = File(..., alias="image"),
+    run_id: str = Form(""),
+) -> dict:
+    return _create_document(images, run_id)
+
+
+@app.get("/api/runs/{run_id}")
+def get_run(run_id: str) -> dict:
+    """查询一次上传的实时进度。只在本进程内存里，服务重启后不再保留。"""
+    key = run_id.strip().lower()
+    if not _RUN_ID_PATTERN.fullmatch(key):
+        raise HTTPException(status_code=404, detail="run not found")
+    snapshot = _run_snapshot(key)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    return snapshot
+
+
+@app.get("/api/status")
+def get_status() -> dict:
+    """工作台自检：把"这台机器上到底能不能跑通"如实列出来。"""
+    openai_status = _openai_status()
+    tectonic = _tectonic_status()
+    try:
+        fontset = _ctex_fontset()
+        fontset_error = None
+    except RuntimeError as error:
+        fontset = None
+        fontset_error = str(error)
+    return {
+        "version": VERSION,
+        "build": _build_info(),
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "openai": openai_status,
+        "tectonic": tectonic,
+        "fontset": fontset,
+        "recognizer": _recognizer_status(),
+        "page_concurrency": _page_concurrency(_MAX_PAGE_COUNT),
+        "frontend": {"available": _VUE_DIR is not None, "source": _VUE_SOURCE, "path": str(_VUE_DIR) if _VUE_DIR else None},
+        "jobs": _jobs_status(),
+        "checks": _status_checks(openai_status, tectonic, fontset, fontset_error),
+    }
 
 
 @app.get("/api/jobs")
@@ -543,6 +918,7 @@ def retry_failed_page(job_id: str, page_number: int) -> dict:
         error=None,
         latency_ms=document["latency_ms"],
         human_review=document["human_review"],
+        signals=document.get("signals"),
     )
 
     documents = []
@@ -719,6 +1095,18 @@ def compile_document(job_id: str, request: CompileRequest) -> dict:
     directory = _job_dir(job_id)
     if not request.tex.strip():
         raise HTTPException(status_code=400, detail="tex 不能为空")
+    main_tex = directory / "main.tex"
+    # 代码没变、PDF 和编译记录都还在时直接复用上次结果：Tectonic 一次要十几秒，
+    # 重复点"重新排版"不应该再等一遍。
+    if (
+        main_tex.is_file()
+        and (directory / "main.pdf").is_file()
+        and (directory / "compile.json").is_file()
+        and main_tex.read_text(encoding="utf-8") == request.tex
+    ):
+        stored = _stored_compile(directory, job_id)
+        (directory / "suggestion.json").unlink(missing_ok=True)
+        return {"compile": stored, "tex": request.tex, "reused": True}
     _write_main_tex(directory, request.tex)
     (directory / "suggestion.json").unlink(missing_ok=True)
     try:
@@ -729,6 +1117,63 @@ def compile_document(job_id: str, request: CompileRequest) -> dict:
     public_result = _public_compile(result, job_id)
     _store_compile(directory, public_result)
     return {"compile": public_result, "tex": request.tex}
+
+
+@app.get("/api/jobs/{job_id}/history")
+def list_history(job_id: str) -> dict:
+    """列出这个任务保存过的所有版本，用于撤销误操作。"""
+    directory = _job_dir(job_id)
+    main_tex = directory / "main.tex"
+    current = main_tex.read_text(encoding="utf-8") if main_tex.is_file() else ""
+    current_sha = _sha256_text(current) if current else None
+    history = directory / "history"
+    entries = []
+    if history.is_dir():
+        paths = sorted(history.glob("*.tex"), key=lambda path: path.stat().st_mtime, reverse=True)[:50]
+        for path in paths:
+            try:
+                text = path.read_text(encoding="utf-8")
+                stat = path.stat()
+            except OSError:
+                continue
+            first_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
+            entries.append(
+                {
+                    "name": path.name,
+                    "saved_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                    "bytes": stat.st_size,
+                    "lines": text.count("\n") + 1,
+                    "sha256": _sha256_text(text),
+                    "is_current": _sha256_text(text) == current_sha,
+                    "first_line": first_line[:80],
+                }
+            )
+    return {"job_id": job_id, "current_sha256": current_sha, "history": entries}
+
+
+@app.post("/api/jobs/{job_id}/restore-history")
+def restore_history(job_id: str, request: RestoreHistoryRequest) -> dict:
+    """恢复到某个历史版本。当前版本本身也在历史里，所以可以再恢复回去。"""
+    directory = _job_dir(job_id)
+    name = request.name.strip()
+    if not _HISTORY_NAME_PATTERN.fullmatch(name):
+        raise HTTPException(status_code=400, detail="历史版本名不合法")
+    path = directory / "history" / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="历史版本不存在")
+    text = path.read_text(encoding="utf-8")
+    if not text.strip():
+        raise HTTPException(status_code=409, detail="这个历史版本是空的，不能恢复")
+    _write_main_tex(directory, text)
+    (directory / "suggestion.json").unlink(missing_ok=True)
+    try:
+        result = compile_tex(directory / "main.tex")
+    except Exception as error:
+        logger.exception("restore-history compilation failed")
+        raise HTTPException(status_code=500, detail=f"{type(error).__name__}: 恢复历史版本后编译失败") from error
+    public_result = _public_compile(result, job_id)
+    _store_compile(directory, public_result)
+    return {"compile": public_result, "tex": text, "restored": name}
 
 
 @app.post("/api/jobs/{job_id}/suggest-fix")
