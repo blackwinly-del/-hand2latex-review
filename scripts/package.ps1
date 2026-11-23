@@ -69,12 +69,20 @@ $git = Get-Command git -ErrorAction SilentlyContinue
 if ($git) {
     Push-Location $Root
     $Commit = (& git rev-parse --short HEAD 2>$null)
-    $dirty = (& git status --porcelain 2>$null)
+    # 分开看：已跟踪文件的改动会让"提交号对不上"，未跟踪文件只是会多带进包里。
+    $dirtyTracked = (& git status --porcelain --untracked-files=no 2>$null)
+    $untracked = (& git ls-files --others --exclude-standard 2>$null)
     Pop-Location
     if ($LASTEXITCODE -ne 0 -or -not $Commit) { $Commit = $null }
     if ($Commit) {
         Write-Ok "提交号 $Commit"
-        if ($dirty) { Write-Warn '工作区还有未提交的改动：安装包里会带上这些改动，但提交号对不上' }
+        if ($dirtyTracked) {
+            Write-Warn '已跟踪的文件还有未提交的改动：安装包里会带上这些改动，但 BUILD_INFO 里的提交号对不上'
+        }
+        if ($untracked) {
+            $untrackedCount = @($untracked).Count
+            Write-Warn "有 $untrackedCount 个未跟踪文件（不在 git 里）也会被复制进安装包，例如：$(@($untracked)[0])"
+        }
     }
 } else {
     Write-Warn '找不到 git，BUILD_INFO.json 里不写提交号'
