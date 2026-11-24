@@ -8,17 +8,26 @@
       2. Hand2LaTeX-<版本>-win64-setup.exe —— 安装器（需要本机装了 Inno Setup 6，加 -BuildInstaller）
 
     打包做的事：
-      - 按排除清单复制仓库（不带 .env、.venv、node_modules、models、artifacts、dist）
+      - 按排除清单复制仓库（不带 .env、.venv、.cache、node_modules、models、artifacts、dist）
       - 把 vue.global.js 随包带上，这样目标机器不装 Node.js 也能打开网页
-      - 写 BUILD_INFO.json（版本、提交号、打包时间），网页"系统状态"里会显示"来源：安装包"
+      - 构建随包 Python 运行时（embeddable 3.12 + 预装 requirements-app.txt），
+        这样目标机器不装 Python 也能跑；只想要瘦包就加 -NoPython
+      - 写 BUILD_INFO.json（版本、提交号、打包时间、有没有带运行时），
+        网页"系统状态"里会显示"来源：安装包"
       - 复制 安装说明.txt
       - 逐项核对打包结果（该在的在不在、不该带的有没有带进去），有问题就停下报错
 
-    这个脚本只读仓库、只往 dist\ 写，不会改动源代码，也不会碰 .env。
+    这个脚本只读仓库、只往 dist\ 与 .cache\ 写，不会改动源代码，也不会碰 .env。
+    构建随包运行时要联网（python.org 下载 embeddable 包 + PyPI 装依赖），
+    下载缓存放在 .cache\，第二次打包就不用重下。
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1
-    只打 zip 绿色包。
+    打带 Python 运行时的 zip 绿色包（约 65 MB）。
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -NoPython
+    打不带运行时的瘦包（约 20 MB），对方要自己装 Python 3.10 / 3.11 / 3.12。
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -BuildInstaller
@@ -32,7 +41,10 @@
 param(
     [switch]$BuildInstaller,
     [switch]$KeepStaging,
-    [string]$Iscc
+    [string]$Iscc,
+    # 默认随包带一份 Python（embeddable + 预装依赖），目标机器不用装 Python。
+    # 加 -NoPython 只打不带运行时的瘦包（约 20 MB），但对方必须自己装 Python 3.10~3.12。
+    [switch]$NoPython
 )
 
 $ErrorActionPreference = 'Stop'
@@ -62,6 +74,8 @@ $excludeDirs = @(
     '.qoder',
     '.venv',
     '.venv-check',
+    '.cache',
+    'runtime',
     'node_modules',
     'models',
     '.paddlex',
@@ -126,6 +140,8 @@ if ($git) {
 
 $PackageName = "Hand2LaTeX-$Version-win64"
 $Staging = Join-Path $StagingParent $PackageName
+# 随包 Python 运行时的版本与官方 MD5，实际下载与校验在 scripts\build_python_runtime.ps1 里做。
+$RuntimePythonVersion = '3.12.10'
 
 # ---------------------------------------------------------------------------
 # 2. 复制仓库（排除清单和 README 第十节的口径一致）
@@ -161,6 +177,21 @@ Write-Ok '已随包带上 vue.global.js（网页不再依赖 node_modules）'
 # 4. BUILD_INFO.json 与安装说明
 # ---------------------------------------------------------------------------
 Write-Step '写入构建信息'
+$needs = @('.env 里的 OPENAI_API_KEY（安装后自己填，安装包里不含任何密钥）')
+$bundled = @(
+    'tools\tectonic\tectonic.exe（PDF 编译器，已随包带上）',
+    'workbench\static\vendor\vue\vue.global.js（网页前端，已随包带上）'
+)
+$notBundled = @(
+    'models\（本地公式模型约 3 GB，只有"画板"用得到；需要时按 安装说明.txt 下载）',
+    '.env（密钥文件，绝不随包分发）'
+)
+if ($NoPython) {
+    $needs = @('Python 3.10 / 3.11 / 3.12（这个包没带运行时，首次启动会自动建虚拟环境并装依赖，需要联网）') + $needs
+    $notBundled = @('runtime\python\（本次用 -NoPython 打的瘦包，不含 Python 运行时）') + $notBundled
+} else {
+    $bundled = @("runtime\python\python.exe（Python $RuntimePythonVersion 运行时 + 网页工作台依赖，目标机器不用装 Python）") + $bundled
+}
 $buildInfo = [ordered]@{
     version    = $Version
     commit     = $Commit
@@ -168,18 +199,14 @@ $buildInfo = [ordered]@{
     built_on   = [System.Environment]::OSVersion.VersionString
     source     = '安装包'
     entry      = '启动工作台.bat'
-    needs      = @(
-        'Python 3.10 / 3.11 / 3.12（首次启动会自动建虚拟环境并装依赖，需要联网）',
-        '.env 里的 OPENAI_API_KEY（安装后自己填，安装包里不含任何密钥）'
-    )
-    bundled    = @(
-        'tools\tectonic\tectonic.exe（PDF 编译器，已随包带上）',
-        'workbench\static\vendor\vue\vue.global.js（网页前端，已随包带上）'
-    )
-    not_bundled = @(
-        'models\（本地公式模型约 3 GB，只有"画板"用得到；需要时按 安装说明.txt 下载）',
-        '.env（密钥文件，绝不随包分发）'
-    )
+    python_runtime = [ordered]@{
+        bundled = (-not $NoPython)
+        version = if ($NoPython) { $null } else { $RuntimePythonVersion }
+        covers  = '只覆盖网页工作台；画板演示与本地公式识别仍需完整环境（见 安装说明.txt）'
+    }
+    needs      = $needs
+    bundled    = $bundled
+    not_bundled = $notBundled
 }
 $buildInfoPath = Join-Path $Staging 'BUILD_INFO.json'
 # PowerShell 5.1 的 Set-Content -Encoding UTF8 会写 BOM，网页那边 json 解析就会失败，
@@ -194,6 +221,24 @@ if (Test-Path -LiteralPath $notesSource) {
     Write-Ok '已放入 安装说明.txt'
 } else {
     Write-Warn '仓库里没有 installer\安装说明.txt，安装包不含使用说明'
+}
+
+# ---------------------------------------------------------------------------
+# 4.5 随包 Python 运行时（目标机器不用装 Python）
+# ---------------------------------------------------------------------------
+$runtimeDir = Join-Path $Staging 'runtime\python'
+if ($NoPython) {
+    Write-Step '跳过随包 Python 运行时（-NoPython）'
+    Write-Warn '这个包不含 Python，对方必须自己装 Python 3.10 / 3.11 / 3.12，首次启动还要联网装依赖'
+} else {
+    Write-Step "构建随包 Python 运行时（$RuntimePythonVersion）"
+    $runtimeScript = Join-Path $Root 'scripts\build_python_runtime.ps1'
+    if (-not (Test-Path -LiteralPath $runtimeScript)) { Stop-WithMessage "找不到 $runtimeScript" }
+    # 这一步会联网下载 embeddable 包（有缓存就不下）并从 PyPI 装依赖，比较慢。
+    & $runtimeScript -TargetDir $runtimeDir -PythonVersion $RuntimePythonVersion
+    if ($LASTEXITCODE -ne 0) { Stop-WithMessage "随包 Python 运行时构建失败（退出码 $LASTEXITCODE）" }
+    $runtimeMb = [math]::Round(((Get-ChildItem -LiteralPath $runtimeDir -Recurse -File | Measure-Object -Property Length -Sum).Sum) / 1MB, 1)
+    Write-Ok "随包运行时就绪（$runtimeMb MB）"
 }
 
 # ---------------------------------------------------------------------------
@@ -235,12 +280,21 @@ Test-StagedFile 'scripts\launch.ps1' '启动器主逻辑'
 Test-StagedFile 'requirements.txt' 'Python 依赖清单'
 Test-StagedFile '.env.example' 'API 配置模板'
 Test-StagedFile 'BUILD_INFO.json' '构建信息'
+Test-StagedFile 'requirements-app.txt' '网页工作台依赖清单（随包运行时装的是这一份）'
 Test-StagedAbsent '.env' 'API 密钥文件'
 Test-StagedAbsent '.venv' '本机虚拟环境'
+Test-StagedAbsent '.cache' '打包用的下载缓存'
 Test-StagedAbsent 'node_modules' 'npm 依赖目录'
 Test-StagedAbsent 'models' '本地公式模型（3 GB）'
 Test-StagedAbsent 'artifacts' '本机跑出来的任务产物'
 Test-StagedAbsent '.git' 'git 历史'
+if ($NoPython) {
+    Test-StagedAbsent 'runtime' 'Python 运行时（本次 -NoPython）'
+} else {
+    Test-StagedFile 'runtime\python\python.exe' '随包 Python 运行时'
+    Test-StagedFile 'runtime\python\Lib\site-packages\fastapi\__init__.py' '随包运行时里的 fastapi'
+    Test-StagedFile 'runtime\python\Lib\site-packages\uvicorn\__init__.py' '随包运行时里的 uvicorn'
+}
 
 $keyValue = $null
 $envFile = Join-Path $Root '.env'
@@ -251,15 +305,20 @@ if (Test-Path -LiteralPath $envFile) {
 }
 if ($keyValue -and $keyValue.Length -ge 8) {
     # 逐个文本文件比对密钥原文，命中就说明打包范围有问题，必须停下。
+    # 随包 Python 运行时与 tools 里是第三方文件，不是我们写的，也不可能是密钥的来源，
+    # 排除掉是为了不让这一步跑几分钟；排除范围会如实打印出来。
     $textExtensions = @('.py', '.ps1', '.txt', '.md', '.json', '.html', '.js', '.bat', '.tex', '.yaml', '.yml', '.toml', '.cfg', '')
     $textFiles = Get-ChildItem -LiteralPath $Staging -Recurse -File |
-        Where-Object { $textExtensions -contains $_.Extension.ToLower() }
+        Where-Object {
+            $textExtensions -contains $_.Extension.ToLower() -and
+            $_.FullName -notlike '*\runtime\*' -and $_.FullName -notlike '*\tools\*'
+        }
     $hits = @($textFiles | Select-String -SimpleMatch -Pattern $keyValue -List | ForEach-Object { $_.Path })
     if ($hits.Count) {
         Write-Bad "在安装包里发现了本机 API 密钥：$($hits -join '、')"
         $problems += '安装包内含 API 密钥'
     } else {
-        Write-Ok "安装包里没有出现本机的 OPENAI_API_KEY（核对了 $($textFiles.Count) 个文本文件）"
+        Write-Ok "安装包里没有出现本机的 OPENAI_API_KEY（核对了 $($textFiles.Count) 个我们自己打包的文本文件；随包运行时与 tools 的第三方文件不在核对范围）"
     }
 } else {
     Write-Warn '本机 .env 里没有可核对的 OPENAI_API_KEY，这一项没法核对'
@@ -354,6 +413,11 @@ Write-Host ''
 Write-Host '打包完成。' -ForegroundColor Green
 Write-Host "    绿色包：dist\$PackageName.zip（$zipMb MB）"
 Write-Host "    SHA256：$zipHash"
+if ($NoPython) {
+    Write-Host '    Python：这个包没带运行时（-NoPython），对方要自己装 Python 3.10 / 3.11 / 3.12。'
+} else {
+    Write-Host "    Python：已随包带上 $RuntimePythonVersion 运行时（$runtimeMb MB），对方不用装 Python。"
+}
 if ($setupHash) {
     Write-Host "    安装器：dist\Hand2LaTeX-$Version-win64-setup.exe（$setupMb MB）"
     Write-Host "    SHA256：$setupHash"

@@ -135,6 +135,7 @@
           <tr><td class="k">多页并发</td><td>最多同时识别 {{ status.page_concurrency }} 页（环境变量 WORKBENCH_PAGE_CONCURRENCY 可调；页数越多提速越明显）</td></tr>
           <tr><td class="k">本地公式后端</td><td>{{ status.recognizer.model || '未指定（用默认引擎）' }} · 设备 {{ status.recognizer.device || 'cpu' }} · 已下载模型 {{ status.recognizer.local_models.join('、') || '无' }}<br>{{ status.recognizer.used_by }}</td></tr>
           <tr><td class="k">运行环境</td><td>Python {{ status.python }} · {{ status.platform }} · 来源 {{ status.build.source }}<template v-if="status.build.built_at"> · 构建于 {{ status.build.built_at }}</template></td></tr>
+          <tr><td class="k">Python 运行时</td><td>{{ status.python_runtime.source }}<template v-if="status.python_runtime.in_virtualenv">（虚拟环境）</template><br><span style="color:var(--muted)">{{ status.python_runtime.executable }}</span></td></tr>
           <tr><td class="k">网页前端资源</td><td>{{ status.frontend.available ? 'vue.global.js 来自' + status.frontend.source : '缺少 vue.global.js：网页会白屏，请运行 npm install 或重新安装' }}</td></tr>
           <tr><td class="k">任务目录</td><td>{{ status.jobs.directory }}</td></tr>
         </table>

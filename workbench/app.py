@@ -6,6 +6,7 @@ import platform
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -341,6 +342,26 @@ def _openai_status() -> dict:
         "base_url": (os.environ.get("OPENAI_BASE_URL") or "").strip() or None,
         "timeout_seconds": os.environ.get("FULLPAGE_TIMEOUT_SECONDS", "120"),
         "max_tokens": os.environ.get("FULLPAGE_MAX_TOKENS", "24000"),
+    }
+
+
+def _python_runtime() -> dict:
+    """当前是哪个 Python 在跑：安装包随带的运行时，还是本机自己的环境。"""
+    executable = Path(sys.executable)
+    try:
+        resolved = executable.resolve()
+    except OSError:
+        resolved = executable
+    try:
+        bundled_root = (_PROJECT_ROOT / "runtime").resolve()
+    except OSError:
+        bundled_root = _PROJECT_ROOT / "runtime"
+    is_bundled = bundled_root in resolved.parents
+    return {
+        "executable": str(resolved),
+        "bundled": is_bundled,
+        "source": "安装包随带的 Python 运行时（本机没装 Python 也能跑）" if is_bundled else "本机自己的 Python 环境",
+        "in_virtualenv": sys.prefix != sys.base_prefix,
     }
 
 
@@ -779,6 +800,7 @@ def get_status() -> dict:
         "version": VERSION,
         "build": _build_info(),
         "python": platform.python_version(),
+        "python_runtime": _python_runtime(),
         "platform": platform.platform(),
         "openai": openai_status,
         "tectonic": tectonic,

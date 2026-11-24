@@ -1,0 +1,23 @@
+# 网页工作台的运行时依赖：随包 Python（embeddable）装的就是这一份。
+#
+# 为什么不直接用 requirements.txt：那里面有 torch（几个 GB），而 torch 只被
+# reasoning/risk_mlp.py、reasoning/train_risk.py 和 recognizer.py 用到；Pillow 与
+# numpy 只被 demo/app.py 和 recognizer.py 用到。这三处都不在"上传 → 整页识别 →
+# 编译 → 复核"这条链路上，而且在 recognizer.py 里都是函数内延迟导入，所以不装也能跑。
+# 版本号与 requirements.txt 保持一致，避免两条链路上的行为分叉。
+#
+# 唯一一处故意不一致：pymupdf。requirements.txt 钉的是 2.0，而 pymupdf 2.0 是个
+# 元包，会拖进 pymupdf-layout（onnxruntime 54 MB + numpy 55 MB + networkx 18 MB）
+# 和 pymupdf4llm，随包运行时因此从约 100 MB 涨到 324 MB。代码里只用到
+# pymupdf.open() / page_count / get_text() / get_images() / get_drawings()
+# （见 workbench/multipage_eval.py），这些在 1.24+ 就有，所以这里钉 1.x 线。
+#
+# 画板演示（Streamlit + 本地公式识别）需要 requirements.txt / requirements-b.txt
+# 的完整环境，随包运行时不覆盖它——安装说明里写清楚了。
+fastapi==0.162.7
+uvicorn==0.54.0
+python-multipart==0.0.33
+openai==3.42.1
+python-dotenv==1.2.4
+pymupdf==1.28.2
+httpx==0.28.1

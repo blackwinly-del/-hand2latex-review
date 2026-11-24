@@ -51,8 +51,17 @@ $ErrorActionPreference = 'Continue'
 $env:PYTHONIOENCODING = 'utf-8'
 
 $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$VenvRoot = Join-Path $Root '.venv'
-$VenvPython = Join-Path $VenvRoot 'Scripts\python.exe'
+# 安装包会随包带一份 Python 运行时（runtime\python\python.exe）。有它就完全不碰 .venv：
+# 不建虚拟环境、不装依赖、不需要目标机器装 Python。日志与 PID 也改放 runtime\ 下。
+$BundledPython = Join-Path $Root 'runtime\python\python.exe'
+$BundledRuntime = Test-Path -LiteralPath $BundledPython
+if ($BundledRuntime) {
+    $VenvRoot = Join-Path $Root 'runtime'
+    $VenvPython = $BundledPython
+} else {
+    $VenvRoot = Join-Path $Root '.venv'
+    $VenvPython = Join-Path $VenvRoot 'Scripts\python.exe'
+}
 $LogFile = Join-Path $VenvRoot 'workbench.log'
 $PidFile = Join-Path $VenvRoot 'workbench.pid'
 $Url = "http://127.0.0.1:$Port/"
@@ -367,8 +376,15 @@ if ($Stop) {
 # ---------------------------------------------------------------------------
 # 1. 虚拟环境
 # ---------------------------------------------------------------------------
-Write-Step '检查 Python 虚拟环境（要求 3.10 / 3.11 / 3.12）'
-if (Test-Path -LiteralPath $VenvPython) {
+Write-Step '检查 Python 运行时'
+if ($BundledRuntime) {
+    $venvInfo = Get-PythonVersionText -Command $VenvPython
+    if (-not $venvInfo.Found) {
+        Stop-WithHint '随包 Python 运行时无法执行（runtime\python\python.exe）' `
+            '安装包可能不完整：重新解压 zip，或重新运行 setup.exe。'
+    }
+    Write-Line "使用随包 Python 运行时（Python $($venvInfo.Version)），不建虚拟环境、不装依赖" 'ok'
+} elseif (Test-Path -LiteralPath $VenvPython) {
     $venvInfo = Get-PythonVersionText -Command $VenvPython
     if (-not $venvInfo.Found) {
         Stop-WithHint '.venv 里的 python.exe 无法执行' '请删除 .venv 后重跑本脚本重建。'
@@ -411,18 +427,26 @@ if ($venvReady) {
     $webDepsReady = ($webProbe.ExitCode -eq 0)
     if ($webDepsReady) {
         Write-Line '网页服务所需 Python 依赖已就绪' 'ok'
+    } elseif ($BundledRuntime) {
+        Stop-WithHint "随包运行时里缺网页依赖：$($webProbe.Output)" `
+            '这说明安装包不完整。重新解压 zip，或重新运行 setup.exe（不要自己 pip install 到 runtime 里）。'
     } else {
         Write-Line "缺少网页依赖：$($webProbe.Output)" 'warn'
     }
 
-    $paddleProbe = Invoke-ImportProbe -FileName 'probe_paddle.py' -Modules @('paddleocr') -SpecOnly
-    $paddleReady = ($paddleProbe.ExitCode -eq 0)
-    if ($paddleReady) {
-        Write-Line '公式识别后端（paddleocr）已安装' 'ok'
-    } elseif ($Lite) {
-        Write-Line '-Lite 模式跳过 paddle，B 侧公式识别不可用' 'warn'
+    if ($BundledRuntime) {
+        Write-Line '随包运行时只覆盖网页工作台：画板演示与本地公式识别（paddle / torch）不在里面' 'info'
+        $paddleReady = $false
     } else {
-        Write-Line 'paddleocr 未安装，公式识别（B 侧）会失败' 'warn'
+        $paddleProbe = Invoke-ImportProbe -FileName 'probe_paddle.py' -Modules @('paddleocr') -SpecOnly
+        $paddleReady = ($paddleProbe.ExitCode -eq 0)
+        if ($paddleReady) {
+            Write-Line '公式识别后端（paddleocr）已安装' 'ok'
+        } elseif ($Lite) {
+            Write-Line '-Lite 模式跳过 paddle，B 侧公式识别不可用' 'warn'
+        } else {
+            Write-Line 'paddleocr 未安装，公式识别（B 侧）会失败' 'warn'
+        }
     }
 } else {
     Write-Line '虚拟环境不可用，跳过 Python 依赖检查' 'warn'
@@ -439,7 +463,8 @@ if ($frontendReady) {
     Write-Line '缺少 vue.global.js，打开页面会报 "Vue is not defined"' 'warn'
 }
 
-$needsPythonInstall = $venvReady -and (-not $webDepsReady -or (-not $Lite -and -not $paddleReady))
+# 随包运行时的依赖是打包时预装好的，绝不在用户机器上 pip install。
+$needsPythonInstall = -not $BundledRuntime -and $venvReady -and (-not $webDepsReady -or (-not $Lite -and -not $paddleReady))
 $needsFrontendInstall = -not $frontendReady
 
 if (-not $needsPythonInstall -and -not $needsFrontendInstall) {
@@ -551,13 +576,30 @@ foreach ($candidate in @(
     break
 }
 if (-not $modelFound) {
-    Write-Line '缺少本地公式模型（models\UniMERNet 或 models\PP-FormulaNet-L）：B 侧会返回明确的失败候选（不会崩，但没有识别结果）。' 'warn'
-    Write-Line '获取：装好 paddleocr 后首次运行自动下载，或在 .env 里设置 RECOGNIZER_MODEL_DIR 指向已有目录。' 'info'
+    if ($BundledRuntime) {
+        Write-Line '没有本地公式模型：随包运行时不含 paddle / torch，画板演示与 B 侧本地识别用不了（网页整页识别走云端 API，不受影响）。' 'info'
+    } else {
+        Write-Line '缺少本地公式模型（models\UniMERNet 或 models\PP-FormulaNet-L）：B 侧会返回明确的失败候选（不会崩，但没有识别结果）。' 'warn'
+        Write-Line '获取：装好 paddleocr 后首次运行自动下载，或在 .env 里设置 RECOGNIZER_MODEL_DIR 指向已有目录。' 'info'
+    }
 }
 
 # ---------------------------------------------------------------------------
-# 4. 接口契约自检
+# 4. 启动前自检
 # ---------------------------------------------------------------------------
+if ($BundledRuntime) {
+    # 随包运行时不含 B 侧本地识别，跑 test_recognizer.py 没有意义；
+    # 真正要确认的是"这个运行时能不能把网页应用 import 起来"。
+    Write-Step '自检：随包运行时能否 import workbench.app'
+    $appProbe = Invoke-ImportProbe -FileName 'probe_app_import.py' -Modules @('workbench.app')
+    if ($appProbe.ExitCode -ne 0) {
+        Write-Block $appProbe.Output
+        Stop-WithHint '随包运行时无法 import workbench.app' `
+            '安装包可能不完整：重新解压 zip，或重新运行 setup.exe。'
+    }
+    Write-Line 'workbench.app 可以被随包运行时导入' 'ok'
+    Write-Line '跳过 test_recognizer.py 契约自检：随包运行时不覆盖 B 侧本地识别（paddle / torch）' 'info'
+} else {
 Write-Step '运行接口契约自检 test_recognizer.py'
 if (-not $venvReady) {
     Write-Line '虚拟环境不可用，跳过自检' 'warn'
@@ -569,6 +611,7 @@ if (-not $venvReady) {
             '契约自检失败说明环境或接口有问题，先修它再启动服务。'
     }
     Write-Line 'test_recognizer.py 通过' 'ok'
+}
 }
 
 if ($CheckOnly) {
@@ -613,7 +656,7 @@ if (-not $server) {
     Stop-WithHint '服务进程启动失败' "完整日志可看 $LogFile"
 }
 Set-Content -LiteralPath $PidFile -Value $server.Id -Encoding ASCII
-Write-Line "服务进程 PID $($server.Id)，日志 .venv\workbench.log" 'info'
+Write-Line "服务进程 PID $($server.Id)，日志 $LogFile" 'info'
 
 if (-not (Wait-ForHttp -Process $server -TargetUrl $Url -Seconds 25)) {
     Write-Line '启动失败：服务在 25 秒内没有响应。' 'bad'

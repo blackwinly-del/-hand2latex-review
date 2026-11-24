@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from workbench.app import _build_info, _tectonic_status, app
+from workbench.app import _PROJECT_ROOT, _build_info, _python_runtime, _tectonic_status, app
 from workbench.version import VERSION
 
 
@@ -821,6 +821,20 @@ class WorkbenchAppTests(unittest.TestCase):
         self.assertEqual(info["source"], "安装包")
         self.assertEqual(info["commit"], "abc1234")
         self.assertEqual(info["built_at"], "2026-11-23 10:00:00 +08:00")
+
+    def test_python_runtime_tells_bundled_from_local(self):
+        bundled = str(_PROJECT_ROOT / "runtime" / "python" / "python.exe")
+        with patch("workbench.app.sys.executable", bundled):
+            runtime = _python_runtime()
+        self.assertTrue(runtime["bundled"])
+        self.assertIn("安装包", runtime["source"])
+        self.assertEqual(runtime["executable"], str(Path(bundled).resolve()))
+
+        local = str(_PROJECT_ROOT / ".venv" / "Scripts" / "python.exe")
+        with patch("workbench.app.sys.executable", local):
+            runtime = _python_runtime()
+        self.assertFalse(runtime["bundled"])
+        self.assertIn("本机", runtime["source"])
 
 
 if __name__ == "__main__":

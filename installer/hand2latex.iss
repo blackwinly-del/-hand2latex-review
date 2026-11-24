@@ -69,7 +69,7 @@ Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppBat}"; WorkingDir: "{app}"; IconFilename: "{sys}\shell32.dll"; IconIndex: 13; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppBat}"; Description: "立即启动工作台（首次启动会联网安装依赖，需要几分钟）"; WorkingDir: "{app}"; Flags: postinstall nowait shellexec skipifsilent
+Filename: "{app}\{#MyAppBat}"; Description: "立即启动工作台（第一次启动会做一遍环境自检）"; WorkingDir: "{app}"; Flags: postinstall nowait shellexec skipifsilent
 Filename: "{app}\.env"; Description: "打开 .env 填写 OPENAI_API_KEY（不填就不能识别）"; WorkingDir: "{app}"; Flags: postinstall nowait shellexec skipifsilent
 
 [UninstallDelete]
@@ -81,9 +81,22 @@ Type: filesandordirs; Name: "{app}\__pycache__"
 Type: filesandordirs; Name: "{app}\workbench\__pycache__"
 Type: filesandordirs; Name: "{app}\reasoning\__pycache__"
 Type: filesandordirs; Name: "{app}\node_modules"
+; 用随包运行时时，日志、PID 和启动自检的临时脚本写在 runtime\ 下。
+Type: files; Name: "{app}\runtime\workbench.log"
+Type: files; Name: "{app}\runtime\workbench.log.err"
+Type: files; Name: "{app}\runtime\workbench.pid"
+Type: files; Name: "{app}\runtime\probe_*.py"
 
 [Code]
-// 安装包里不含 Python，也没有 Python 就跑不起来，所以装之前先体检一次并如实告知。
+// 包里带了随包 Python 运行时（runtime\python\python.exe）时，根本不需要本机装 Python，
+// 这时候再弹"没检测到 python 命令"就是误导。用 ISPP 在编译期看一眼暂存目录里有没有它。
+#if FileExists(SourceDir + "\runtime\python\python.exe")
+  #define BundledPython 1
+#else
+  #define BundledPython 0
+#endif
+
+// 安装包里不含 Python（-NoPython 打的瘦包）时，装之前先体检一次并如实告知。
 function IsPythonAvailable(): Boolean;
 var
   ResultCode: Integer;
@@ -95,14 +108,16 @@ end;
 function InitializeSetup(): Boolean;
 begin
   Result := True;
+#if BundledPython == 0
   // 静默安装时弹框会把安装卡住，所以只在有界面的安装里提示。
   if (not IsPythonAvailable()) and (not WizardSilent) then
-    MsgBox('没有检测到可用的 python 命令。' + #13#10 + #13#10 +
-           'Hand2LaTeX 需要 Python 3.10 / 3.11 / 3.12（安装包里不含 Python）。' + #13#10 +
+    MsgBox('这个安装包没有随带 Python 运行时，而本机也没检测到可用的 python 命令。' + #13#10 + #13#10 +
+           'Hand2LaTeX 需要 Python 3.10 / 3.11 / 3.12。' + #13#10 +
            '下载地址：https://www.python.org/downloads/windows/' + #13#10 +
            '安装时请勾选 "Add python.exe to PATH"。' + #13#10 + #13#10 +
            '现在可以继续安装，但装完要先装好 Python 才能启动。',
            mbInformation, MB_OK);
+#endif
 end;
 
 // artifacts\jobs 是用户自己跑出来的任务，卸载时不当默认垃圾删掉，问一下再决定。

@@ -106,9 +106,10 @@
 │   └── assets/                演示文档引用的图片
 ├── artifacts/                 真实运行产物（评估 JSON、验收 JSON、编译样例）
 ├── scripts/
-│   ├── launch.ps1             一键体检 / 装环境 / 启动 / 重启 / 停止的实际逻辑
+│   ├── launch.ps1             一键体检 / 装环境 / 启动 / 重启 / 停止的实际逻辑（安装包里有随包运行时时跳过建 venv 与装依赖）
 │   ├── launch_demo.ps1        画板演示的启动逻辑（前台窗口运行，关窗即停）
-│   └── package.ps1            打包成 dist/ 下的绿色 zip（可选 -BuildInstaller 编 setup.exe）
+│   ├── build_python_runtime.ps1 构建随包 Python 运行时（下载 embeddable 包并按官方 MD5 校验、预装依赖、导入自检）
+│   └── package.ps1            打包成 dist/ 下的绿色 zip（可选 -BuildInstaller 编 setup.exe、-NoPython 打瘦包）
 ├── installer/
 │   ├── 安装说明.txt            给最终用户看的中文说明（会随包分发）
 │   ├── hand2latex.iss         Inno Setup 6 脚本（2026-11-23 用 ISCC 6.7.3 编译并实装验证过）
@@ -119,6 +120,7 @@
 ├── 关闭工作台.bat              双击停止服务
 ├── README_B.md                B 模块的详细说明与环境变量表
 ├── requirements.txt           Web 工作台 + C 模块依赖
+├── requirements-app.txt       随包 Python 运行时只装这一份（不含 torch / numpy / Pillow，理由写在文件里）
 └── requirements-b.txt         PP-FormulaNet-L 本地推理依赖（paddlepaddle / paddleocr）
 ```
 
@@ -133,6 +135,11 @@
 | 中文字体 | ctex 默认用 `fontset=windows`，需要系统装有 SimHei/SimSun 等 CJK 字体。**没有预装中文字体的环境**（Linux/macOS/CI runner）可设环境变量 `LATEX_FONTSET=fandol`，改用随 Tectonic TeX bundle 分发的开源 Fandol 字体，无需系统字体。合法值：`windows` / `mac` / `adobe` / `ubuntu` / `fandol` / `none`。 |
 | 模型权重 | PP-FormulaNet-L 约 695 MB，放 `models/PP-FormulaNet-L/`（同样被排除，首次运行可自动下载） |
 | 多模态 API | 任意 OpenAI 兼容接口，需支持图片输入 |
+
+上表是**从源码开发**时的要求。用 `scripts/package.ps1` 打出来的安装包不需要目标机器装 Python、
+Node.js 或 Tectonic：Python 3.12 运行时（embeddable + 预装 `requirements-app.txt`）、`vue.global.js`
+和 `tectonic.exe` 都随包带。**只有画板演示与 B 侧本地识别不在覆盖范围内**——它们要 paddle / torch
+和约 3 GB 模型，仍然得按本节和第四节装完整环境。
 
 ## 四、安装
 
@@ -378,8 +385,11 @@ RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 PADDLE_PDX_CACHE_HOME=D:/late
 ### 6.5 打包成安装包（发给不用 git 的人）
 
 ```bash
-# 只打绿色 zip（默认）
+# 默认：打绿色 zip，随包带 Python 运行时（约 65 MB）
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1
+
+# 只想打瘦包（约 20 MB，对方要自己装 Python 3.10~3.12）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -NoPython
 
 # 打 zip，并顺便编出 setup.exe（本机装了 Inno Setup 6 才行）
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -BuildInstaller
@@ -391,15 +401,28 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -BuildIn
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -KeepStaging
 ```
 
+随包 Python 运行时由 [scripts/build_python_runtime.ps1](scripts/build_python_runtime.ps1) 构建，
+默认 Python 3.12.10 embeddable：从 python.org 下载（缓存在 `.cache/`，第二次不重下）、
+**按官方下载页公布的 MD5 校验，对不上就中止**、解压到 `runtime/python/`、改 `python312._pth`
+（加 `Lib\site-packages` 与 `..\..`，并启用 `import site`——embeddable 版会忽略 `PYTHONPATH`，
+只能写在这个文件里）、然后用构建机的 pip `--target` 装 `requirements-app.txt`，最后用随包
+`python.exe` 真跑一次 `import workbench.app` 自检。构建机的 Python 次版本必须与运行时一致
+（都是 3.12），否则装进去的 `.pyd` ABI 对不上，脚本会先核对再动手。
+运行时约 111 MB（其中 pymupdf 自带 MuPDF 二进制 54 MB、openai 26 MB）。
+**构建这一步要联网**（python.org + PyPI）；目标机器不需要联网装依赖。
+
 `-BuildInstaller` 找 ISCC 的顺序：`-Iscc` 参数 → PATH 里的 `iscc` → 三个默认安装目录 →
 注册表卸载项里的 `InstallLocation`（本机就装在 `D:\API\Inno Setup 6`，靠这一步才找到）。
 安装界面用的简体中文消息文件随仓库带在 `installer/languages/ChineseSimplified.isl`，
 因为 Inno Setup 官方安装器**不含**简体中文，不这样做编出来就是英文向导。
+安装器里"没检测到 Python"的提示只在瘦包（`-NoPython`）时才会出现——ISPP 在编译期先看
+暂存目录里有没有 `runtime\python\python.exe`，带了就不弹。
 
-脚本只读仓库、只往 `dist/` 写，不改源码也不碰 `.env`。它做的事：按第十节的排除清单复制仓库 →
-把 `node_modules/vue/dist/vue.global.js` 复制进包里（目标机器**不需要装 Node.js**）→ 写
-`BUILD_INFO.json`（无 BOM 的 UTF-8；网页状态里因此显示“来源：安装包”和打包时的提交号）→
-放入 `installer/安装说明.txt` → 逐项核对该在的在、不该带的没带 → 扫描所有文本文件确认本机的
+脚本只读仓库、只往 `dist/` 和 `.cache/` 写，不改源码也不碰 `.env`。它做的事：按第十节的排除清单复制仓库 →
+把 `node_modules/vue/dist/vue.global.js` 复制进包里（目标机器**不需要装 Node.js**）→
+构建随包 Python 运行时（目标机器**不需要装 Python**，加 `-NoPython` 可跳过）→ 写
+`BUILD_INFO.json`（无 BOM 的 UTF-8；网页状态里因此显示“来源：安装包”、打包时的提交号、有没有带运行时）→
+放入 `installer/安装说明.txt` → 逐项核对该在的在、不该带的没带 → 扫描我们自己打包的文本文件确认本机的
 `OPENAI_API_KEY` 值没有混进包里（扫到就中止）→ 压成 zip 并打印 SHA256。zip 里是一个
 `Hand2LaTeX-<版本>-win64` 顶层文件夹，"解压到当前文件夹"也不会把文件撒得到处都是。
 
@@ -588,11 +611,14 @@ sample_6/7/10 在已试模型的多视角候选里都没有正确答案；zoom2/
 - `dist/`（本地审阅用 ZIP）
 - `data/pdf_pages/page_1.png`（笔记封面页，被显式排除；`page_2` ~ `page_5` 已保留为多页评估素材）
 
-`scripts/package.ps1` 的排除清单和上面基本一致（`.git`、`.qoder`、`.venv`、`.venv-check`、`node_modules`、
-`models`、`.paddlex`、`artifacts`、`dist`、各种缓存目录，以及 `.env`、`*.pyc`、`workbench.log`、`workbench.pid`），
-但**两处故意不同**：`tools/tectonic/tectonic.exe` 和一份 `vue.global.js` 会随包带上，
-这样对方不用装 Tectonic 也不用装 Node.js；`.env` 和 `models/` 绝不随包分发。
-打包脚本会在压缩前扫描包内所有文本文件，一旦发现本机 `OPENAI_API_KEY` 的值就中止。
+`scripts/package.ps1` 的排除清单和上面基本一致（`.git`、`.qoder`、`.venv`、`.venv-check`、`.cache`、
+`runtime`、`node_modules`、`models`、`.paddlex`、`artifacts`、`dist`、各种缓存目录，以及 `.env`、`*.pyc`、
+`workbench.log`、`workbench.pid`），但**三处故意不同**：`tools/tectonic/tectonic.exe`、一份 `vue.global.js`
+和一份 Python 运行时（`runtime/python/`，由 `scripts/build_python_runtime.ps1` 现场构建）会随包带上，
+这样对方不用装 Tectonic、不用装 Node.js、也不用装 Python；`.env` 和 `models/` 绝不随包分发。
+`.cache/` 是打包时的下载缓存（embeddable Python 安装包），只在构建机上有，不进包。
+打包脚本会在压缩前扫描包内我们自己打包的文本文件，一旦发现本机 `OPENAI_API_KEY` 的值就中止
+（随包运行时与 `tools/` 里是第三方文件，不在扫描范围，脚本会把这句话打印出来）。
 
 ## 十一、协作约定（给参与开发的审阅者）
 
