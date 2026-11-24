@@ -1,0 +1,142 @@
+{
+  "label": "串行1",
+  "started_at_local": "2026-11-24 21:43:22",
+  "http_status": 200,
+  "wall_ms": 232729,
+  "images": [
+    "data\\pdf_pages\\page_2.png",
+    "data\\pdf_pages\\page_3.png",
+    "data\\pdf_pages\\page_4.png"
+  ],
+  "model": "deepseek-flash",
+  "base_url": "https://api.deepseek.com/v1",
+  "max_tokens": "24000",
+  "page_concurrency_reported_by_status": 1,
+  "job_id": "a94781454db842ea987212fae72421b3",
+  "run": {
+    "status": "done",
+    "concurrency": 1,
+    "total_pages": 3,
+    "elapsed_ms": 232688,
+    "error": null,
+    "pages": [
+      {
+        "page": 1,
+        "state": "done",
+        "started_offset_ms": 3,
+        "finished_offset_ms": 77600,
+        "latency_ms": 77595.866,
+        "retried": false,
+        "error": null
+      },
+      {
+        "page": 2,
+        "state": "done",
+        "started_offset_ms": 77600,
+        "finished_offset_ms": 200047,
+        "latency_ms": 122447.166,
+        "retried": false,
+        "error": null
+      },
+      {
+        "page": 3,
+        "state": "done",
+        "started_offset_ms": 200047,
+        "finished_offset_ms": 228911,
+        "latency_ms": 28862.385,
+        "retried": false,
+        "error": null
+      }
+    ]
+  },
+  "max_concurrent_pages_observed_by_client": 1,
+  "poll_samples": 573,
+  "pages": [
+    {
+      "page": 1,
+      "latency_ms": 77595.866,
+      "human_review": "required",
+      "error": null,
+      "signals": {
+        "finish_reason": "stop",
+        "max_tokens": 24000,
+        "prompt_tokens": 920,
+        "completion_tokens": 18959,
+        "total_tokens": 19879,
+        "near_token_budget": false,
+        "attempts": 1,
+        "retried": false,
+        "base_max_tokens": 24000,
+        "block_stats": {
+          "paragraph": 3,
+          "display_formula": 19,
+          "figure": 0,
+          "blank_page": 0,
+          "other": 0
+        }
+      }
+    },
+    {
+      "page": 2,
+      "latency_ms": 122447.166,
+      "human_review": "required",
+      "error": null,
+      "signals": {
+        "finish_reason": "stop",
+        "max_tokens": 24000,
+        "prompt_tokens": 920,
+        "completion_tokens": 20232,
+        "total_tokens": 21152,
+        "near_token_budget": false,
+        "attempts": 1,
+        "retried": false,
+        "base_max_tokens": 24000,
+        "block_stats": {
+          "paragraph": 0,
+          "display_formula": 8,
+          "figure": 0,
+          "blank_page": 0,
+          "other": 0
+        }
+      }
+    },
+    {
+      "page": 3,
+      "latency_ms": 28862.385,
+      "human_review": "required",
+      "error": null,
+      "signals": {
+        "finish_reason": "stop",
+        "max_tokens": 24000,
+        "prompt_tokens": 920,
+        "completion_tokens": 6754,
+        "total_tokens": 7674,
+        "near_token_budget": false,
+        "attempts": 1,
+        "retried": false,
+        "base_max_tokens": 24000,
+        "block_stats": {
+          "paragraph": 2,
+          "display_formula": 7,
+          "figure": 0,
+          "blank_page": 0,
+          "other": 0
+        }
+      }
+    }
+  ],
+  "tex_chars": 3052,
+  "compile": {
+    "success": true,
+    "log": "note: Running TeX ...\nnote: Rerunning TeX because \"main.aux\" changed ...\nnote: Running xdvipdfmx ...\nnote: Writing `D:\\latex\\artifacts\\jobs\\a94781454db842ea987212fae72421b3\\main.pdf` (33.326171875 KiB)\nnote: Skipped writing 1 intermediate files (use --keep-intermediates to keep them)\nFontconfig error: Cannot load default config file: No such file: (null)\nwarning: accessing absolute path `C:/windows/fonts\\simsun.ttc`; build may not be reproducible in other environments\nwarning: accessing absolute path `C:/windows/fonts\\simkai.ttf`; build may not be reproducible in other environments\nwarning: accessing absolute path `C:/windows/fonts\\simhei.ttf`; build may not be reproducible in other environments\n",
+    "errors": [],
+    "returncode": 0,
+    "pdf_url": "/api/jobs/a94781454db842ea987212fae72421b3/pdf"
+  },
+  "recompile": {
+    "reused": true,
+    "success": true,
+    "pdf_pages": null,
+    "error_count": 0
+  }
+}

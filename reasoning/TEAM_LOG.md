@@ -865,3 +865,20 @@
 - **证据边界**：仍然只验证了静默安装/静默卸载，带界面的向导没有人工点过。两个 SHA256 只对这一次构建有效——`README.md` 与 `TEAM_LOG.md` 本身也在包里，本条目提交后再打包哈希必然变，这一点已写进 README 6.5，避免以后拿旧哈希去核对新包。
 - **Git 状态**：`fcc2d52`（告警分开报）、`8ea79e6`（告警按排除清单过滤）为代码提交；本条目与 README 的哈希更新为随后的文档提交。`dist/` 与 `.venv/` 均被忽略，产物只在本机。本次不推送远端。
 - **未完成事项**：带界面安装向导的人工走查；干净机器上的首次启动全流程；真实付费 API 下的并行提速与限流表现；10 页以上压测；整页转录真值集仍缺。
+
+## 2026-11-24 真实付费 API 跑通端到端：并行提速 2.81 倍，并暴露识别不确定性
+
+**阶段状态：上一条里"真实付费 API 下的并行提速"已完成实测。走的是产品真实链路（`POST /api/documents/batch` → 并行识别 → 信号落盘 → Tectonic 编译），不是 mock。同时暴露出远端整页识别不是确定性的，这一点已写进 README 的"尚未证明"。**
+
+- **怎么跑的**：素材是 `data/pdf_pages/page_2.png`、`page_3.png`、`page_4.png`（3 张真实手写笔记页，共约 265 KB）；模型 `deepseek-flash`（`OPENAI_BASE_URL=https://api.deepseek.com/v1`，输出预算 24000，单页超时 120 s）。起两个真实服务实例：8016 端口 `WORKBENCH_PAGE_CONCURRENCY=3`、8017 端口 `WORKBENCH_PAGE_CONCURRENCY=1`，同样 3 张图各跑一轮。客户端脚本 `.venv/real_api_check.py`（git 忽略）在发请求的同时每 0.4 秒轮询 `/api/runs/{run_id}`，记录"同时有几页在跑"。
+- **实测提速 2.81 倍**：并发 3 客户端实测总耗时 82721 ms（服务端 run 记 82658 ms），串行 1 为 232729 ms（run 记 232688 ms）。并发轮三页开始时刻为 run 起点后 8 / 12 / 13 ms，串行轮为 3 / 77600 / 200047 ms；客户端轮询看到的同时在跑页数上限分别是 3 和 1（轮询样本 203 与 573 个）。三页各自耗时：并发轮 65258 / 71311 / 77329 ms，串行轮 77596 / 122447 / 28862 ms。
+- **真实信号（全部来自模型返回，未加工）**：两轮 6 页 `finish_reason` 全为 `stop`，`attempts` 全为 1（没有触发重试），`near_token_budget` 全为 `false`；prompt_tokens 每页 920，completion_tokens 并发轮 16354 / 18211 / 10892、串行轮 18959 / 20232 / 6754，两轮合计 91402；单页最高用到输出预算的 84%（20232/24000）。6 页 `human_review` 全为 `required`。
+- **编译与复用**：两轮 Tectonic 都真实编译成功（并发轮 PDF 32 KB、`errors` 为空、`returncode` 0），紧接着用同一份 TeX 再调一次 `/api/jobs/{id}/compile`，两轮都返回 `reused=true`——编译复用路径在真实环境验证过。
+- **发现一：远端整页识别不是确定性的**。同样 3 张图、同一模型跑两轮，TeX 长度 2799 vs 3052 字符；块统计也不同：第 1 页 `paragraph/display_formula` 为 5/17 与 3/19，第 2 页为 0/16 与 0/8。**没有真值集，无法判断哪一轮更接近原文**，因此"重试这一页"必然给出不同结果，`human_review=required` 不是保守而是必要。这条已改写 README 第一节原来的"模型稳定性只有单次证据"。
+- **发现二：3 张原图编出 4 页 PDF，这是正常的**。用 pymupdf 核对：`main.tex` 里 `\newpage` 是 2 个（对应 3 页，正确），第三页内容在 LaTeX 里自然溢出到第 4 个 PDF 页（第 3 PDF 页 650 字符、第 4 页 291 字符）。所以**"PDF 页数 ≠ 原图页数"不能当复核信号**，否则会天天误报；真正的缺口是 PDF 窗格只是 `iframe`，点左栏原图页只把代码跳到对应行、不会把 PDF 跳到对应页，要做这个映射需要在编译时记录每个 `\newpage` 落在第几个 PDF 页。
+- **发现三（环境坑）**：本机 `NO_PROXY=[::1],::1` 会让 httpx 直接抛 `InvalidURL: Invalid port: ':1]'`（它把该值当 URL 解析）。测试脚本改用 `httpx.Client(trust_env=False)` 绕过；产品里的 OpenAI 调用不受影响，本次真实识别成功即为证据。以后写任何用 httpx 的本机脚本都会再撞一次。
+- **证据落盘**：`artifacts/real_api_parallel/run_concurrency_3.json`、`run_concurrency_1.json`（含逐页 signals、run 时间线、compile 日志）与 `summary.json`（对照与结论）。两个任务目录在 `artifacts/jobs/`（git 忽略）：`1ba16d725fc74dbab41d4e8c646435f1`、`a94781454db842ea987212fae72421b3`。两个测试服务已停止。
+- **证据边界**：每种并发只跑了一轮、只有 3 页，**没有压测并行度上限，也没有遇到网关限流**，所以"并发调大一定更快"仍无证据；`near_token_budget` 真实触发次数为 0，这条告警依然只有 mock 证据；本次没有做浏览器端验收（真实 API 只跑了服务端链路）；没有任何准确率结论——没有真值集，本轮不评转录正确性。
+- **边界遵守**：未改 `schemas.py`，未改 A、B 的文件，未编造置信度；`raw_latex` 与识别原稿未被覆盖（两轮各自生成独立任务目录）。花费为 6 次真实整页识别调用、completion 合计 91402 token。
+- **Git 状态**：本条目、README 9.3 与"尚未证明"的改写、以及 `artifacts/real_api_parallel/` 三个 JSON 放在同一提交中；`.venv/real_api_check.py` 与两个任务目录被 git 忽略。本次不推送远端。
+- **未完成事项**：并行度压测与限流表现；10 页以上大批量；`near_token_budget` 的真实触发案例；PDF 页与原图页的映射；带界面安装向导的人工走查；干净机器首次启动全流程；整页转录真值集仍缺。
