@@ -1,20 +1,40 @@
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from reasoning.render_check import check_renderable
+from reasoning.render_check import _PROJECT_ROOT, check_renderable
+
+
+def _renderer_unavailable_reason():
+    """真调 node 的用例需要本机同时具备 node 和 node_modules/katex。
+
+    安装包按设计不带 node_modules（体积大，且终端用户用不到渲染校验），
+    所以在交付包里这几个用例没有运行条件。缺条件时应当 skip 而不是 ERROR：
+    ERROR 会让人以为代码坏了，而真实原因是"这台机器没装渲染环境"。
+    """
+    if shutil.which("node") is None:
+        return "本机没有 node，跳过真调渲染器的用例"
+    if not (Path(_PROJECT_ROOT) / "node_modules" / "katex" / "package.json").is_file():
+        return "没有 node_modules/katex（安装包按设计不带 node_modules），跳过真调渲染器的用例"
+    return None
+
+
+_RENDERER_SKIP_REASON = _renderer_unavailable_reason()
 
 
 class RenderCheckTests(unittest.TestCase):
+    @unittest.skipIf(_RENDERER_SKIP_REASON, _RENDERER_SKIP_REASON or "")
     def test_valid_latex_is_renderable(self):
         result = check_renderable(r"\frac{x^{2}}{2}")
 
         self.assertEqual(result, {"renderable": True, "error": None})
 
+    @unittest.skipIf(_RENDERER_SKIP_REASON, _RENDERER_SKIP_REASON or "")
     def test_undefined_command_returns_render_error_without_rewriting(self):
         latex = r"\badmacro{x}"
 
@@ -24,6 +44,7 @@ class RenderCheckTests(unittest.TestCase):
         self.assertIn("Undefined control sequence", result["error"])
         self.assertEqual(latex, r"\badmacro{x}")
 
+    @unittest.skipIf(_RENDERER_SKIP_REASON, _RENDERER_SKIP_REASON or "")
     def test_unbalanced_braces_return_render_error(self):
         result = check_renderable(r"\frac{x}{2")
 
@@ -89,6 +110,7 @@ class RenderCheckTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "invalid output"):
             check_renderable("x")
 
+    @unittest.skipIf(_RENDERER_SKIP_REASON, _RENDERER_SKIP_REASON or "")
     def test_project_local_renderer_works_outside_project_directory(self):
         original_directory = Path.cwd()
         with tempfile.TemporaryDirectory() as directory:

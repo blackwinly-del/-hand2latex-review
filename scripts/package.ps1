@@ -226,8 +226,10 @@ if ($IncludeDemoJob) {
         $target = Join-Path $demoRoot $jobId
         # 只带文件，不带 __pycache__ 之类的中间产物。
         Copy-Item -LiteralPath $source -Destination $target -Recurse -Force
+        # 用 ForEach-Object 显式传 -LiteralPath，而不是把对象管道给 Remove-Item：
+        # 管道绑定时 -Path 走的是位置参数，某些环境的安全钩子会判成"缺少路径操作数"直接拦掉。
         Get-ChildItem -Path $target -Recurse -Directory -Filter '__pycache__' -ErrorAction SilentlyContinue |
-            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
         Write-Ok "已带上演示任务 $jobId"
     }
 }
@@ -312,7 +314,7 @@ if ($NoPython) {
     Write-Step '复用仓库已有的 Python 运行时'
     Copy-Item -LiteralPath (Join-Path $Root 'runtime\python') -Destination $runtimeDir -Recurse -Force
     Get-ChildItem -Path $runtimeDir -Recurse -Directory -Filter '__pycache__' -ErrorAction SilentlyContinue |
-        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
     $runtimeMb = [math]::Round(((Get-ChildItem -LiteralPath $runtimeDir -Recurse -File | Measure-Object -Property Length -Sum).Sum) / 1MB, 1)
     Write-Ok "已复用运行时（$runtimeMb MB）。要重新构建请加 -RebuildRuntime"
 } else {
