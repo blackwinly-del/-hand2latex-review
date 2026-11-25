@@ -86,6 +86,79 @@ class PushViaApiTests(unittest.TestCase):
         self.assertIn('"sha": None', self.source, "删除条目必须显式写 sha=None")
         self.assertNotIn("--name-only", self.source)
 
+    # ---- 后补的四个缺口 ----
+
+    def test_can_create_branch_with_post(self):
+        """新建分支必须用 POST /git/refs；PATCH 对不存在的引用只会给 422。"""
+        self.assertIn("--create-branch", self.source)
+        self.assertIn('"POST",\n            f"{_API}/repos/{args.repo}/git/refs"', self.source)
+        self.assertIn('"ref": f"refs/heads/{args.branch}"', self.source)
+
+    def test_replays_commit_chain_with_multi_parents(self):
+        """逐提交重放并保留多父，否则合并提交会被压平成单亲（拓扑丢失）。"""
+        self.assertIn("--reverse", self.source, "要按从旧到新的顺序重放")
+        self.assertIn("_local_commit_chain", self.source)
+        self.assertIn("_commit_meta", self.source)
+        # parents 必须来自真实提交对象，不能写死成 [base_sha]。
+        self.assertNotIn('"parents": [base_sha]', self.source)
+        self.assertIn('"parents": remote_parents', self.source)
+        # 合并提交的父可能不止一个，要能从 commit 对象里读出来。
+        self.assertIn('line.startswith("parent ")', self.source)
+
+    def test_refuses_stale_base_without_force(self):
+        """远端分支已移动时，用过期 base 推等于把别人的提交当删除抹掉——必须拦住。"""
+        self.assertIn("remote_tip", self.source)
+        self.assertIn("远端分支已经移到", self.source)
+        self.assertIn("merge-base", self.source, "还要校验 head 是 base 的后代")
+        self.assertIn("--force", self.source)
+
+    def test_verifies_remote_after_push(self):
+        """推完不许自说自话：回头拉远端树与本地逐 blob 比对。"""
+        self.assertIn("_verify_remote", self.source)
+        self.assertIn("自校验", self.source)
+
+    def test_can_delete_branch(self):
+        """删分支要 --delete-branch，并且删后复查确认真没了。"""
+        self.assertIn("--delete-branch", self.source)
+        self.assertIn('"DELETE"', self.source)
+        self.assertIn("_delete_branch", self.source)
+
+    def test_missing_branch_is_not_silently_created(self):
+        """分支不存在时默认拒绝，避免打错分支名却"成功"建出一条新分支。"""
+        self.assertIn("远端没有分支", self.source)
+
+    def test_commit_meta_reads_real_parents(self):
+        """直接跑一遍 _commit_meta，锁住"父提交真读得到"。
+
+        这里踩过一个坑：cat-file 返回 bytes，用 str(raw) 会得到 "b'tree ...'" 这种
+        字面量，行首是 "b'parent"，startswith("parent ") 永远匹配不到——
+        于是每个提交都被当成无父提交，合并拓扑被静默压平。
+        """
+        meta = self.module._commit_meta("HEAD")
+        self.assertTrue(meta["parents"], "HEAD 应该有父提交（仓库已有多条提交）")
+        for parent in meta["parents"]:
+            self.assertRegex(parent, r"^[0-9a-f]{40}$")
+
+    def test_commit_meta_detects_merge_commits(self):
+        """合并提交必须能读出两个父提交。"""
+        merges = [
+            line.split()[0]
+            for line in __import__("subprocess")
+            .run(
+                ["git", "log", "--merges", "--format=%H", "-20"],
+                cwd=_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            .stdout.splitlines()
+            if line.strip()
+        ]
+        if not merges:
+            self.skipTest("仓库里没有合并提交")
+        meta = self.module._commit_meta(merges[0])
+        self.assertEqual(len(meta["parents"]), 2, f"{merges[0][:8]} 应该是双亲合并提交")
+
 
 if __name__ == "__main__":
     unittest.main()
