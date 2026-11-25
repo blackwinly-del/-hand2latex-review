@@ -48,7 +48,7 @@
 | 逐页真实识别信号（`finish_reason`、真实 token 用量、是否接近输出上限、重试次数、块统计、耗时） | `workbench/full_page.py` | `tests/test_workbench.py` |
 | TeX 一字未改时复用上一次 PDF，不重跑 Tectonic | `workbench/app.py` | `tests/test_workbench_app.py` |
 | 改稿便捷性：`Ctrl+S` 编译、`F2` 跳下一处复核（带"第 N / M 处"计数）、浏览器草稿自动保存与恢复、历史版本回滚 | `workbench/static/index.html` | 2026-11-23 Playwright 实测 |
-| 打包成绿色 zip（随包带 Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描） | `scripts/package.ps1` | `dist/Hand2LaTeX-1.0.0-win64.zip`，56.8 MB；2026-11-25 解压到独立目录后起服务实测：`/` 返回 200、`/api/jobs` 为空、pid 文件指向 uvicorn 子进程、退出时自动清理 |
+| 打包成绿色 zip（随包带 Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描） | `scripts/package.ps1` | `dist/Hand2LaTeX-1.0.0-win64.zip`，67.3 MB；2026-11-26 解压到独立目录后起服务实测：`/` 返回 200（106 KB）、`/api/status` 返回构建提交 `4616a7a`、包内全量测试 234 passed / 0 ERROR / 24 skipped、`check_kernel.py` 走兜底值全绿退出码 0 |
 | 编译出 setup.exe 安装器（免管理员、装到用户目录、中文安装界面、卸载时问要不要删任务产物） | `scripts/package.ps1 -BuildInstaller` + `installer/hand2latex.iss` | `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，15.5 MB，SHA256 `7BDC80C048D857556142235906065E22BF8D4AE97BF2ACED2BC4985A4C6A8D71`；2026-11-23 静默装机 + 起服务 + 静默卸载实测通过 |
 | 真实付费 API 下的并行提速与真实信号采集（3 页真实手写笔记，并发 3 与串行各跑一轮） | `workbench/app.py` + `workbench/full_page.py` | `artifacts/real_api_parallel/summary.json`：82.7 s vs 232.7 s，**实测提速 2.81 倍**；两轮 completion token 合计 91402，`finish_reason` 全为 `stop`，无重试 |
 
@@ -532,14 +532,29 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 `
 2026-11-25 实测产出（当前工作区打的包；目录不是 git 仓库，所以 `BUILD_INFO.json` 里 `commit` 为空）：
 
 - `dist/Hand2LaTeX-1.0.0-win64.zip`，56.8 MB（3047 个条目）。
-  解压到独立目录、从解压目录起服务（8877 端口）实测：`/` 返回 200、`/api/status` 报 `build.source = 安装包`、
-  `/api/jobs` 返回空列表（新装无残留任务）、`runtime\workbench.pid` 写入的 pid 命令行含 `workbench.app`（能被
-  `launch.ps1` 的 `Get-RunningServerProcess` 认出）、`taskkill` 后 pid 文件自动清理。
   同一份解压包上用真实 HTTP 复验后端的三个修复：文本改名 `.png` → 400、空文件 → 400、
   两页都识别失败 → 422 且任务数保持 0（不留孤儿目录）；无头浏览器打开首页 Vue 正常挂载，失败面板逐页显示
   `OPENAI_API_KEY is not configured`（包里不带 `.env`，如实报未配置），`pageErrors` 为空。
   包的正确性证明是上面这些实测行为，不是哈希：`README.md` 自己就在包里，改一个字哈希就变，
   所以这里不记固定值。要校验拿到手的包，取包里的 `BUILD_INFO.json` 看版本与构建时间，或直接解压跑一遍。
+
+**2026-11-26 重打（当前最新的包）**：
+
+- `dist/Hand2LaTeX-1.0.0-win64.zip`，**67.3 MB / 3417 个条目**，`BUILD_INFO.json` 记提交 `4616a7a`。
+  为什么要重打：上一版是 11-25 22:25 打的，之后做了分支合并，**包里的 `demo/app.py` 还是 264 行的旧快照**
+  （缺队友 11-19 做的裁剪加速与结果缓存），当前是 368 行的合并版。业务代码（`workbench/`）没变，
+  `index.html` 的 sha 与旧包一致，所以影响只在画板。
+- 解压到独立目录后实测（这次把包当真实用户环境跑了一遍）：
+  - 包内全量测试 **234 passed / 0 ERROR / 24 skipped**（工作区是 11 skipped，多出的 13 个是包里按设计没有的东西：
+    torch 10 + 缺 API 存档 4 + 缺 `node_modules/katex` 4 + 缺 `OPENAI_MODEL` 4 + 缺 git 基线 1，
+    注意这几项有重叠计数，实际多出 13 个）。关键是 **0 ERROR**——缺东西应该是 skip，不该是一屏红。
+  - `scripts/check_kernel.py` 走内置兜底值（包里没有 `.git`），8 个内核文件全绿、退出码 0。
+    这一条正是修掉「基线录错」缺陷换来的：修之前队友拿到包跑一下就会看到 2 个文件飘红。
+  - 起服务实测：`/` 200（106,150 字节）、`/api/status` 200 且 `build.commit = 4616a7a`、`/api/jobs` 200。
+  - 路由表 20 个端点齐全，含 11-25 新增的 `POST /api/jobs/{job_id}/review`。
+  - 353 张 `data/page_math/` 裁切图与 353 条真值 json 都在包内。
+- `artifacts/` 按设计不进包（本机运行产物），所以包内那 4 个「缺 API 存档」的跳过是预期行为，不是缺陷。
+
 - `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，15.5 MB，SHA256 `7BDC80C048D857556142235906065E22BF8D4AE97BF2ACED2BC4985A4C6A8D71`。
   （这个安装器是 2026-11-23 在提交 `8ea79e6` 上打的，**不包含** 11-25 的后端修复与界面改动；要用最新代码请用上面的绿色包，或重跑 `-BuildInstaller`。）
   用 ISCC 6.7.3 编译（`Successful compile`，约 17 s）。静默装到临时目录（退出码 0）后核对：启动/关闭脚本、
@@ -791,7 +806,7 @@ python -m scripts.import_page_dataset --zip <page_math_dataset.zip 路径>
 | `hand2latex-workbench-2026-11-25` | 12 | 今天新增的全部内容 | 不含 mvp 的 16 个独有提交 |
 
 队友打开仓库首页看到的是默认分支，所以**今天做的都看不到**。现在合并成
-`hand2latex-complete-2026-11-25`（51 个提交、536 个文件），并把默认分支快进过去，
+`hand2latex-complete-2026-11-25`（55 个提交、538 个文件），并把默认分支快进过去，
 三条分支指向同一个提交 `5bdd02b`。
 
 合并时踩到一个坑，值得记下来：**第一次我只合了 `mvp`，把队友的工作覆盖了**。
@@ -812,10 +827,10 @@ python -m scripts.import_page_dataset --zip <page_math_dataset.zip 路径>
 
 合并后核对的四件事：
 
-1. 全量 **230 passed / 0 failed / 11 skipped**（18 个测试模块）
+1. 全量 **234 passed / 0 failed / 11 skipped**（19 个测试模块）
 2. 内核 5 个文件 blob 与 11-25 备份**逐字节一致**，基线之后零改动
 3. `review` 的 145 个文件、`mvp` 的 31 个提交全部包含，无一处丢失
-4. 远端树的 536 个 blob 与本地**逐一比对哈希，零差异**（匿名访问即可拉到）
+4. 远端树的 538 个 blob 与本地**逐一比对哈希，零差异**（匿名访问即可拉到）
 
 **合并后发现并修掉一处脚本缺陷**：`python scripts/check_kernel.py` 原本会报
 `recognizer.py` 与 `workbench/full_page.py` 两个文件"改动"。查下来**内核本身没被改**，
