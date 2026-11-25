@@ -66,9 +66,32 @@ def _git(*args: str, binary: bool = False) -> bytes | str:
     return done.stdout if binary else done.stdout.decode("utf-8")
 
 
-def _changed_files(base: str, head: str) -> list[str]:
-    out = _git("diff", "--name-only", base, head)
-    return [line for line in str(out).splitlines() if line.strip()]
+def _changed_files(base: str, head: str, repo: str, token: str, base_tree_sha: str) -> list[str]:
+    """找出 head 相对 base 改了哪些文件。
+
+    base 可能是上一次走 API 推上去的提交，本地 git 根本没有这个对象
+    （git push 走不到 API 通道）。这时 `git diff` 会报 bad object，
+    所以退回用远端的 tree 做比对——两边都是 blob sha，比文件名可靠。
+    """
+    known = subprocess.run(
+        ["git", "cat-file", "-e", f"{base}^{{commit}}"], cwd=_ROOT, capture_output=True, check=False
+    ).returncode == 0
+    if known:
+        return [line for line in str(_git("diff", "--name-only", base, head)).splitlines() if line.strip()]
+
+    print("  base 不在本地（上次是走 API 推的），改用远端树比对")
+    remote = _request("GET", f"{_API}/repos/{repo}/git/trees/{base_tree_sha}?recursive=1", token)
+    remote_blobs = {item["path"]: item["sha"] for item in remote.get("tree", []) if item["type"] == "blob"}
+    local = {}
+    for line in str(_git("ls-tree", "-r", head)).splitlines():
+        meta, path = line.split("\t", 1)
+        local[path] = meta.split()[2]
+    changed = [p for p in local if remote_blobs.get(p) != local[p]]
+    # 远端有但本地没有的（删除）也要带上，否则树里会留着旧文件
+    removed = [p for p in remote_blobs if p not in local]
+    if removed:
+        print(f"  注意：有 {len(removed)} 个文件在远端存在但本地没有：{', '.join(removed[:5])}")
+    return changed
 
 
 def _file_mode(head: str, path: str) -> str:
@@ -90,19 +113,24 @@ def main() -> int:
     args = parser.parse_args()
 
     head_sha = str(_git("rev-parse", args.head)).strip()
-    base_sha = str(_git("rev-parse", args.base)).strip()
+    # base 允许传远端 SHA（本地可能不认识），所以这里不强求 rev-parse 成功
+    base_probe = subprocess.run(
+        ["git", "rev-parse", args.base], cwd=_ROOT, capture_output=True, check=False
+    )
+    base_sha = base_probe.stdout.decode("utf-8", "replace").strip() if base_probe.returncode == 0 else args.base
     message = str(_git("log", "-1", "--format=%B", head_sha))
     author_name = str(_git("log", "-1", "--format=%an", head_sha)).strip()
     author_email = str(_git("log", "-1", "--format=%ae", head_sha)).strip()
     author_date = str(_git("log", "-1", "--format=%aI", head_sha)).strip()
 
-    files = _changed_files(base_sha, head_sha)
+    base_commit = _request("GET", f"{_API}/repos/{args.repo}/git/commits/{base_sha}", args.token)
+    base_tree = base_commit["tree"]["sha"]
+
+    files = _changed_files(base_sha, head_sha, args.repo, args.token, base_tree)
     if not files:
         print("没有改动，无需推送。")
         return 0
     print(f"将推送 {len(files)} 个改动文件，{base_sha[:8]} -> {head_sha[:8]}，目标分支 {args.branch}")
-
-    base_tree = _request("GET", f"{_API}/repos/{args.repo}/git/commits/{base_sha}", args.token)["tree"]["sha"]
 
     entries = []
     for path in files:
