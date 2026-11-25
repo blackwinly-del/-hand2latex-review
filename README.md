@@ -19,7 +19,7 @@
 > **关于表中「证据」列的一点更正（2026-11-25）**：标了 `artifacts/...` 的那几行，
 > 对应文件**当前不在工作区**，也不在备份里（核对过 `h2l-backups/h2l-work-2026-11-25.zip`）。
 > 也就是说这些条目"实现过、跑通过"，但**证据文件没能留下来**，本机无法直接复现。
-> 标了 `tests/xxx.py` 的条目不受影响——那些测试现在全部通过（215 个用例，0 错误，15 个按条件跳过）。
+> 标了 `tests/xxx.py` 的条目不受影响——那些测试现在全部通过（226 个用例，0 错误，15 个按条件跳过）。
 > 缺失文件完整清单（11 个）与处理选项见 `docs/成果汇报_2026-11-25.md` 的 7.2 节。
 
 | 能力 | 入口 | 证据 |
@@ -101,10 +101,14 @@
 │   ├── version.py             版本号（打包脚本从这里读，也写进 BUILD_INFO.json）
 │   └── static/index.html      Vue 3 前端单页
 │
-├── tests/                     14 个 unittest 测试模块（180 项）+ test_recognizer.py 契约自检脚本（`python -m unittest discover -s tests`）
+├── tests/                     unittest 测试模块 + test_recognizer.py 契约自检脚本（`python -m unittest discover -s tests`）
 ├── data/
 │   ├── handwritten/           12 张真实手写公式样本 sample_1 ~ sample_12
+│   ├── handwritten_ground_truth.json  上述 12 条真值（用户逐条确认）
+│   ├── page_math/             353 张单公式裁切图（由 page_math_dataset 导入）
+│   ├── page_math_ground_truth.json    353 条真值（MathWriting normalizedLabel）
 │   ├── pdf_pages/             真实笔记分页图 page_1 ~ page_5（多页评估素材）
+│   ├── pdf_pages_ground_truth.json    逐页转录草稿（待人工确认，门禁未放行）
 │   └── multipage_samples.json 多页评估用例清单（合并顺序 / 倒序 / 尾部空白页）
 ├── samples/                   单张打印体测试图
 ├── docs/
@@ -697,7 +701,38 @@ sample_6/7/10 在已试模型的多视角候选里都没有正确答案；zoom2/
 规则复核只能发现结构问题，**这些看错仍然只能靠人工对原图发现**。
 
 边界：这是公式裁剪图，不是整页；样本只有 12 个，且用于过冲突分析和本轮选型，不能当作
-泛化准确率或性能基准。整页转录仍未建立逐字真值。
+泛化准确率或性能基准。
+
+### 9.2b 扩样本后的真值集（353 条，尚未跑出数字）
+
+上面那条"样本只有 12 个"的边界已经补上了。用户提供了 `page_math_dataset.zip`
+（100 页整页手写图 + 逐条 bbox + latex），导入后得到 **353 条互不重复的单公式真值**：
+
+```bash
+python -m scripts.import_page_dataset --zip <page_math_dataset.zip 路径>
+```
+
+- 清单：`data/page_math_ground_truth.json`，裁切图在 `data/page_math/`（10.4 MB）
+- 真值来源：**MathWriting 官方人工标注的 `normalizedLabel`**，不是模型生成。
+  这一点很关键——它和 `data/pdf_pages_ground_truth.json` 里那份"我读图写的草稿"
+  性质完全不同，后者被评估器硬门禁挡着不给算准确率。
+- 覆盖：93 个含分数、37 个含根号、21 个含积分、169 个含下标，平均 31.3 字符。
+
+两个必须知道的限制：
+
+1. **353 条现在还没有跑出准确率。** `reasoning/handwritten_eval.py` 走
+   `recognizer` + `refine`，实测直接报 `ModuleNotFoundError: No module named 'paddleocr'`
+   ——`requirements-app.txt` 故意不装 paddle（它为网页工作台服务）。`models/` 也不存在，
+   `OPENAI_API_KEY` 为空。要出数字需装 `requirements-b.txt` + 约 3 GB 模型权重，再跑
+   `python -m reasoning.handwritten_eval --manifest data/page_math_ground_truth.json`。
+   **"样本扩到 353 条"不等于"准确率提升了"**，这是两件事。
+2. **100 页不等于 100 份独立证据。** 实测验过：100 页只含 370 条唯一 latex，
+   平均每条被排进 4.5 页（最多一条重复 13 次）。版面是每页 16–18 个公式的
+   **单列纵向堆叠**（bbox 左边界全在 92–118px，无同 y 并排），不是连续推导。
+   所以它评的是"单公式转录准确率"，不能评"整页连续推导准确率"——
+   后者仍需人工逐页真值（见 `data/pdf_pages_ground_truth.json`）。
+   导入脚本按唯一 latex 去重，否则重复 13 次那条会被计 13 遍，准确率就成了
+   那个公式的加权结果。
 
 ### 9.3 真实 API 下的并行提速与重复识别差异（2026-11-24）
 

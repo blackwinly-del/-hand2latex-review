@@ -1,0 +1,2842 @@
+{
+  "version": 1,
+  "description": "从 page_math_dataset（MathWriting normalizedLabel 标注的合成版面）导入的单公式真值。按唯一 latex 去重后导入，不是按页计。",
+  "review_status": "ground_truth_from_mathwriting_normalized_label",
+  "review_status_meaning": "真值来自 MathWriting 官方人工标注的 normalizedLabel，不是模型生成，因此可以直接用于准确率评估（与整页草稿不同，那边必须人工确认）。",
+  "provenance": {
+    "dataset": "page_math_dataset.zip",
+    "underlying": "MathWriting (CC BY-NC-SA 4.0)",
+    "page_count": 100,
+    "unique_expressions": 370,
+    "imported_samples": 353,
+    "skipped_too_short": 17,
+    "note": "100 页只含 370 条唯一 latex，页面是这些公式的重复排版组合。"
+  },
+  "sample_count": 353,
+  "samples": [
+    {
+      "sample_id": "pm_001",
+      "image_path": "data/page_math/pm_001.png",
+      "ground_truth": "(0,1)^{n}\\subseteq R^{n}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/04026cefc5bee356.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_003",
+      "image_path": "data/page_math/pm_003.png",
+      "ground_truth": "(2n,n,\\lambda,1)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01a2f3186b7e33e1.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0043.png"
+    },
+    {
+      "sample_id": "pm_004",
+      "image_path": "data/page_math/pm_004.png",
+      "ground_truth": "(RU^{2}D^{-1}BD^{-1})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02c6f6dea91a2a06.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0019.png"
+    },
+    {
+      "sample_id": "pm_005",
+      "image_path": "data/page_math/pm_005.png",
+      "ground_truth": "(Tf)(x)=\\int_{0}^{x}f(t)g(t)dt.",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000d8f307d81395e.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_007",
+      "image_path": "data/page_math/pm_007.png",
+      "ground_truth": "(X,Y,Z,aZ^{4})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00f3fa64f4c2235f.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0026.png"
+    },
+    {
+      "sample_id": "pm_008",
+      "image_path": "data/page_math/pm_008.png",
+      "ground_truth": "(\\Lambda(A):A\\in B_{b}(S))",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0114e881d8b22bbb.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_009",
+      "image_path": "data/page_math/pm_009.png",
+      "ground_truth": "(\\begin{matrix}0&1\\\\ -1&0\\\\ \\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01927fe0f1d3c23d.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_010",
+      "image_path": "data/page_math/pm_010.png",
+      "ground_truth": "(\\begin{matrix}0\\\\ 1\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00a32b900a4aa32f.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0022.png"
+    },
+    {
+      "sample_id": "pm_011",
+      "image_path": "data/page_math/pm_011.png",
+      "ground_truth": "(\\begin{matrix}[n]\\\\ 1\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0115ad5ee12ad7d4.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0014.png"
+    },
+    {
+      "sample_id": "pm_012",
+      "image_path": "data/page_math/pm_012.png",
+      "ground_truth": "(\\begin{matrix}\\pm\\sqrt{N}\\\\ 1\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/03d92e3e170bb629.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_013",
+      "image_path": "data/page_math/pm_013.png",
+      "ground_truth": "(\\begin{matrix}i&j\\\\ k&l\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/05f2be02bbe36bd4.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_014",
+      "image_path": "data/page_math/pm_014.png",
+      "ground_truth": "(\\begin{matrix}j\\\\ m+1\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00000b332dcd6fe5.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0027.png"
+    },
+    {
+      "sample_id": "pm_015",
+      "image_path": "data/page_math/pm_015.png",
+      "ground_truth": "(\\begin{matrix}n+1\\\\ 3\\end{matrix})+1",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/008d3f60da3e972b.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0032.png"
+    },
+    {
+      "sample_id": "pm_016",
+      "image_path": "data/page_math/pm_016.png",
+      "ground_truth": "(\\frac{4}{364})^{\\sqrt{7}}+84^{9}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/04f65fb089280e4c.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_017",
+      "image_path": "data/page_math/pm_017.png",
+      "ground_truth": "(\\frac{7}{\\sqrt{10}},\\frac{-5}{\\sqrt{6}},\\frac{1}{\\sqrt{3}},\\pm1)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0009a349d9752e67.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0027.png"
+    },
+    {
+      "sample_id": "pm_018",
+      "image_path": "data/page_math/pm_018.png",
+      "ground_truth": "(\\frac{lnN}{N})\\rightarrow0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/011f1f41eb55b661.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_019",
+      "image_path": "data/page_math/pm_019.png",
+      "ground_truth": "(\\frac{q}{p})=(\\frac{p^{*}}{q})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/070c12a71a7265a3.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0067.png"
+    },
+    {
+      "sample_id": "pm_020",
+      "image_path": "data/page_math/pm_020.png",
+      "ground_truth": "(g^{a}modp,g,p)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/00915f0ffe17930e.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_021",
+      "image_path": "data/page_math/pm_021.png",
+      "ground_truth": "(h,h(\\hat{k}),h(\\hat{l}))",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02248037ee4a5528.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_022",
+      "image_path": "data/page_math/pm_022.png",
+      "ground_truth": "(l_{1}+l_{2})^{\\theta}=l_{1}^{\\theta}+l_{2}^{\\theta}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/017a79eea7fa5f63.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0011.png"
+    },
+    {
+      "sample_id": "pm_023",
+      "image_path": "data/page_math/pm_023.png",
+      "ground_truth": "(x,y,\\theta,\\kappa,\\kappa^{\\prime})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0204f1101b3f4033.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_024",
+      "image_path": "data/page_math/pm_024.png",
+      "ground_truth": "(x-y)/sqrt(2)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/000a4e8ca49c5a1c.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0014.png"
+    },
+    {
+      "sample_id": "pm_026",
+      "image_path": "data/page_math/pm_026.png",
+      "ground_truth": "-\\frac{\\epsilon_{0}}{q}\\nabla^{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0326c8496e189144.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0018.png"
+    },
+    {
+      "sample_id": "pm_027",
+      "image_path": "data/page_math/pm_027.png",
+      "ground_truth": "-\\frac{dT_{0}}{dt}-\\epsilon\\frac{dT_{1}}{dt}=T_{0}^{4}+4T_{0}^{3}T_{1}\\epsilon-\\epsilon",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00026ea02bde7a04.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0011.png"
+    },
+    {
+      "sample_id": "pm_028",
+      "image_path": "data/page_math/pm_028.png",
+      "ground_truth": "-|I|>I_{0}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02b7060b95d998eb.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_029",
+      "image_path": "data/page_math/pm_029.png",
+      "ground_truth": "0/x=0,x/x=1",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02894b4ff1ee6c7b.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0046.png"
+    },
+    {
+      "sample_id": "pm_030",
+      "image_path": "data/page_math/pm_030.png",
+      "ground_truth": "1+x+\\frac{x^{2}}{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0255dc5b14261907.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0026.png"
+    },
+    {
+      "sample_id": "pm_031",
+      "image_path": "data/page_math/pm_031.png",
+      "ground_truth": "1-4\\pi r^{3}/3V",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02c39c1be9d660b7.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0040.png"
+    },
+    {
+      "sample_id": "pm_032",
+      "image_path": "data/page_math/pm_032.png",
+      "ground_truth": "1.3\\frac{a}{d}\\sqrt{n}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/016af79ba8f2cca8.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0017.png"
+    },
+    {
+      "sample_id": "pm_033",
+      "image_path": "data/page_math/pm_033.png",
+      "ground_truth": "1/x\\approx1-x",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02aced0c052805c6.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0067.png"
+    },
+    {
+      "sample_id": "pm_034",
+      "image_path": "data/page_math/pm_034.png",
+      "ground_truth": "10^{-12}W/\\sqrt{Hz}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/002c168eb422aab9.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0034.png"
+    },
+    {
+      "sample_id": "pm_035",
+      "image_path": "data/page_math/pm_035.png",
+      "ground_truth": "1^{\\prime}s",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01992bb808919d17.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0017.png"
+    },
+    {
+      "sample_id": "pm_036",
+      "image_path": "data/page_math/pm_036.png",
+      "ground_truth": "2(\\sqrt{2}-1)\\approx0.828",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/032e674bf4a61ff0.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_037",
+      "image_path": "data/page_math/pm_037.png",
+      "ground_truth": "2,\\sqrt{5},\\sqrt{6},3",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/017c4e5970880570.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_038",
+      "image_path": "data/page_math/pm_038.png",
+      "ground_truth": "2^{k}t_{0}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02da6f52e30f674d.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_039",
+      "image_path": "data/page_math/pm_039.png",
+      "ground_truth": "2sin(\\theta/2)r",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02ace78dfc726867.inkml；该公式在 9 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_040",
+      "image_path": "data/page_math/pm_040.png",
+      "ground_truth": "2sin(x/2)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/00fcddfee1ebfee6.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0018.png"
+    },
+    {
+      "sample_id": "pm_041",
+      "image_path": "data/page_math/pm_041.png",
+      "ground_truth": "3k+1=2^{a}k^{\\prime}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01a0b54b759ab60d.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_042",
+      "image_path": "data/page_math/pm_042.png",
+      "ground_truth": "4^{-N}(\\begin{matrix}2N\\\\ N\\end{matrix})\\approx\\frac{1}{\\sqrt{\\pi N}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/007a46e2dd19428e.inkml；该公式在 10 页中出现过",
+      "source_artifact": "images/page_0018.png"
+    },
+    {
+      "sample_id": "pm_044",
+      "image_path": "data/page_math/pm_044.png",
+      "ground_truth": "=J+\\epsilon_{0}\\frac{\\partial E}{\\partial t}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01453872d3d2afe5.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0037.png"
+    },
+    {
+      "sample_id": "pm_045",
+      "image_path": "data/page_math/pm_045.png",
+      "ground_truth": "A=UDV^{*}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0005d575fc3397cb.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_046",
+      "image_path": "data/page_math/pm_046.png",
+      "ground_truth": "A\\ge0.018",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000440fb7f5d3094.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_047",
+      "image_path": "data/page_math/pm_047.png",
+      "ground_truth": "A\\models_{X}^{+}Rt_{1}...t_{n}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01d90fce29b20f64.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0023.png"
+    },
+    {
+      "sample_id": "pm_048",
+      "image_path": "data/page_math/pm_048.png",
+      "ground_truth": "A_{\\mu}\\rightarrow A_{\\mu}+\\partial_{\\mu}\\phi(x)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/017b290258802288.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0032.png"
+    },
+    {
+      "sample_id": "pm_050",
+      "image_path": "data/page_math/pm_050.png",
+      "ground_truth": "Availability=",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000bc1ef3c3ee9aa.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0030.png"
+    },
+    {
+      "sample_id": "pm_052",
+      "image_path": "data/page_math/pm_052.png",
+      "ground_truth": "B=\\nabla\\times\\hat{A}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/04fc707abea3e7a1.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0072.png"
+    },
+    {
+      "sample_id": "pm_053",
+      "image_path": "data/page_math/pm_053.png",
+      "ground_truth": "B=coreB.",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000a259db55c92df.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_054",
+      "image_path": "data/page_math/pm_054.png",
+      "ground_truth": "B=ln(-b)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/00eaf4f2d3d20bb1.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0030.png"
+    },
+    {
+      "sample_id": "pm_055",
+      "image_path": "data/page_math/pm_055.png",
+      "ground_truth": "B^{\\prime}\\in(\\begin{matrix}C\\\\ B\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/03474b3d9a7ae87b.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_056",
+      "image_path": "data/page_math/pm_056.png",
+      "ground_truth": "C(X)>X^{0.332}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/01751ea13ceb1817.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_057",
+      "image_path": "data/page_math/pm_057.png",
+      "ground_truth": "C=P\\times\\frac{F_{L}}{F_{n}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/07406a1470c708c4.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_058",
+      "image_path": "data/page_math/pm_058.png",
+      "ground_truth": "C=[I-A]^{-1}d_{\\perp}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/03c3977784c8f56c.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_059",
+      "image_path": "data/page_math/pm_059.png",
+      "ground_truth": "C[x,y]/(x,y)\\cong C",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01ab63ab784befeb.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0041.png"
+    },
+    {
+      "sample_id": "pm_060",
+      "image_path": "data/page_math/pm_060.png",
+      "ground_truth": "E:R^{n}\\rightarrow T_{p}M",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01a53ae1e3a9b918.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0031.png"
+    },
+    {
+      "sample_id": "pm_061",
+      "image_path": "data/page_math/pm_061.png",
+      "ground_truth": "E\\mapsto\\int_{E}fd\\mu",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/01f2f6142ec1c97f.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_062",
+      "image_path": "data/page_math/pm_062.png",
+      "ground_truth": "E_{1}=\\frac{1}{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0606da46464a5804.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0014.png"
+    },
+    {
+      "sample_id": "pm_064",
+      "image_path": "data/page_math/pm_064.png",
+      "ground_truth": "F=Mg=\\dot{m}\\Delta v",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00ee5698f103452f.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_065",
+      "image_path": "data/page_math/pm_065.png",
+      "ground_truth": "F=\\frac{1}{4}+(\\frac{1}{4})^{2}+(\\frac{1}{4})^{3}+(\\frac{1}{4})^{4}+\\cdot\\cdot\\cdot=\\frac{\\frac{1}{4}}{1-\\frac{1}{4}}=\\frac{1}{3}.",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000bec6751692179.inkml；该公式在 9 页中出现过",
+      "source_artifact": "images/page_0019.png"
+    },
+    {
+      "sample_id": "pm_066",
+      "image_path": "data/page_math/pm_066.png",
+      "ground_truth": "F^{0}[f]=f",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01d54b93c127e89c.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0023.png"
+    },
+    {
+      "sample_id": "pm_067",
+      "image_path": "data/page_math/pm_067.png",
+      "ground_truth": "F_{out}d_{out}=\\eta F_{in}d_{in}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/02a7f7f172671fb4.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0024.png"
+    },
+    {
+      "sample_id": "pm_068",
+      "image_path": "data/page_math/pm_068.png",
+      "ground_truth": "F_{r}=\\frac{v}{\\sqrt{g\\frac{A}{B}}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/018fb881d2eef21d.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_069",
+      "image_path": "data/page_math/pm_069.png",
+      "ground_truth": "F_{x}[f(x)]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0075591d8b2ba4d2.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_071",
+      "image_path": "data/page_math/pm_071.png",
+      "ground_truth": "G(Y^{\\prime})=G(Y)\\oplus R",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0703652c7a0c26f7.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_072",
+      "image_path": "data/page_math/pm_072.png",
+      "ground_truth": "G,\\overline{G},\\tilde{G}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00ed2238753c9850.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_074",
+      "image_path": "data/page_math/pm_074.png",
+      "ground_truth": "G^{p^{k}}=\\{g^{p^{k}}|g\\in G\\}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01cf085d26abe325.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0030.png"
+    },
+    {
+      "sample_id": "pm_075",
+      "image_path": "data/page_math/pm_075.png",
+      "ground_truth": "H(X_{1},X_{2})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000bbf477610dad5.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0015.png"
+    },
+    {
+      "sample_id": "pm_076",
+      "image_path": "data/page_math/pm_076.png",
+      "ground_truth": "H_{i}=\\langle h_{i},G^{\\prime}\\rangle",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0101e1e2b84d7837.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_077",
+      "image_path": "data/page_math/pm_077.png",
+      "ground_truth": "H_{n}(\\underline{q},\\underline{x})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00b2a1efdeae0ced.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_078",
+      "image_path": "data/page_math/pm_078.png",
+      "ground_truth": "Hol^{0}(\\nabla)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0000d72d6d24c485.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_079",
+      "image_path": "data/page_math/pm_079.png",
+      "ground_truth": "Inj(M_{i})<\\epsilon(n)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/010d4fea2361f01f.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0050.png"
+    },
+    {
+      "sample_id": "pm_080",
+      "image_path": "data/page_math/pm_080.png",
+      "ground_truth": "J^{n}\\subseteq V",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000da0e972a64830.inkml；该公式在 9 页中出现过",
+      "source_artifact": "images/page_0026.png"
+    },
+    {
+      "sample_id": "pm_081",
+      "image_path": "data/page_math/pm_081.png",
+      "ground_truth": "J_{i}=\\sum_{j}L_{ij}\\frac{\\partial F_{j}}{\\partial x_{j}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/009d124a50399bba.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_082",
+      "image_path": "data/page_math/pm_082.png",
+      "ground_truth": "K(x)=x\\cdot K^{\\prime}(x)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/076be7470d48f458.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0050.png"
+    },
+    {
+      "sample_id": "pm_083",
+      "image_path": "data/page_math/pm_083.png",
+      "ground_truth": "K=Q(\\sqrt{-d})d>0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/046728735864246f.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_084",
+      "image_path": "data/page_math/pm_084.png",
+      "ground_truth": "K_{h_{\\lambda}}(X_{0},X)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00c22b6f5407cf2d.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0040.png"
+    },
+    {
+      "sample_id": "pm_085",
+      "image_path": "data/page_math/pm_085.png",
+      "ground_truth": "K_{m}=\\frac{1}{2}(k_{1}+k_{2})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01d4d9a9dc145333.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_086",
+      "image_path": "data/page_math/pm_086.png",
+      "ground_truth": "L=(\\begin{matrix}1&0\\\\ \\frac{-1}{f}&1\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01752f0f5fba0225.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0022.png"
+    },
+    {
+      "sample_id": "pm_087",
+      "image_path": "data/page_math/pm_087.png",
+      "ground_truth": "L>>(x+a/2)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0178bf7cceb64473.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_088",
+      "image_path": "data/page_math/pm_088.png",
+      "ground_truth": "L_{10}=(C/P)^{p}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02720f6a67e8bc09.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0017.png"
+    },
+    {
+      "sample_id": "pm_089",
+      "image_path": "data/page_math/pm_089.png",
+      "ground_truth": "L_{X}dz=f(z)dz",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/019d0ab8b91ae217.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0066.png"
+    },
+    {
+      "sample_id": "pm_090",
+      "image_path": "data/page_math/pm_090.png",
+      "ground_truth": "L_{r},L_{t},L_{L}/10",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/032278982233fefa.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_091",
+      "image_path": "data/page_math/pm_091.png",
+      "ground_truth": "M=\\mathbb{R}^{n}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/050f08e2fe6fe162.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0025.png"
+    },
+    {
+      "sample_id": "pm_092",
+      "image_path": "data/page_math/pm_092.png",
+      "ground_truth": "M_{2}=P_{1}^{\\prime}|P_{2}|...",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/030ea5646116a251.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_093",
+      "image_path": "data/page_math/pm_093.png",
+      "ground_truth": "N(t)=N_{0}2^{-t/t_{1/2}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01e6c79f4d27bc54.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0082.png"
+    },
+    {
+      "sample_id": "pm_095",
+      "image_path": "data/page_math/pm_095.png",
+      "ground_truth": "N_{0}||X-\\hat{X}||^{2}/2",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/01d4536a52886b73.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0031.png"
+    },
+    {
+      "sample_id": "pm_096",
+      "image_path": "data/page_math/pm_096.png",
+      "ground_truth": "N_{i}\\overline{r_{i}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01d2b56291c7ffdd.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0018.png"
+    },
+    {
+      "sample_id": "pm_097",
+      "image_path": "data/page_math/pm_097.png",
+      "ground_truth": "O(F)\\hookrightarrow g^{*}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/01d4ae95eb9e94c8.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0035.png"
+    },
+    {
+      "sample_id": "pm_098",
+      "image_path": "data/page_math/pm_098.png",
+      "ground_truth": "O(nlogn)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/00bddacfb3de33ce.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_100",
+      "image_path": "data/page_math/pm_100.png",
+      "ground_truth": "P(\\omega)=\\frac{2}{3}\\omega^{4}|d_{i}|^{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/02f72a386327c6d9.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_101",
+      "image_path": "data/page_math/pm_101.png",
+      "ground_truth": "P(e^{\\prime})=\\{a_{1},b_{4}\\}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0068bc1f523b42d8.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0024.png"
+    },
+    {
+      "sample_id": "pm_102",
+      "image_path": "data/page_math/pm_102.png",
+      "ground_truth": "P=P(C(Z))",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0017bb5822bcba69.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0025.png"
+    },
+    {
+      "sample_id": "pm_103",
+      "image_path": "data/page_math/pm_103.png",
+      "ground_truth": "P\\in\\mathbb{R}^{2k\\times d}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/032130fddec53c78.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_104",
+      "image_path": "data/page_math/pm_104.png",
+      "ground_truth": "P^{\\mu}=p^{\\mu}+qA^{\\mu}.",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0005ccb2789b30f8.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0032.png"
+    },
+    {
+      "sample_id": "pm_105",
+      "image_path": "data/page_math/pm_105.png",
+      "ground_truth": "P_{F}=\\sqrt{P_{P}\\cdot P_{L}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0272a794109d5d2d.inkml；该公式在 10 页中出现过",
+      "source_artifact": "images/page_0015.png"
+    },
+    {
+      "sample_id": "pm_106",
+      "image_path": "data/page_math/pm_106.png",
+      "ground_truth": "Pr(s|I)\\propto1/s",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01917677eaf160bb.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0036.png"
+    },
+    {
+      "sample_id": "pm_107",
+      "image_path": "data/page_math/pm_107.png",
+      "ground_truth": "Q(\\sqrt{2})\\supseteq Q",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/04a855ef776363c2.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0021.png"
+    },
+    {
+      "sample_id": "pm_108",
+      "image_path": "data/page_math/pm_108.png",
+      "ground_truth": "Q:=\\bigcup_{\\sigma\\in\\sigma(T_{0})}Q_{\\sigma}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00061be0501a1fa8.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_109",
+      "image_path": "data/page_math/pm_109.png",
+      "ground_truth": "R(X,L)=\\bigoplus_{d=0}^{\\infty}H^{0}(X,L^{\\otimes d}).",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0007c32e1880c9a4.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0024.png"
+    },
+    {
+      "sample_id": "pm_110",
+      "image_path": "data/page_math/pm_110.png",
+      "ground_truth": "R=\\int_{0}^{\\tau}X(s)ds",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00245713d08b4f1a.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_111",
+      "image_path": "data/page_math/pm_111.png",
+      "ground_truth": "R_{0}=\\frac{\\langle k^{2}\\rangle}{\\langle k\\rangle}-1,",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00009cc521976274.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_112",
+      "image_path": "data/page_math/pm_112.png",
+      "ground_truth": "R_{U}\\in R_{U}\\iff R_{U}\\notin R_{U}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0368471ca4fbe892.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_113",
+      "image_path": "data/page_math/pm_113.png",
+      "ground_truth": "R_{x}=(R_{2}/R_{1})\\cdot R_{3}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01529aa0572f4897.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_114",
+      "image_path": "data/page_math/pm_114.png",
+      "ground_truth": "S=\\int_{0}^{T}\\frac{dQ_{rev}}{T}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00078ec9bfbf96e3.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0028.png"
+    },
+    {
+      "sample_id": "pm_115",
+      "image_path": "data/page_math/pm_115.png",
+      "ground_truth": "S=\\int_{M}BF",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0005ea8e21185d36.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0028.png"
+    },
+    {
+      "sample_id": "pm_117",
+      "image_path": "data/page_math/pm_117.png",
+      "ground_truth": "S_{0}+h\\nu_{ex}\\rightarrow S_{1}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00a58f479a9d95b9.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_118",
+      "image_path": "data/page_math/pm_118.png",
+      "ground_truth": "S_{ijk}\\rightarrow S_{ij}(\\omega_{k})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0090db2a639b5c98.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_119",
+      "image_path": "data/page_math/pm_119.png",
+      "ground_truth": "T+ATT=1+E",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01c37bbe7ea55c56.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0052.png"
+    },
+    {
+      "sample_id": "pm_120",
+      "image_path": "data/page_math/pm_120.png",
+      "ground_truth": "T=(\\begin{matrix}1&0\\\\ 1&0\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00253e181f0200ab.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_121",
+      "image_path": "data/page_math/pm_121.png",
+      "ground_truth": "T^{-1}=(T_{b}^{a})^{-1}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/026fd85034106735.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0011.png"
+    },
+    {
+      "sample_id": "pm_122",
+      "image_path": "data/page_math/pm_122.png",
+      "ground_truth": "T^{t}:=S^{1}\\times\\cdot\\cdot\\cdot\\times S^{1}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01cdd808862eab64.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0037.png"
+    },
+    {
+      "sample_id": "pm_123",
+      "image_path": "data/page_math/pm_123.png",
+      "ground_truth": "T_{0}=2\\pi\\sqrt{\\frac{l}{g}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/011bc2c4d3e15714.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_124",
+      "image_path": "data/page_math/pm_124.png",
+      "ground_truth": "T_{pq}(e_{p}\\otimes e_{q})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01b552b8a037ab13.inkml；该公式在 10 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_125",
+      "image_path": "data/page_math/pm_125.png",
+      "ground_truth": "U=-m\\sum G\\frac{M}{r}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0578f6b97d18358a.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0018.png"
+    },
+    {
+      "sample_id": "pm_126",
+      "image_path": "data/page_math/pm_126.png",
+      "ground_truth": "U\\times X",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00040c7f0ccce622.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_127",
+      "image_path": "data/page_math/pm_127.png",
+      "ground_truth": "U_{i}(I)=I_{L_{i}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/028cf1f0507df703.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_128",
+      "image_path": "data/page_math/pm_128.png",
+      "ground_truth": "V=(\\begin{matrix}0&1\\\\ 1&0\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0023e88388577dc1.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_129",
+      "image_path": "data/page_math/pm_129.png",
+      "ground_truth": "V=|a\\cdot(b\\times c)|",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/006631d6baa51d31.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0031.png"
+    },
+    {
+      "sample_id": "pm_130",
+      "image_path": "data/page_math/pm_130.png",
+      "ground_truth": "X:=\\bigcup_{k=1}^{m}3B_{j_{k}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01470b33b8c78f3f.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0044.png"
+    },
+    {
+      "sample_id": "pm_131",
+      "image_path": "data/page_math/pm_131.png",
+      "ground_truth": "X\\frac{d}{dX}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/006b9bfab1127fac.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0051.png"
+    },
+    {
+      "sample_id": "pm_132",
+      "image_path": "data/page_math/pm_132.png",
+      "ground_truth": "X_{2i}\\epsilon R^{Q}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01f3445177808c3d.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_133",
+      "image_path": "data/page_math/pm_133.png",
+      "ground_truth": "X_{k}=p(e^{2\\pi i\\frac{k}{2^{n}}})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0316d949cd776194.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_134",
+      "image_path": "data/page_math/pm_134.png",
+      "ground_truth": "Y_{n+1}=I-XY_{n}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/03277de2f80a8aaf.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0023.png"
+    },
+    {
+      "sample_id": "pm_135",
+      "image_path": "data/page_math/pm_135.png",
+      "ground_truth": "Z^{n}\\times\\mu_{R}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000d6170688670d0.inkml；该公式在 9 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_136",
+      "image_path": "data/page_math/pm_136.png",
+      "ground_truth": "[I_{R}]=-\\sum_{i=1}^{n}m_{i}[r_{i}-R][r_{i}-R],",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000b80a1a1f5a854.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0046.png"
+    },
+    {
+      "sample_id": "pm_137",
+      "image_path": "data/page_math/pm_137.png",
+      "ground_truth": "[K^{j},P^{k}]=i\\delta^{jk}H",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00f546829c405447.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0059.png"
+    },
+    {
+      "sample_id": "pm_138",
+      "image_path": "data/page_math/pm_138.png",
+      "ground_truth": "[\\begin{matrix}1&0\\\\ -sC&1\\end{matrix}]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/060ab59eeba54d2f.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0015.png"
+    },
+    {
+      "sample_id": "pm_139",
+      "image_path": "data/page_math/pm_139.png",
+      "ground_truth": "[\\begin{matrix}1&1\\\\ 0&1\\end{matrix}]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/006fb32b84a99137.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0020.png"
+    },
+    {
+      "sample_id": "pm_140",
+      "image_path": "data/page_math/pm_140.png",
+      "ground_truth": "[\\begin{matrix}A&U\\\\ V&C\\end{matrix}]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00622d73c8739bd8.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0025.png"
+    },
+    {
+      "sample_id": "pm_141",
+      "image_path": "data/page_math/pm_141.png",
+      "ground_truth": "[\\begin{matrix}a&b\\\\ c&d\\\\ \\end{matrix}]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00e00364101abad0.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_142",
+      "image_path": "data/page_math/pm_142.png",
+      "ground_truth": "[\\begin{matrix}a\\\\ b\\\\ c\\end{matrix}]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0047f70eafca2534.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0022.png"
+    },
+    {
+      "sample_id": "pm_143",
+      "image_path": "data/page_math/pm_143.png",
+      "ground_truth": "[\\begin{matrix}n\\\\ n-3\\end{matrix}]=\\sum_{i=0}^{n-1}\\sum_{j=0}^{i-1}\\sum_{k=0}^{j-1}ijk=(\\begin{matrix}n\\\\ 2\\end{matrix})(\\begin{matrix}n\\\\ 4\\end{matrix}),",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00000e2b2e813760.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0061.png"
+    },
+    {
+      "sample_id": "pm_144",
+      "image_path": "data/page_math/pm_144.png",
+      "ground_truth": "[\\frac{2n\\pi}{3};\\frac{2(n+1)\\pi}{3}]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0053f4751a1d9065.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_145",
+      "image_path": "data/page_math/pm_145.png",
+      "ground_truth": "[g^{ij}]=\\frac{1}{g}\\frac{\\partial g}{\\partial g_{ij}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0067440924b60b2b.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_146",
+      "image_path": "data/page_math/pm_146.png",
+      "ground_truth": "\\Delta S=\\oint\\frac{\\delta Q}{T}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/010c427bf30599d3.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0039.png"
+    },
+    {
+      "sample_id": "pm_147",
+      "image_path": "data/page_math/pm_147.png",
+      "ground_truth": "\\Delta b/b^{2}\\approx\\Delta f/f^{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/028414d36ea98262.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_148",
+      "image_path": "data/page_math/pm_148.png",
+      "ground_truth": "\\Delta\\eta_{ij}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0005ec27f7221a95.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_149",
+      "image_path": "data/page_math/pm_149.png",
+      "ground_truth": "\\Leftrightarrow1-\\frac{1}{r}<[\\frac{m}{r}]_{1}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/06b2711e539715e0.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_150",
+      "image_path": "data/page_math/pm_150.png",
+      "ground_truth": "\\Leftrightarrow|PA|^{2}=9|PB|^{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0121d7fdad59c8ab.inkml；该公式在 10 页中出现过",
+      "source_artifact": "images/page_0011.png"
+    },
+    {
+      "sample_id": "pm_151",
+      "image_path": "data/page_math/pm_151.png",
+      "ground_truth": "\\Omega((logn)/n^{2})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/00ba90fe7f71d8c6.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_152",
+      "image_path": "data/page_math/pm_152.png",
+      "ground_truth": "\\Omega(R)=cP(R)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02b1dc6d4efd493a.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0026.png"
+    },
+    {
+      "sample_id": "pm_153",
+      "image_path": "data/page_math/pm_153.png",
+      "ground_truth": "\\Omega(eg)=g^{-1}\\Omega(e)g",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0180366e774d93be.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0014.png"
+    },
+    {
+      "sample_id": "pm_154",
+      "image_path": "data/page_math/pm_154.png",
+      "ground_truth": "\\Omega=\\frac{\\Delta PE}{\\Delta t}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0112074a000acff4.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_155",
+      "image_path": "data/page_math/pm_155.png",
+      "ground_truth": "\\Omega=\\sqrt{|\\chi_{g,e}|^{2}+\\delta^{2}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0175c1fb5814dc11.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0018.png"
+    },
+    {
+      "sample_id": "pm_156",
+      "image_path": "data/page_math/pm_156.png",
+      "ground_truth": "\\Omega=arg(-z_{2},z_{1})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01d12458811a5a38.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0034.png"
+    },
+    {
+      "sample_id": "pm_157",
+      "image_path": "data/page_math/pm_157.png",
+      "ground_truth": "\\Phi=\\int E(\\hat{e}_{\\angle}\\cdot dA)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/004970a2ad0fcb27.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0021.png"
+    },
+    {
+      "sample_id": "pm_158",
+      "image_path": "data/page_math/pm_158.png",
+      "ground_truth": "\\Psi(\\rho,\\phi,z)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/02c82a919e114b86.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_159",
+      "image_path": "data/page_math/pm_159.png",
+      "ground_truth": "\\Rightarrow ln\\frac{x(t)}{x(0)}=kt",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/05882db6930f636c.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_160",
+      "image_path": "data/page_math/pm_160.png",
+      "ground_truth": "\\Rightarrow\\frac{-lnx}{3}=W(\\frac{-1}{3})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00062af9cb5101f5.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0010.png"
+    },
+    {
+      "sample_id": "pm_161",
+      "image_path": "data/page_math/pm_161.png",
+      "ground_truth": "\\Xi(p)=\\frac{e^{-\\frac{p^{3}}{3}}}{\\sqrt{3\\pi}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0667cabda0ae2b81.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_162",
+      "image_path": "data/page_math/pm_162.png",
+      "ground_truth": "\\beta>-0.5",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0417ce94315c0dea.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_163",
+      "image_path": "data/page_math/pm_163.png",
+      "ground_truth": "\\bigcup_{i\\in I}C_{i}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0006c633e31cb23a.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_164",
+      "image_path": "data/page_math/pm_164.png",
+      "ground_truth": "\\delta g_{B}=2\\pi\\rho GH",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00032092410c1677.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0015.png"
+    },
+    {
+      "sample_id": "pm_165",
+      "image_path": "data/page_math/pm_165.png",
+      "ground_truth": "\\delta_{j,j_{1}}\\delta_{m,m_{1}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/004fc8d3f626f1d9.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0074.png"
+    },
+    {
+      "sample_id": "pm_166",
+      "image_path": "data/page_math/pm_166.png",
+      "ground_truth": "\\dot{f}(t)\\rightarrow0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0004bce586182a21.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_167",
+      "image_path": "data/page_math/pm_167.png",
+      "ground_truth": "\\dot{x}(t)=f(x(t))",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/00ad7566b9f1d872.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0034.png"
+    },
+    {
+      "sample_id": "pm_168",
+      "image_path": "data/page_math/pm_168.png",
+      "ground_truth": "\\epsilon,\\delta,K>0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/015e012d8baa97f3.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0021.png"
+    },
+    {
+      "sample_id": "pm_169",
+      "image_path": "data/page_math/pm_169.png",
+      "ground_truth": "\\epsilon_{2}=\\lambda^{\\lambda^{\\lambda^{\\cdot^{\\cdot^{\\cdot}}}}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/020ebba0c00073be.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0027.png"
+    },
+    {
+      "sample_id": "pm_170",
+      "image_path": "data/page_math/pm_170.png",
+      "ground_truth": "\\forall b_{1},...,b_{n}\\notin T(s)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/068de3aad90c403c.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0016.png"
+    },
+    {
+      "sample_id": "pm_171",
+      "image_path": "data/page_math/pm_171.png",
+      "ground_truth": "\\forall u(wR_{i}u\\Rightarrow u\\Vdash A)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00ac5cd85e462376.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0019.png"
+    },
+    {
+      "sample_id": "pm_172",
+      "image_path": "data/page_math/pm_172.png",
+      "ground_truth": "\\frac{1+\\frac{n}{c}cos\\iota_{s}}{\\sqrt{1\\cdot\\frac{n^{3}}{c^{3}}}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/018cd2d904174062.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0040.png"
+    },
+    {
+      "sample_id": "pm_173",
+      "image_path": "data/page_math/pm_173.png",
+      "ground_truth": "\\frac{1}{16}[\\begin{matrix}-&\\#&7\\\\ 3&5&1\\end{matrix}]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/059225965e1e5dd6.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0047.png"
+    },
+    {
+      "sample_id": "pm_174",
+      "image_path": "data/page_math/pm_174.png",
+      "ground_truth": "\\frac{1}{\\sqrt{d}_{u}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0013be3abc070fb7.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0030.png"
+    },
+    {
+      "sample_id": "pm_175",
+      "image_path": "data/page_math/pm_175.png",
+      "ground_truth": "\\frac{4\\zeta m}{\\sqrt{1-\\frac{0m}{vu^{0}}}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/06c6f0395cdee938.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0010.png"
+    },
+    {
+      "sample_id": "pm_176",
+      "image_path": "data/page_math/pm_176.png",
+      "ground_truth": "\\frac{61}{\\frac{\\frac{111155552221}{9.7805}}{999995555222}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0004597d0d1b430f.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0017.png"
+    },
+    {
+      "sample_id": "pm_177",
+      "image_path": "data/page_math/pm_177.png",
+      "ground_truth": "\\frac{8.243752}{\\frac{10000000}{54.536-111555556688}*7.7095}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000269ab4b30fcb0.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0023.png"
+    },
+    {
+      "sample_id": "pm_178",
+      "image_path": "data/page_math/pm_178.png",
+      "ground_truth": "\\frac{889994446666}{\\frac{\\frac{666555555222}{131}}{555550000008}\\cdot\\frac{46.19}{111333334466}*\\frac{8}{a}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00062ab9cb5926f2.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0019.png"
+    },
+    {
+      "sample_id": "pm_179",
+      "image_path": "data/page_math/pm_179.png",
+      "ground_truth": "\\frac{A(O\\cap P)}{A(P)}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/03bd51165a1a81b1.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_180",
+      "image_path": "data/page_math/pm_180.png",
+      "ground_truth": "\\frac{I}{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000918f80b681a7a.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0036.png"
+    },
+    {
+      "sample_id": "pm_181",
+      "image_path": "data/page_math/pm_181.png",
+      "ground_truth": "\\frac{R_{U}}{r_{e}}\\approx\\frac{r_{H}}{r_{e}}\\approx10^{42}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/030373f9d3edac3b.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0040.png"
+    },
+    {
+      "sample_id": "pm_182",
+      "image_path": "data/page_math/pm_182.png",
+      "ground_truth": "\\frac{\\Delta f}{f}\\simeq-\\frac{vcos\\theta}{c}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/02f5816611877c27.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0020.png"
+    },
+    {
+      "sample_id": "pm_183",
+      "image_path": "data/page_math/pm_183.png",
+      "ground_truth": "\\frac{\\Phi_{G}}{m}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00083308cce64627.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0046.png"
+    },
+    {
+      "sample_id": "pm_184",
+      "image_path": "data/page_math/pm_184.png",
+      "ground_truth": "\\frac{\\frac{\\frac{100000000}{3.064879951}-10000000000}{\\frac{105.8744494}{28}}}{32}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000dd1d7b7d9ea40.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_185",
+      "image_path": "data/page_math/pm_185.png",
+      "ground_truth": "\\frac{\\partial E}{\\partial t}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/04f16ee0cbb55791.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0023.png"
+    },
+    {
+      "sample_id": "pm_186",
+      "image_path": "data/page_math/pm_186.png",
+      "ground_truth": "\\frac{\\partial\\Pi}{\\partial x_{j}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/04852f06a82865c1.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0051.png"
+    },
+    {
+      "sample_id": "pm_187",
+      "image_path": "data/page_math/pm_187.png",
+      "ground_truth": "\\frac{\\partial\\varphi}{\\partial t}(x,t)=F(\\varphi).",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/002b6a98000765fb.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0047.png"
+    },
+    {
+      "sample_id": "pm_188",
+      "image_path": "data/page_math/pm_188.png",
+      "ground_truth": "\\frac{\\partial}{\\partial\\overline{z}}w(z)=0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/016a39f81ff20b8d.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_189",
+      "image_path": "data/page_math/pm_189.png",
+      "ground_truth": "\\frac{\\pi}{2}(i-1)\\le v_{i}<\\frac{\\pi}{2}i",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/009f7b727b467490.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_190",
+      "image_path": "data/page_math/pm_190.png",
+      "ground_truth": "\\frac{dC_{U}}{dC_{W}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/001f0c3d8940f546.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0042.png"
+    },
+    {
+      "sample_id": "pm_191",
+      "image_path": "data/page_math/pm_191.png",
+      "ground_truth": "\\frac{dP}{d\\tau}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00184588166a4dac.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_192",
+      "image_path": "data/page_math/pm_192.png",
+      "ground_truth": "\\frac{d\\theta}{dt}=\\omega",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0668dd347d600906.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0061.png"
+    },
+    {
+      "sample_id": "pm_193",
+      "image_path": "data/page_math/pm_193.png",
+      "ground_truth": "\\frac{d^{2}u}{dx^{2}}-u=0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/003921302c543b2c.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0025.png"
+    },
+    {
+      "sample_id": "pm_194",
+      "image_path": "data/page_math/pm_194.png",
+      "ground_truth": "\\frac{d^{2}x}{dt^{2}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00146a32fdab9e8e.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_195",
+      "image_path": "data/page_math/pm_195.png",
+      "ground_truth": "\\frac{d}{dt}\\frac{\\partial R}{\\partial\\dot{\\zeta}_{j}}=\\frac{\\partial R}{\\partial\\zeta_{j}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/05fa73b7807336c8.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0029.png"
+    },
+    {
+      "sample_id": "pm_196",
+      "image_path": "data/page_math/pm_196.png",
+      "ground_truth": "\\frac{z+550044444444}{10000000}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00037f1a6f22b509.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_197",
+      "image_path": "data/page_math/pm_197.png",
+      "ground_truth": "\\frac{z}{22288226611}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00070574bf81e8f6.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_198",
+      "image_path": "data/page_math/pm_198.png",
+      "ground_truth": "\\gamma_{2}=-0.0747",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000a192d6e72d170.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0053.png"
+    },
+    {
+      "sample_id": "pm_199",
+      "image_path": "data/page_math/pm_199.png",
+      "ground_truth": "\\hat{A}_{n,\\alpha}^{\\dagger}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0656e77f512563c5.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0010.png"
+    },
+    {
+      "sample_id": "pm_200",
+      "image_path": "data/page_math/pm_200.png",
+      "ground_truth": "\\hat{\\Sigma}_{j,/j}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0325d90612c71772.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_201",
+      "image_path": "data/page_math/pm_201.png",
+      "ground_truth": "\\hat{\\beta}=(\\overline{y/x})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01998b624db95830.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0016.png"
+    },
+    {
+      "sample_id": "pm_202",
+      "image_path": "data/page_math/pm_202.png",
+      "ground_truth": "\\hat{\\mu}_{3}=56/3=18.67",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/032cab7514e408ba.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0016.png"
+    },
+    {
+      "sample_id": "pm_203",
+      "image_path": "data/page_math/pm_203.png",
+      "ground_truth": "\\hat{\\psi}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000a7a5a694616a5.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0017.png"
+    },
+    {
+      "sample_id": "pm_204",
+      "image_path": "data/page_math/pm_204.png",
+      "ground_truth": "\\hat{\\theta}=\\hat{z}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01a33dcbdaf5d858.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_205",
+      "image_path": "data/page_math/pm_205.png",
+      "ground_truth": "\\hat{f}(k)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00c4f34b460c7933.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_206",
+      "image_path": "data/page_math/pm_206.png",
+      "ground_truth": "\\hat{q}=q_{i}i+q_{j}j+q_{k}k+q_{r}=[\\begin{matrix}q_{i}\\\\ q_{j}\\\\ q_{k}\\\\ q_{r}\\end{matrix}]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00006210bcd6c975.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0024.png"
+    },
+    {
+      "sample_id": "pm_207",
+      "image_path": "data/page_math/pm_207.png",
+      "ground_truth": "\\hat{x}=R_{1}^{-1}(Q_{1}^{T}b)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000a5eb4dbb0a626.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0029.png"
+    },
+    {
+      "sample_id": "pm_208",
+      "image_path": "data/page_math/pm_208.png",
+      "ground_truth": "\\iint_{R}(x^{2}+z^{2})dS",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/01e8ffa2afd3ae8e.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_209",
+      "image_path": "data/page_math/pm_209.png",
+      "ground_truth": "\\iint_{S}FdS",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/05c704f21b802507.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0036.png"
+    },
+    {
+      "sample_id": "pm_210",
+      "image_path": "data/page_math/pm_210.png",
+      "ground_truth": "\\int d^{3}xJ^{0}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/00c0cefd35f09179.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_211",
+      "image_path": "data/page_math/pm_211.png",
+      "ground_truth": "\\int v_{i}dm",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00b45d3bd1d56ead.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0016.png"
+    },
+    {
+      "sample_id": "pm_212",
+      "image_path": "data/page_math/pm_212.png",
+      "ground_truth": "\\int x\\cdot dx",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0019bb8e97507f8e.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0017.png"
+    },
+    {
+      "sample_id": "pm_213",
+      "image_path": "data/page_math/pm_213.png",
+      "ground_truth": "\\int x^{k}d\\mu(x)=m_{k}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/012c517a05e2c2d4.inkml；该公式在 10 页中出现过",
+      "source_artifact": "images/page_0020.png"
+    },
+    {
+      "sample_id": "pm_214",
+      "image_path": "data/page_math/pm_214.png",
+      "ground_truth": "\\int x^{s}\\phi(x)dx",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/003169384315282b.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0020.png"
+    },
+    {
+      "sample_id": "pm_215",
+      "image_path": "data/page_math/pm_215.png",
+      "ground_truth": "\\int^{c\\in C}F(c,c)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00c94cb75d8df0bf.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0015.png"
+    },
+    {
+      "sample_id": "pm_216",
+      "image_path": "data/page_math/pm_216.png",
+      "ground_truth": "\\int_{0}^{\\infty}\\frac{sin(x)}{x}dx",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00235ec3dee919dd.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_217",
+      "image_path": "data/page_math/pm_217.png",
+      "ground_truth": "\\int_{1}^{0}\\frac{dt}{t}=-\\infty",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/014be054e72e64fd.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_218",
+      "image_path": "data/page_math/pm_218.png",
+      "ground_truth": "\\int_{A}P_{A}dA=1",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/002651244bc93554.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_219",
+      "image_path": "data/page_math/pm_219.png",
+      "ground_truth": "\\int_{E}f(x)\\mu(dx)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/000453d57c3d334d.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_220",
+      "image_path": "data/page_math/pm_220.png",
+      "ground_truth": "\\int_{\\gamma}f(z)dz",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/012f1f23d40a2995.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_221",
+      "image_path": "data/page_math/pm_221.png",
+      "ground_truth": "\\int_{a}^{b}f(x,\\alpha)dx=\\varphi(\\alpha),",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0007c0cc361ef700.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0020.png"
+    },
+    {
+      "sample_id": "pm_222",
+      "image_path": "data/page_math/pm_222.png",
+      "ground_truth": "\\iota_{\\rho(\\xi)}\\omega=dH_{\\xi}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000d657eba4141ca.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0054.png"
+    },
+    {
+      "sample_id": "pm_223",
+      "image_path": "data/page_math/pm_223.png",
+      "ground_truth": "\\kappa_{2}=\\mu_{2}^{\\prime}-{\\mu_{1}^{\\prime}}^{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/032360b882783120.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_224",
+      "image_path": "data/page_math/pm_224.png",
+      "ground_truth": "\\lambda I\\gg J^{T}WJ,\\Delta\\beta\\approx\\frac{1}{\\lambda}J^{T}W\\Delta y.",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0008be2f445b2bfb.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0053.png"
+    },
+    {
+      "sample_id": "pm_225",
+      "image_path": "data/page_math/pm_225.png",
+      "ground_truth": "\\lambda:A\\longrightarrow A^{\\vee}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/01a043f03146f76c.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0050.png"
+    },
+    {
+      "sample_id": "pm_226",
+      "image_path": "data/page_math/pm_226.png",
+      "ground_truth": "\\lambda=(4,3,1,1)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0002683ca298b741.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_227",
+      "image_path": "data/page_math/pm_227.png",
+      "ground_truth": "\\langle A\\rangle_{\\psi}=||A\\psi||^{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/004c9413be3ff1be.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0025.png"
+    },
+    {
+      "sample_id": "pm_228",
+      "image_path": "data/page_math/pm_228.png",
+      "ground_truth": "\\langle Pu,u\\rangle>0,\\forall u\\ne0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0435a7e82431e973.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0020.png"
+    },
+    {
+      "sample_id": "pm_229",
+      "image_path": "data/page_math/pm_229.png",
+      "ground_truth": "\\langle a_{0},a_{1},...\\rangle\\in R^{\\omega}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/00386113d577085b.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0019.png"
+    },
+    {
+      "sample_id": "pm_230",
+      "image_path": "data/page_math/pm_230.png",
+      "ground_truth": "\\langle\\psi^{jk}|\\psi_{lm}\\rangle=\\delta_{jl}\\delta_{km}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/014d90d483380e66.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0033.png"
+    },
+    {
+      "sample_id": "pm_231",
+      "image_path": "data/page_math/pm_231.png",
+      "ground_truth": "\\mathbb{E}[logX!]=\\overline{logX!}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/038ccb46ae3443db.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0031.png"
+    },
+    {
+      "sample_id": "pm_232",
+      "image_path": "data/page_math/pm_232.png",
+      "ground_truth": "\\mathbb{Q}(\\sqrt{-19})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/06a81979619c88e4.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0014.png"
+    },
+    {
+      "sample_id": "pm_233",
+      "image_path": "data/page_math/pm_233.png",
+      "ground_truth": "\\mu(G)-\\{w\\}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0001e24e0cc47752.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_234",
+      "image_path": "data/page_math/pm_234.png",
+      "ground_truth": "\\mu=A_{H}T\\cdot e^{Q_{L}/RT}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/049d2cf3f10ac2d7.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_235",
+      "image_path": "data/page_math/pm_235.png",
+      "ground_truth": "\\mu^{*}=k\\mu",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0002407f992e8307.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_236",
+      "image_path": "data/page_math/pm_236.png",
+      "ground_truth": "\\mu_{G}(H_{1},H_{2})=(-1)^{k}p^{(\\begin{matrix}k\\\\ 2\\end{matrix})}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/013f565c7a547d0b.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0037.png"
+    },
+    {
+      "sample_id": "pm_237",
+      "image_path": "data/page_math/pm_237.png",
+      "ground_truth": "\\nabla I=(I_{x},I_{y})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/001083e26028da36.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0033.png"
+    },
+    {
+      "sample_id": "pm_238",
+      "image_path": "data/page_math/pm_238.png",
+      "ground_truth": "\\nabla_{\\vec{\\theta}}=D_{d}\\nabla",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/023a443f36a838ff.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0057.png"
+    },
+    {
+      "sample_id": "pm_239",
+      "image_path": "data/page_math/pm_239.png",
+      "ground_truth": "\\neg^{T}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0004f177e981e3ae.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0092.png"
+    },
+    {
+      "sample_id": "pm_240",
+      "image_path": "data/page_math/pm_240.png",
+      "ground_truth": "\\nu(A)=\\int_{A}f_{n}d\\mu",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/021aff768b53ac50.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0019.png"
+    },
+    {
+      "sample_id": "pm_241",
+      "image_path": "data/page_math/pm_241.png",
+      "ground_truth": "\\omega_{\\{(k,i),(k^{\\prime},i^{\\prime}),(k^{\\prime\\prime},i^{\\prime\\prime})\\}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/029b5da0999d4903.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_242",
+      "image_path": "data/page_math/pm_242.png",
+      "ground_truth": "\\overline{K}_{n}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0491ecbb62f31a6e.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_243",
+      "image_path": "data/page_math/pm_243.png",
+      "ground_truth": "\\overline{S_{n}}=a\\mathbb{I}\\{S_{n}>a\\}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/051a9b215ce2f7dc.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0011.png"
+    },
+    {
+      "sample_id": "pm_244",
+      "image_path": "data/page_math/pm_244.png",
+      "ground_truth": "\\overline{Y}_{1}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/033bbf63000c086d.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0067.png"
+    },
+    {
+      "sample_id": "pm_245",
+      "image_path": "data/page_math/pm_245.png",
+      "ground_truth": "\\overline{\\rho}_{i}(t_{2})=\\frac{1}{x_{i+\\frac{1}{2}}-x_{i-\\frac{1}{2}}}\\int_{x_{i-\\frac{1}{2}}}^{x_{i+\\frac{1}{2}}}\\rho(x,t_{2})dx,",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000e33646eb22a80.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0047.png"
+    },
+    {
+      "sample_id": "pm_246",
+      "image_path": "data/page_math/pm_246.png",
+      "ground_truth": "\\overline{z}=1-i\\sqrt{\\nu}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0005d0be8e507b24.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0011.png"
+    },
+    {
+      "sample_id": "pm_247",
+      "image_path": "data/page_math/pm_247.png",
+      "ground_truth": "\\partial_{i}f=\\frac{\\partial f}{\\partial\\xi^{i}}:=\\frac{\\partial\\overline{f}}{\\partial\\xi^{i}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/003ca9082c7047d3.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0026.png"
+    },
+    {
+      "sample_id": "pm_248",
+      "image_path": "data/page_math/pm_248.png",
+      "ground_truth": "\\pi(x)-\\pi(\\frac{x}{2})\\ge1",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/030a0f18b6fcb87b.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_249",
+      "image_path": "data/page_math/pm_249.png",
+      "ground_truth": "\\pi^{2k}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0009e82c62c2aaf4.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_250",
+      "image_path": "data/page_math/pm_250.png",
+      "ground_truth": "\\prod_{i=1}^{n}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/009183c575123315.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_251",
+      "image_path": "data/page_math/pm_251.png",
+      "ground_truth": "\\prod_{p}p/(p-1)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0199f657babdf636.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0010.png"
+    },
+    {
+      "sample_id": "pm_252",
+      "image_path": "data/page_math/pm_252.png",
+      "ground_truth": "\\rho(\\nu)d\\nu=\\frac{u(\\nu)d\\nu}{V}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01a0415f932322d3.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0080.png"
+    },
+    {
+      "sample_id": "pm_253",
+      "image_path": "data/page_math/pm_253.png",
+      "ground_truth": "\\rho(r)\\sim e^{-2Z_{\\alpha}r}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01844e9baa82698c.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0031.png"
+    },
+    {
+      "sample_id": "pm_254",
+      "image_path": "data/page_math/pm_254.png",
+      "ground_truth": "\\rho=max\\{|\\lambda|\\}\\le1",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0000ec54f84b729e.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_255",
+      "image_path": "data/page_math/pm_255.png",
+      "ground_truth": "\\sigma(i)=i",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0005bd3dd973f475.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_256",
+      "image_path": "data/page_math/pm_256.png",
+      "ground_truth": "\\sigma_{applied}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000cddcb51302ae2.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0013.png"
+    },
+    {
+      "sample_id": "pm_257",
+      "image_path": "data/page_math/pm_257.png",
+      "ground_truth": "\\sqrt[3]{z}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/007a639f47c479d0.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_258",
+      "image_path": "data/page_math/pm_258.png",
+      "ground_truth": "\\sqrt{1-\\omega^{2}r_{0}^{2}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/00fee560e6c9af79.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_259",
+      "image_path": "data/page_math/pm_259.png",
+      "ground_truth": "\\sqrt{3}^{\\sqrt{3}^{\\sqrt{3}^{\\cdot^{\\cdot^{\\cdot}}}}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/049aa166f1cfb206.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0022.png"
+    },
+    {
+      "sample_id": "pm_260",
+      "image_path": "data/page_math/pm_260.png",
+      "ground_truth": "\\sqrt{tr(A^{\\top}A)}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0698cd5349dae70c.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_261",
+      "image_path": "data/page_math/pm_261.png",
+      "ground_truth": "\\sum_{0\\le k\\le n}(\\begin{matrix}n\\\\ k\\end{matrix})=2^{n}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01054bf06792066a.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0051.png"
+    },
+    {
+      "sample_id": "pm_262",
+      "image_path": "data/page_math/pm_262.png",
+      "ground_truth": "\\sum_{i=1}^{k}\\sum_{w\\in V}f_{i}(s_{i},w)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00b2ce18a5aa30a6.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_263",
+      "image_path": "data/page_math/pm_263.png",
+      "ground_truth": "\\sum_{x\\in\\{0,1\\}^{T}}|x\\rangle|f(x)\\rangle",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02c9daf282f5a1e3.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_264",
+      "image_path": "data/page_math/pm_264.png",
+      "ground_truth": "\\tau_{1}=\\frac{L/2}{c+u};\\tau_{2}=\\frac{L/2}{c-u}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0000e31e33be1430.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0014.png"
+    },
+    {
+      "sample_id": "pm_265",
+      "image_path": "data/page_math/pm_265.png",
+      "ground_truth": "\\tilde{C}_{8}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/001f0f96215e2d84.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0010.png"
+    },
+    {
+      "sample_id": "pm_266",
+      "image_path": "data/page_math/pm_266.png",
+      "ground_truth": "\\tilde{E}=E\\times\\mathbb{Z}_{n}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/008004981b5b3ee1.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0024.png"
+    },
+    {
+      "sample_id": "pm_267",
+      "image_path": "data/page_math/pm_267.png",
+      "ground_truth": "\\tilde{X}\\in T_{e}E",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0155c0fe01231b04.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0017.png"
+    },
+    {
+      "sample_id": "pm_268",
+      "image_path": "data/page_math/pm_268.png",
+      "ground_truth": "\\tilde{\\Sigma}=V\\otimes\\Sigma",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/046fde10ad80f6f4.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_269",
+      "image_path": "data/page_math/pm_269.png",
+      "ground_truth": "\\tilde{\\gamma}(0)=p",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/010963a06d1d5a79.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0064.png"
+    },
+    {
+      "sample_id": "pm_270",
+      "image_path": "data/page_math/pm_270.png",
+      "ground_truth": "\\tilde{\\varphi}:\\mathbb{S}^{\\lambda}E\\rightarrow M",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/02270559509706de.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0015.png"
+    },
+    {
+      "sample_id": "pm_271",
+      "image_path": "data/page_math/pm_271.png",
+      "ground_truth": "\\tilde{g}_{lk}\\overline{n}=g_{kl}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/005f0a6b379cc5db.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0034.png"
+    },
+    {
+      "sample_id": "pm_272",
+      "image_path": "data/page_math/pm_272.png",
+      "ground_truth": "\\tilde{g}_{n}=[\\begin{matrix}g_{n}\\\\ \\gamma_{n}\\end{matrix}]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/00d4fc6636cbf2d9.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_273",
+      "image_path": "data/page_math/pm_273.png",
+      "ground_truth": "\\tilde{v}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/018f8eb18419d5bb.inkml；该公式在 13 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_274",
+      "image_path": "data/page_math/pm_274.png",
+      "ground_truth": "\\underline{P}X=\\emptyset",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/00874649f83c08b3.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0027.png"
+    },
+    {
+      "sample_id": "pm_275",
+      "image_path": "data/page_math/pm_275.png",
+      "ground_truth": "\\underline{x}\\in\\mathbb{R}^{n}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/067a327b0c92095f.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_276",
+      "image_path": "data/page_math/pm_276.png",
+      "ground_truth": "\\vartheta(KG_{n,k})=(\\begin{matrix}n-1\\\\ k-1\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0426225e4adc4605.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0021.png"
+    },
+    {
+      "sample_id": "pm_277",
+      "image_path": "data/page_math/pm_277.png",
+      "ground_truth": "\\vartheta(n)=\\frac{1}{\\sqrt{1-\\frac{n^{7}}{c^{7}}}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/07556e5288679e40.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_278",
+      "image_path": "data/page_math/pm_278.png",
+      "ground_truth": "\\vartheta=-\\frac{log\\frac{\\phi_{\\varsigma_{1}}}{\\phi_{\\varsigma_{2}}}}{log\\frac{\\varsigma_{1}}{\\varsigma_{2}}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/000aa4c444cba3f2.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0079.png"
+    },
+    {
+      "sample_id": "pm_279",
+      "image_path": "data/page_math/pm_279.png",
+      "ground_truth": "\\vec{A}=[\\begin{matrix}A_{x}\\\\ A_{y}\\\\ A_{z}\\\\ \\end{matrix}]",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00029f64ce4df82b.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0027.png"
+    },
+    {
+      "sample_id": "pm_280",
+      "image_path": "data/page_math/pm_280.png",
+      "ground_truth": "\\vec{R}(\\nu)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/07534c098d424d5f.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0023.png"
+    },
+    {
+      "sample_id": "pm_281",
+      "image_path": "data/page_math/pm_281.png",
+      "ground_truth": "\\vec{p}_{0}=(0,1,0)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/07549352bfb72996.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0034.png"
+    },
+    {
+      "sample_id": "pm_282",
+      "image_path": "data/page_math/pm_282.png",
+      "ground_truth": "\\vec{x}\\in S",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01b74db41e479782.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0015.png"
+    },
+    {
+      "sample_id": "pm_283",
+      "image_path": "data/page_math/pm_283.png",
+      "ground_truth": "\\xi(B_{1}),...,\\xi(B_{n})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000ef5e38715a9bc.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0027.png"
+    },
+    {
+      "sample_id": "pm_284",
+      "image_path": "data/page_math/pm_284.png",
+      "ground_truth": "\\xi=\\frac{x}{2\\sqrt{t}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/047ce2586c0b5f0c.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_285",
+      "image_path": "data/page_math/pm_285.png",
+      "ground_truth": "\\xi_{[t]}=(\\xi_{1},...,\\xi_{t})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01058e873802b3d2.inkml；该公式在 10 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_286",
+      "image_path": "data/page_math/pm_286.png",
+      "ground_truth": "\\{A_{i}|i\\in\\underline{m}\\backslash A\\}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/025f579aa67dfd7c.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0015.png"
+    },
+    {
+      "sample_id": "pm_287",
+      "image_path": "data/page_math/pm_287.png",
+      "ground_truth": "\\{L(u,v):u,v\\in X\\}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/013a32b84ce6252f.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0039.png"
+    },
+    {
+      "sample_id": "pm_288",
+      "image_path": "data/page_math/pm_288.png",
+      "ground_truth": "\\{f_{X}(\\cdot;\\theta)|\\theta\\in\\Theta\\}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/009fb93aab47d6f5.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0010.png"
+    },
+    {
+      "sample_id": "pm_289",
+      "image_path": "data/page_math/pm_289.png",
+      "ground_truth": "a\\cdot(pb)\\ne pa\\cdot b",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0154666b7b559c17.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_290",
+      "image_path": "data/page_math/pm_290.png",
+      "ground_truth": "a\\notin A",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/013b7229b727f967.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0028.png"
+    },
+    {
+      "sample_id": "pm_291",
+      "image_path": "data/page_math/pm_291.png",
+      "ground_truth": "a_{b,i}=\\gamma_{b,i}\\frac{b_{i}}{b^{\\ominus}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/04fc9a7665035a0d.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0011.png"
+    },
+    {
+      "sample_id": "pm_292",
+      "image_path": "data/page_math/pm_292.png",
+      "ground_truth": "abca^{-1}b^{-1}d\\sim?",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/029decc2d74fd082.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_293",
+      "image_path": "data/page_math/pm_293.png",
+      "ground_truth": "arctan\\sqrt{2}=54.7^{\\circ}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00d3c94d3fc0dd27.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_294",
+      "image_path": "data/page_math/pm_294.png",
+      "ground_truth": "b\\cdot c=a",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0002f466c11dda20.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0016.png"
+    },
+    {
+      "sample_id": "pm_295",
+      "image_path": "data/page_math/pm_295.png",
+      "ground_truth": "c\\notin A",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/011a66ef71133c7d.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_296",
+      "image_path": "data/page_math/pm_296.png",
+      "ground_truth": "d\\approx\\sqrt{2\\cdot k\\cdot R\\cdot h}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/02229a0c174d8dbe.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0021.png"
+    },
+    {
+      "sample_id": "pm_297",
+      "image_path": "data/page_math/pm_297.png",
+      "ground_truth": "d\\overline{v}=-\\frac{e\\cdot\\overline{E}}{m}dt",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/018b8fb309ce7af2.inkml；该公式在 10 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_298",
+      "image_path": "data/page_math/pm_298.png",
+      "ground_truth": "d^{\\prime}=V_{ud}d+V_{us}s",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/022b4cfb5a5a3856.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0056.png"
+    },
+    {
+      "sample_id": "pm_300",
+      "image_path": "data/page_math/pm_300.png",
+      "ground_truth": "e^{(\\frac{\\Upsilon}{\\phi})[1-\\sqrt{1-\\frac{5\\phi^{5}m}{\\Upsilon}}]}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/063aa42f5d0ef5be.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_301",
+      "image_path": "data/page_math/pm_301.png",
+      "ground_truth": "f(w)\\Vdash^{\\prime}p",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/059ac88233086bc0.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0026.png"
+    },
+    {
+      "sample_id": "pm_302",
+      "image_path": "data/page_math/pm_302.png",
+      "ground_truth": "f(x)=\\sum_{k=1}^{\\infty}\\frac{sin(2^{k}x)}{\\sqrt{2}^{k}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0000d71cda4329a6.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0039.png"
+    },
+    {
+      "sample_id": "pm_303",
+      "image_path": "data/page_math/pm_303.png",
+      "ground_truth": "f(x_{t},t)=x_{t}e^{\\theta t}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02dcdb815d18cdf1.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0075.png"
+    },
+    {
+      "sample_id": "pm_304",
+      "image_path": "data/page_math/pm_304.png",
+      "ground_truth": "f(y)=2+2y+y^{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/024279a4b8037bae.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0024.png"
+    },
+    {
+      "sample_id": "pm_305",
+      "image_path": "data/page_math/pm_305.png",
+      "ground_truth": "f=1-exp(-\\frac{\\pi}{3}\\dot{N}G^{3}t^{4})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0006d70f6ba76817.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0047.png"
+    },
+    {
+      "sample_id": "pm_306",
+      "image_path": "data/page_math/pm_306.png",
+      "ground_truth": "f=g(\\theta^{\\prime})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/05373ec225cc541a.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_307",
+      "image_path": "data/page_math/pm_307.png",
+      "ground_truth": "f^{-1}(x)=\\frac{1}{f(x)}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0333d9584ff7c0d0.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0022.png"
+    },
+    {
+      "sample_id": "pm_308",
+      "image_path": "data/page_math/pm_308.png",
+      "ground_truth": "f^{-1}(y)=\\sqrt{y}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0276c02c9b9222e9.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0022.png"
+    },
+    {
+      "sample_id": "pm_309",
+      "image_path": "data/page_math/pm_309.png",
+      "ground_truth": "f_{a}(bx)=f_{f_{a}(b)}(x)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02657f6bba1d2004.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_310",
+      "image_path": "data/page_math/pm_310.png",
+      "ground_truth": "f_{c}=\\frac{1}{2\\pi C(R+S)}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01a595d8d764a7b7.inkml；该公式在 9 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_311",
+      "image_path": "data/page_math/pm_311.png",
+      "ground_truth": "f_{n}:S\\rightarrow\\mathbb{C}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/03d01506fe3647c4.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_312",
+      "image_path": "data/page_math/pm_312.png",
+      "ground_truth": "f_{n}\\rightarrow\\chi_{[1,2)}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01ab618a2350036f.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_313",
+      "image_path": "data/page_math/pm_313.png",
+      "ground_truth": "f_{z}(x)=e^{ix^{t}Zx/2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02d5b5f98ac5fbd2.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0090.png"
+    },
+    {
+      "sample_id": "pm_314",
+      "image_path": "data/page_math/pm_314.png",
+      "ground_truth": "g(x)=G^{\\prime}(x)=0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/00015681597577ca.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0087.png"
+    },
+    {
+      "sample_id": "pm_315",
+      "image_path": "data/page_math/pm_315.png",
+      "ground_truth": "g=g_{-1}\\oplus g_{0}\\oplus g_{1}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/025f51bee0e59494.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_316",
+      "image_path": "data/page_math/pm_316.png",
+      "ground_truth": "i_{Q}:Q\\hookrightarrow E",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/01650d074915628e.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0003.png"
+    },
+    {
+      "sample_id": "pm_317",
+      "image_path": "data/page_math/pm_317.png",
+      "ground_truth": "j=\\frac{da}{dt}=\\frac{d^{2}v}{dt^{2}}=\\frac{d^{3}r}{dt^{3}}.",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000738d0afa0adb1.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0015.png"
+    },
+    {
+      "sample_id": "pm_318",
+      "image_path": "data/page_math/pm_318.png",
+      "ground_truth": "k=\\lceil log_{2}n+1\\rceil",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/00bc1c89dff0672e.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0064.png"
+    },
+    {
+      "sample_id": "pm_320",
+      "image_path": "data/page_math/pm_320.png",
+      "ground_truth": "l_{2}\\equiv\\partial_{xy}+\\frac{1}{x+y}\\partial_{y}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/02210ec4545e3b0a.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_321",
+      "image_path": "data/page_math/pm_321.png",
+      "ground_truth": "l_{n}=kl_{n}\\cdot\\frac{b_{n}}{b_{a}}\\cdot\\frac{s_{n}}{s_{a}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/00c46c9b07b39bb7.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0024.png"
+    },
+    {
+      "sample_id": "pm_322",
+      "image_path": "data/page_math/pm_322.png",
+      "ground_truth": "lim_{\\lambda\\in\\Lambda}||ae_{\\lambda}-a||\\rightarrow0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/01468b08b993df97.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0052.png"
+    },
+    {
+      "sample_id": "pm_323",
+      "image_path": "data/page_math/pm_323.png",
+      "ground_truth": "lim_{n\\longrightarrow\\infty}\\alpha(G_{n},\\epsilon)=0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/033d57e0703ab948.inkml；该公式在 10 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_324",
+      "image_path": "data/page_math/pm_324.png",
+      "ground_truth": "log\\hat{\\lambda}\\approx Z\\sqrt{4/D}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/018f456e217f1301.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0017.png"
+    },
+    {
+      "sample_id": "pm_325",
+      "image_path": "data/page_math/pm_325.png",
+      "ground_truth": "m\\equiv\\frac{RF_{,R}}{F}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01d2f97f90ed79e6.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_326",
+      "image_path": "data/page_math/pm_326.png",
+      "ground_truth": "m^{*}(E,\\hat{B},k_{\\hat{B}})=\\frac{\\hbar^{2}}{2\\pi}\\cdot\\frac{\\partial}{\\partial E}A(E,\\hat{B},k_{\\hat{B}})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000e15155cba9feb.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0010.png"
+    },
+    {
+      "sample_id": "pm_327",
+      "image_path": "data/page_math/pm_327.png",
+      "ground_truth": "m_{i,j}=x^{i}\\cdot x^{j}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0083f66ddd05c46c.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_328",
+      "image_path": "data/page_math/pm_328.png",
+      "ground_truth": "n=\\frac{M_{1}-M_{0}}{t}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/04aeed012ef93461.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_330",
+      "image_path": "data/page_math/pm_330.png",
+      "ground_truth": "nlog_{2}n-\\frac{n}{ln2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0235a447c15a24d7.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0017.png"
+    },
+    {
+      "sample_id": "pm_331",
+      "image_path": "data/page_math/pm_331.png",
+      "ground_truth": "o_{n}(R)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/004466873ec97648.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_332",
+      "image_path": "data/page_math/pm_332.png",
+      "ground_truth": "p20+1,\\cdot\\cdot\\cdot,p20+\\lambda",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/050eb35c2f18a695.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0052.png"
+    },
+    {
+      "sample_id": "pm_333",
+      "image_path": "data/page_math/pm_333.png",
+      "ground_truth": "p=(p_{x},p_{y},p_{z})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/006badbfc63bbd21.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0004.png"
+    },
+    {
+      "sample_id": "pm_334",
+      "image_path": "data/page_math/pm_334.png",
+      "ground_truth": "p\\in Z(g^{*})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/011f633d896bd07b.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0090.png"
+    },
+    {
+      "sample_id": "pm_335",
+      "image_path": "data/page_math/pm_335.png",
+      "ground_truth": "p\\mathbb{N}+b",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000ec7031be06d31.inkml；该公式在 1 页中出现过",
+      "source_artifact": "images/page_0036.png"
+    },
+    {
+      "sample_id": "pm_336",
+      "image_path": "data/page_math/pm_336.png",
+      "ground_truth": "pz\\overline{z}+gz+\\overline{gz}=q",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0040a950663bd899.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0015.png"
+    },
+    {
+      "sample_id": "pm_337",
+      "image_path": "data/page_math/pm_337.png",
+      "ground_truth": "q=\\frac{1}{\\sqrt{1\\cdot\\frac{v^{5}}{c^{5}}}}\\xi",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0050464363a7d02d.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0048.png"
+    },
+    {
+      "sample_id": "pm_338",
+      "image_path": "data/page_math/pm_338.png",
+      "ground_truth": "q=min(al,\\frac{k}{\\sigma})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/04e56f2e30f866d8.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0058.png"
+    },
+    {
+      "sample_id": "pm_339",
+      "image_path": "data/page_math/pm_339.png",
+      "ground_truth": "r=a-|n|\\lfloor\\frac{a}{|n|}\\rfloor",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/00997a3afd226540.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_340",
+      "image_path": "data/page_math/pm_340.png",
+      "ground_truth": "s(\\lambda),\\lambda\\in\\sigma(A),",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0002459d7b2998f7.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_341",
+      "image_path": "data/page_math/pm_341.png",
+      "ground_truth": "t=\\frac{0}{\\sqrt{0+\\frac{u^{2}}{c^{2}}}}\\kappa",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0443cdf212ee67b1.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0016.png"
+    },
+    {
+      "sample_id": "pm_342",
+      "image_path": "data/page_math/pm_342.png",
+      "ground_truth": "t\\longrightarrow F(t,t_{0},x)",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/00692074bbc0f678.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0023.png"
+    },
+    {
+      "sample_id": "pm_343",
+      "image_path": "data/page_math/pm_343.png",
+      "ground_truth": "t_{i}-1\\le x<t_{i}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/0717c14705cc721d.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_344",
+      "image_path": "data/page_math/pm_344.png",
+      "ground_truth": "tan(-\\theta)=-tan\\theta",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0001721306e6f1df.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0030.png"
+    },
+    {
+      "sample_id": "pm_346",
+      "image_path": "data/page_math/pm_346.png",
+      "ground_truth": "u=1+l^{2}+m^{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01292cf19c2c9c7c.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0010.png"
+    },
+    {
+      "sample_id": "pm_347",
+      "image_path": "data/page_math/pm_347.png",
+      "ground_truth": "v_{i}:X\\longrightarrow R_{+}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/028a59322b50b764.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0037.png"
+    },
+    {
+      "sample_id": "pm_348",
+      "image_path": "data/page_math/pm_348.png",
+      "ground_truth": "w(\\neg\\theta)=F_{\\neg}(w(\\theta))",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0052b8e13b5f4a36.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0007.png"
+    },
+    {
+      "sample_id": "pm_349",
+      "image_path": "data/page_math/pm_349.png",
+      "ground_truth": "w_{1}\\cdot\\cdot\\cdot w_{p}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/00e206f3a5cdc7fb.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0008.png"
+    },
+    {
+      "sample_id": "pm_350",
+      "image_path": "data/page_math/pm_350.png",
+      "ground_truth": "x!=\\Gamma(x+1)=\\int_{0}^{\\infty}\\frac{t^{x}}{e^{t}}dt",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0000cbeca361b986.inkml；该公式在 2 页中出现过",
+      "source_artifact": "images/page_0058.png"
+    },
+    {
+      "sample_id": "pm_351",
+      "image_path": "data/page_math/pm_351.png",
+      "ground_truth": "x,y\\in\\mathbb{Z}+\\mathbb{Z}\\sqrt{10}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/06186bea537734a2.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0005.png"
+    },
+    {
+      "sample_id": "pm_352",
+      "image_path": "data/page_math/pm_352.png",
+      "ground_truth": "x=\\frac{4}{\\sqrt{4+\\frac{v^{2}}{c^{2}}}}\\upsilon",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/04e2d85cba0103e9.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0055.png"
+    },
+    {
+      "sample_id": "pm_353",
+      "image_path": "data/page_math/pm_353.png",
+      "ground_truth": "x=\\frac{E}{\\omega_{c}B}(1-cos(\\omega_{c}t))",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000b7c3278aa77bf.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0026.png"
+    },
+    {
+      "sample_id": "pm_354",
+      "image_path": "data/page_math/pm_354.png",
+      "ground_truth": "x=\\frac{a^{2}-2}{2},y=\\frac{ab}{2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/0001d203bdf3b07e.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_355",
+      "image_path": "data/page_math/pm_355.png",
+      "ground_truth": "x=\\sqrt[3]{u}+\\sqrt[3]{v}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/016e9b0a2882071d.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_356",
+      "image_path": "data/page_math/pm_356.png",
+      "ground_truth": "x\\#=\\prod_{p\\le x}p",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/073036bdd616605d.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0042.png"
+    },
+    {
+      "sample_id": "pm_357",
+      "image_path": "data/page_math/pm_357.png",
+      "ground_truth": "x_{1}-x_{2}+x_{0}=0",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/002ae6d5dd4173e4.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0027.png"
+    },
+    {
+      "sample_id": "pm_358",
+      "image_path": "data/page_math/pm_358.png",
+      "ground_truth": "x_{i}^{\\prime}\\equiv\\frac{1}{1+e^{-\\frac{x_{i}-\\mu_{i}}{\\sigma_{i}}}}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/010d0f9e951a7a44.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0045.png"
+    },
+    {
+      "sample_id": "pm_359",
+      "image_path": "data/page_math/pm_359.png",
+      "ground_truth": "y=c_{1}e^{x}+xe^{x}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/0114d751a72fd56b.inkml；该公式在 8 页中出现过",
+      "source_artifact": "images/page_0006.png"
+    },
+    {
+      "sample_id": "pm_360",
+      "image_path": "data/page_math/pm_360.png",
+      "ground_truth": "y\\in\\mathbb{Z}_{n}^{*}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 synthetic/000231fcc0808b6a.inkml；该公式在 7 页中出现过",
+      "source_artifact": "images/page_0009.png"
+    },
+    {
+      "sample_id": "pm_361",
+      "image_path": "data/page_math/pm_361.png",
+      "ground_truth": "y^{2}=x^{3}-n^{2}x",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/02de91b624143438.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0036.png"
+    },
+    {
+      "sample_id": "pm_362",
+      "image_path": "data/page_math/pm_362.png",
+      "ground_truth": "|0|<|1|+|-2|",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/018f48ac8fe4bd53.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0001.png"
+    },
+    {
+      "sample_id": "pm_363",
+      "image_path": "data/page_math/pm_363.png",
+      "ground_truth": "|S|\\le(\\begin{matrix}n\\\\ \\lfloor n/2\\rfloor\\end{matrix})",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 train/01fdfab60060594b.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0032.png"
+    },
+    {
+      "sample_id": "pm_364",
+      "image_path": "data/page_math/pm_364.png",
+      "ground_truth": "|V_{0}|\\gg E_{f}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0247a5d7e1002d66.inkml；该公式在 4 页中出现过",
+      "source_artifact": "images/page_0023.png"
+    },
+    {
+      "sample_id": "pm_365",
+      "image_path": "data/page_math/pm_365.png",
+      "ground_truth": "|\\frac{d^{2}y}{dx^{2}}|\\approx\\frac{1}{R}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/0082d4aa943b9f8c.inkml；该公式在 9 页中出现过",
+      "source_artifact": "images/page_0002.png"
+    },
+    {
+      "sample_id": "pm_366",
+      "image_path": "data/page_math/pm_366.png",
+      "ground_truth": "|\\omega_{i}|=q^{1/2}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 valid/009fc6849e2b7909.inkml；该公式在 5 页中出现过",
+      "source_artifact": "images/page_0039.png"
+    },
+    {
+      "sample_id": "pm_367",
+      "image_path": "data/page_math/pm_367.png",
+      "ground_truth": "|\\psi\\rangle=\\sum_{n=0}^{\\infty}a_{n}|\\psi_{n}\\rangle",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/022be26e0a8ab535.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0024.png"
+    },
+    {
+      "sample_id": "pm_368",
+      "image_path": "data/page_math/pm_368.png",
+      "ground_truth": "|g,n\\rangle\\rightarrow|e,n-1\\rangle",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/01e4c8973307a964.inkml；该公式在 6 页中出现过",
+      "source_artifact": "images/page_0012.png"
+    },
+    {
+      "sample_id": "pm_369",
+      "image_path": "data/page_math/pm_369.png",
+      "ground_truth": "||L_{x}||_{(l^{p})^{*}}=||x||_{q}",
+      "human_review": "confirmed_correct",
+      "review_note": "latex 取自 MathWriting 的 normalizedLabel（人工标注），来源 test/014f7412fa06f5c0.inkml；该公式在 3 页中出现过",
+      "source_artifact": "images/page_0042.png"
+    }
+  ]
+}
