@@ -16,6 +16,12 @@
 
 ### 已经实现并有本地证据
 
+> **关于表中「证据」列的一点更正（2026-11-25）**：标了 `artifacts/...` 的那几行，
+> 对应文件**当前不在工作区**，也不在备份里（核对过 `h2l-backups/h2l-work-2026-11-25.zip`）。
+> 也就是说这些条目"实现过、跑通过"，但**证据文件没能留下来**，本机无法直接复现。
+> 标了 `tests/xxx.py` 的条目不受影响——那些测试现在全部通过（186 个用例，0 错误）。
+> 缺失文件完整清单（11 个）与处理选项见 `docs/成果汇报_2026-11-25.md` 的 7.2 节。
+
 | 能力 | 入口 | 证据 |
 | --- | --- | --- |
 | 公式图片 → LaTeX 候选列表（5 字段契约） | `recognizer.recognize()` | `tests/test_recognizer.py` |
@@ -584,6 +590,15 @@ FULLPAGE_MAX_TOKENS=40000 FULLPAGE_TIMEOUT_SECONDS=300 \
 
 ### 9.2 单张手写公式真值与实测准确率（2026-11-20）
 
+> **证据文件状态（2026-11-25 核对）**：本节表格引用的
+> `artifacts/handwritten_eval_*.json` 报告**不在当前工作区**，也不在
+> `h2l-backups/h2l-work-2026-11-25.zip` 备份里（即不是某次改动弄丢的）。
+> 下面这些数字是**当时在 RTX 5070 Laptop 上跑出来的历史结果**，本机无法直接复现。
+> 真值集本身还在（`data/handwritten_ground_truth.json`，12 条，用户逐条确认），
+> 评估脚本也在，装上对应模型并配好密钥后可重跑：
+> `python -m reasoning.handwritten_eval --output artifacts/handwritten_eval_xxx.json`。
+> 完整缺失清单与处理选项见 `docs/成果汇报_2026-11-25.md` 的 7.2 节。
+
 12 张裁剪图的真值由用户在 2026-11-03 逐条确认，清单在
 `data/handwritten_ground_truth.json`，评估脚本是 `reasoning/handwritten_eval.py`。
 口径与 C 的 `evaluate_refinement` 一致：只做 `strip` 后**整串精确匹配**，不做语义等价。
@@ -612,6 +627,13 @@ sample_6/7/10 在已试模型的多视角候选里都没有正确答案；zoom2/
 泛化准确率或性能基准。整页转录仍未建立逐字真值。
 
 ### 9.3 真实 API 下的并行提速与重复识别差异（2026-11-24）
+
+> **证据文件状态（2026-11-25 核对）**：本节引用的 `artifacts/real_api_parallel/`
+> （`run_concurrency_3.json`、`run_concurrency_1.json`、`summary.json`）**不在当前
+> 工作区**，也不在备份里。下表的数字是**历史实测结果**，本机当前无法复现——
+> 而且这台机器的 `.env` 里 `OPENAI_API_KEY` 是空的，重跑必然得到不同数字，
+> 拿它当同一份证据反而更糟。要重新生成需先配好密钥，再按本节方法跑并发 3 / 串行 1 两轮。
+> 完整缺失清单见 `docs/成果汇报_2026-11-25.md` 的 7.2 节。
 
 用 `data/pdf_pages/page_2~4`（3 张真实手写笔记页）走**产品真实链路**（`POST /api/documents/batch` →
 并行识别 → 信号落盘 → Tectonic 编译），`deepseek-flash`，并发 3 与串行各跑一轮。
