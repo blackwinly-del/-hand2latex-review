@@ -160,6 +160,24 @@ def _local_commit_chain(base: str, head: str) -> list[str]:
     return [line.strip() for line in out.splitlines() if line.strip()]
 
 
+def _resolve_local_equivalent(base_sha: str, head: str, base_tree: str) -> str | None:
+    """base 是本机不认识的远端 sha 时，找一个"内容与它完全相同"的本地提交。
+
+    典型场景：上次走 API 推的提交在远端叫 3ee41768，本地对应的是 f1cb06b
+    （树相同、提交对象不同）。不把这两个对上，回放时就会拿本地 sha 去远端查父提交，
+    得到一个 404。判据用树哈希，不用提交号——提交号本来就不同。
+    """
+    if _is_local(base_sha):
+        return base_sha
+    for line in str(_git("rev-list", head)).splitlines():
+        candidate = line.strip()
+        if not candidate:
+            continue
+        if str(_git("rev-parse", f"{candidate}^{{tree}}")).strip() == base_tree:
+            return candidate
+    return None
+
+
 def _commit_meta(sha: str) -> dict:
     """取一个本地提交的元信息：树、作者、提交者、消息、父提交。
 
@@ -265,13 +283,30 @@ def main() -> int:
         return 0
 
     # ---- 要推哪些提交 ----
-    chain = _local_commit_chain(base_sha, head_sha)
+    # base 是本机不认识的远端 sha 时，先找本地那个"树相同"的提交，把它当成 base 的替身：
+    # 回放时父提交必须能落到"已存在的东西"上，拿本地 sha 去远端查只会 404。
+    base_stand_in = _resolve_local_equivalent(base_sha, head_sha, base_tree)
+    if base_stand_in != base_sha:
+        if base_stand_in is None:
+            print(
+                f"  注意：本地找不到与远端 base {base_sha[:8]} 内容相同的提交，"
+                f"按单提交推送（父子关系会对不上，推多项改动时慎用）",
+            )
+            chain = [head_sha]
+        else:
+            print(f"  base {base_sha[:8]}（远端）对应本地 {base_stand_in[:8]}（树相同）")
+            chain = _local_commit_chain(base_stand_in, head_sha)
+    else:
+        chain = _local_commit_chain(base_sha, head_sha)
     if not chain:
-        # base 不在本地时算不出增量提交，退回"把 head 压成一个提交挂到 base 上"。
         chain = [head_sha]
-        print(f"  只推 1 个提交（base 不在本地，算不出中间的提交链）")
+        print("  只推 1 个提交")
     else:
         print(f"  提交链 {len(chain)} 个：{' -> '.join(s[:7] for s in chain)}")
+    # 本地替身要映射到远端 base，回放第一个提交时父提交才落得下去。
+    stand_in_map: dict[str, str] = {}
+    if base_stand_in and base_stand_in != base_sha:
+        stand_in_map[base_stand_in] = base_sha
 
     if args.dry_run:
         for sha in chain:
@@ -280,20 +315,27 @@ def main() -> int:
         return 0
 
     # ---- 逐个提交重放，保留父提交与合并拓扑 ----
-    mapping: dict[str, str] = {}          # 本地提交 -> 远端新建的提交
+    mapping: dict[str, str] = dict(stand_in_map)   # 本地提交 -> 远端已有/新建的提交
     trees: dict[str, str] = {base_sha: base_tree}
     last_remote = base_sha
     for sha in chain:
         meta = _commit_meta(sha)
         local_parents = meta["parents"]
-        # 父提交映射：链内已重放的用新 sha，链外的（base 或别的分支）原样保留。
+        # 父提交映射：链内已重放的用新 sha，本地替身映射到远端 base，链外的原样保留。
         remote_parents = [mapping.get(p, p) for p in local_parents] or [base_sha]
-        parent_tree = trees.get(remote_parents[0]) or _tree_of(args.repo, token, remote_parents[0])
+        # 父提交必须能落到远端已知的提交上；落不下去说明链条断了，直接停下报清楚。
+        parent_tree = trees.get(remote_parents[0])
+        if parent_tree is None:
+            parent_tree = _tree_of(args.repo, token, remote_parents[0])
+        trees[remote_parents[0]] = parent_tree
 
-        # 相对第一个本地父提交算改动（合并提交也是这个语义：净变化）。
-        # 父提交不在本地（就是 base，而 base 是别人用 API 推的）时，_changed_files 会自己
-        # 退回用远端树比对。
-        diff_base = local_parents[0] if local_parents else base_sha
+        # 相对第一个父提交算改动（合并提交也是这个语义：净变化）。
+        # 优先用本地父提交（本地 git 能直接 diff）；它是本地替身、本地没有对应对象时，
+        # 退到远端 base——_changed_files 会自己改用远端树比对。
+        if local_parents and _is_local(local_parents[0]):
+            diff_base = local_parents[0]
+        else:
+            diff_base = base_sha
         files = _changed_files(diff_base, sha, args.repo, token, parent_tree)
         entries = _build_entries(files, sha, args.repo, token)
         tree = _request(

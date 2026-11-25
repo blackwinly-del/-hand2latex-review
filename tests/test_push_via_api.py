@@ -159,6 +159,32 @@ class PushViaApiTests(unittest.TestCase):
         meta = self.module._commit_meta(merges[0])
         self.assertEqual(len(meta["parents"]), 2, f"{merges[0][:8]} 应该是双亲合并提交")
 
+    def test_resolves_local_stand_in_for_foreign_base(self):
+        """远端 base 是本机不认识的 sha 时，要按树哈希找到本地替身。
+
+        不这么做的话，回放第一个提交时会把本地 sha 当父提交去远端查，得到 404。
+        （真踩过：base 是上次走 API 推的 3ee41768，本地对应的是 f1cb06b。）
+        """
+        head_tree = __import__("subprocess").run(
+            ["git", "rev-parse", "HEAD^{tree}"], cwd=_ROOT, capture_output=True, text=True, check=False
+        ).stdout.strip()
+        # 拿一个本地绝不存在的假 sha 当"远端 base"，它不可能被 _is_local 认出来。
+        fake_remote = "0" * 40
+        found = self.module._resolve_local_equivalent(fake_remote, "HEAD", head_tree)
+        self.assertEqual(
+            found,
+            __import__("subprocess")
+            .run(["git", "rev-parse", "HEAD"], cwd=_ROOT, capture_output=True, text=True, check=False)
+            .stdout.strip(),
+            "树与 HEAD 相同的本地提交应该就是 HEAD 自己",
+        )
+
+    def test_stand_in_mapping_is_used_for_parents(self):
+        """替身映射必须真的进 parents，否则父提交又会变成远端不认识的本地 sha。"""
+        self.assertIn("_resolve_local_equivalent", self.source)
+        self.assertIn("stand_in_map", self.source)
+        self.assertIn("dict(stand_in_map)", self.source)
+
 
 if __name__ == "__main__":
     unittest.main()
