@@ -37,8 +37,9 @@
 | 逐页真实识别信号（`finish_reason`、真实 token 用量、是否接近输出上限、重试次数、块统计、耗时） | `workbench/full_page.py` | `tests/test_workbench.py` |
 | TeX 一字未改时复用上一次 PDF，不重跑 Tectonic | `workbench/app.py` | `tests/test_workbench_app.py` |
 | 改稿便捷性：`Ctrl+S` 编译、`F2` 跳下一处复核（带"第 N / M 处"计数）、浏览器草稿自动保存与恢复、历史版本回滚 | `workbench/static/index.html` | 2026-11-23 Playwright 实测 |
-| 打包成绿色 zip（随包带 Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描） | `scripts/package.ps1` | `dist/Hand2LaTeX-1.0.0-win64.zip`，20.4 MB，SHA256 `C30DFA363D75E565B74A08B849EF3EFBBF5B2ED639D7D9520698BD93B6D80E37`；解压后在浏览器里实测可用 |
-| 编译出 setup.exe 安装器（免管理员、装到用户目录、中文安装界面、卸载时问要不要删任务产物） | `scripts/package.ps1 -BuildInstaller` + `installer/hand2latex.iss` | `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，15.5 MB，SHA256 `7BDC80C048D857556142235906065E22BF8D4AE97BF2ACED2BC4985A4C6A8D71`；2026-11-23 静默装机 + 起服务 + 静默卸载实测通过 |
+| 随包 Python 运行时：目标机器不装 Python 也能跑（embeddable 3.12.10 + 预装 `requirements-app.txt`，官方 MD5 校验） | `scripts/build_python_runtime.ps1` | 运行时 111.5 MB；解压包与安装目录各起过一次服务，`/api/status` 报 `python_runtime.bundled=true`、解释器路径在包内、Python 3.12.10 |
+| 打包成绿色 zip（随包带 Python、Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描） | `scripts/package.ps1` | `dist/Hand2LaTeX-1.0.0-win64.zip`，64.9 MB，SHA256 `6989654F8454C0D7F951B37E98F75430A4076D93DAA57E98E3AAEDE81D3E53EA`；解压后用它自己的 `launch.ps1` 起服务并通过浏览器实测 |
+| 编译出 setup.exe 安装器（免管理员、装到用户目录、中文安装界面、卸载时问要不要删任务产物） | `scripts/package.ps1 -BuildInstaller` + `installer/hand2latex.iss` | `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，44.1 MB，SHA256 `01B84DE262091BFE005EE0CDE392542A3F2AFF95EED275DB2EDDA66C60B98CFB`；静默装机 + 起服务 + 静默卸载实测通过 |
 | 真实付费 API 下的并行提速与真实信号采集（3 页真实手写笔记，并发 3 与串行各跑一轮） | `workbench/app.py` + `workbench/full_page.py` | `artifacts/real_api_parallel/summary.json`：82.7 s vs 232.7 s，**实测提速 2.81 倍**；两轮 completion token 合计 91402，`finish_reason` 全为 `stop`，无重试 |
 
 ### 尚未实现或尚未证明（审阅时请重点看这里）
@@ -60,7 +61,14 @@
   本地画板识别仍是单张串行，CPU 推理和 Tectonic 编译都慢。
 - 安装器只做过**静默安装 / 静默卸载**的验证（装到临时目录、跑通、卸干净）；带界面的安装向导
   （选目录、勾桌面快捷方式、卸载时问要不要删 `artifacts`）**没有人工点过一遍**，只做了代码审阅。
-  安装包里不含 Python，目标机器没有 Python 3.10~3.12 时仍然跑不起来。
+- 随包 Python 运行时是在**本机**（装了 Python 3.12 的开发机）上验证的：解释器路径、依赖导入、起服务、
+  浏览器页面都确认过走的是包里那份 3.12.10，启动器也完全不碰 `.venv`。但**没有在一台真没装过 Python 的
+  干净机器上跑过**，所以"目标机器零 Python 依赖"这一步还差最后一道实证。
+- 随包运行时只覆盖网页工作台：`requirements-app.txt` 里没有 torch / paddle / numpy / Pillow，
+  所以**安装包里的画板演示与 B 侧本地公式识别用不了**（整页识别走云端 API，不受影响）。
+  运行时里的 `pymupdf` 钉的是 1.28.2，而开发环境是 2.0——已实测两者在代码用到的
+  `open/page_count/get_text/get_images/get_drawings` 上结果一致，但这是一处**故意的版本分叉**。
+- 卸载后 `.env`（可能写着你的密钥）仍会留在安装目录里，卸载器不删用户密钥文件；说明里写了要自己删。
 - 状态面板、进度条、逐页信号和改稿便捷性的**浏览器验收是在 mock 识别 + mock 编译下做的**；
   真实 API 只跑过服务端链路（上传→并行识别→信号落盘→编译→编译复用），没有同时在浏览器里点一遍。
   真实运行里 `near_token_budget` 六页全为 `false`（最高一页用了输出预算的 84%），所以"接近预算"这条告警
@@ -136,10 +144,10 @@
 | 模型权重 | PP-FormulaNet-L 约 695 MB，放 `models/PP-FormulaNet-L/`（同样被排除，首次运行可自动下载） |
 | 多模态 API | 任意 OpenAI 兼容接口，需支持图片输入 |
 
-上表是**从源码开发**时的要求。用 `scripts/package.ps1` 打出来的安装包不需要目标机器装 Python、
-Node.js 或 Tectonic：Python 3.12 运行时（embeddable + 预装 `requirements-app.txt`）、`vue.global.js`
-和 `tectonic.exe` 都随包带。**只有画板演示与 B 侧本地识别不在覆盖范围内**——它们要 paddle / torch
-和约 3 GB 模型，仍然得按本节和第四节装完整环境。
+上表是**从源码开发**时的要求。用 `scripts/package.ps1` 打出来的安装包（zip 约 65 MB）不需要目标机器装 Python、
+Node.js 或 Tectonic：Python 3.12 运行时（embeddable + 预装 `requirements-app.txt`，约 111 MB 未压缩）、
+`vue.global.js` 和 `tectonic.exe` 都随包带。**只有画板演示与 B 侧本地识别不在覆盖范围内**——它们要 paddle / torch
+和约 3 GB 模型，仍然得按本节和第四节装完整环境。只想要瘦包（约 20 MB，对方自己装 Python）就加 `-NoPython`。
 
 ## 四、安装
 
@@ -426,26 +434,35 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -KeepSta
 `OPENAI_API_KEY` 值没有混进包里（扫到就中止）→ 压成 zip 并打印 SHA256。zip 里是一个
 `Hand2LaTeX-<版本>-win64` 顶层文件夹，"解压到当前文件夹"也不会把文件撒得到处都是。
 
-2026-11-23 实测产出（在提交 `8ea79e6` 的干净工作区上打的包，`BUILD_INFO.json` 里记的就是这个提交号）：
+2026-11-24 实测产出（在提交 `b9fae78` 的干净工作区上打的包，`BUILD_INFO.json` 里记的就是这个提交号）：
 
-- `dist/Hand2LaTeX-1.0.0-win64.zip`，20.4 MB，SHA256 `C30DFA363D75E565B74A08B849EF3EFBBF5B2ED639D7D9520698BD93B6D80E37`。
-  解压到临时目录、从解压目录起服务（8014 端口）：`/api/status` 报告 `build.source = 安装包`、`commit = 8ea79e6`、
-  构建时间有值、前端来自随包副本、Tectonic 0.17.0 在包内可用、任务数 0、`openai.configured = false`
-  （包里不带 `.env`，如实报未配置）；无头浏览器打开首页 Vue 正常挂载（10 个状态 chip、上传控件在、
-  `pageErrors` 为空），详情里显示“来源 安装包”“vue.global.js 来自随安装包携带的副本”
-  “API 密钥 未配置：上传识别、修复建议都用不了”，页面上没有出现任何密钥长度数字。
-- `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，15.5 MB，SHA256 `7BDC80C048D857556142235906065E22BF8D4AE97BF2ACED2BC4985A4C6A8D71`。
-  用 ISCC 6.7.3 编译（`Successful compile`，约 17 s）。静默装到临时目录（退出码 0）后核对：启动/关闭脚本、
-  `安装说明.txt`、`BUILD_INFO.json`、`tools\tectonic\tectonic.exe`、随包 `vue.global.js`、`unins000.exe` 都在；
-  从安装目录起服务（8015 端口），`/api/status` 报告 `build.source = 安装包`、`commit = 8ea79e6`、
-  前端与 Tectonic 路径都在安装目录内、任务目录也在安装目录内、云端识别如实报未配置。
-  静默卸载（`/VERYSILENT`）退出码 0：程序文件、`.venv`、各层 `__pycache__`、开始菜单组、注册表卸载项全部清掉，
-  事先放进去的 `artifacts\jobs\keepme.txt` **按设计保留**；`[Run]` 两条都带 `skipifsilent`，静默安装不会自动启动工作台。
-- 验证过程中真找到并修掉两个缺陷：① 卸载阶段的弹框判断误用了 `WizardSilent`（安装阶段专用），
+- `dist/Hand2LaTeX-1.0.0-win64.zip`，64.9 MB，SHA256 `6989654F8454C0D7F951B37E98F75430A4076D93DAA57E98E3AAEDE81D3E53EA`。
+  解压到临时目录后，**用它自己的 `scripts/launch.ps1` 起服务**（8022 端口）：启动器报告"使用随包 Python 运行时
+  （Python 3.12），不建虚拟环境、不装依赖""依赖齐全，无需安装""workbench.app 可以被随包运行时导入"，
+  日志与 PID 写在 `runtime\` 下；`/api/status` 报 `build.source = 安装包`、`commit = b9fae78`、
+  `python_runtime.bundled = true`、解释器路径在解压目录内、`in_virtualenv = false`、Python 3.12.10、
+  Tectonic 0.17.0 在包内可用、前端来自随包副本、任务目录在包内、`openai.configured = false`（不带 `.env`，如实报）。
+  无头浏览器首页检查 `PACKAGE PAGE CHECK OK`：Vue 正常挂载（10 个状态 chip、上传控件在、`pageErrors` 为空），
+  详情里显示“来源 安装包”“vue.global.js 来自随安装包携带的副本”“安装包随带的 Python 运行时”
+  “API 密钥 未配置：上传识别、修复建议都用不了”，页面上没有任何密钥长度数字。
+  再用它自己的 `launch.ps1 -Stop` 停服务：PID 1960 已停、端口关闭、`-Status` 报未运行。
+- `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，44.1 MB，SHA256 `01B84DE262091BFE005EE0CDE392542A3F2AFF95EED275DB2EDDA66C60B98CFB`。
+  用 ISCC 6.7.3 编译（`Successful compile`，约 69 s）。静默装到临时目录（退出码 0）后核对：
+  `runtime\python\python.exe`、`runtime\python\Lib\site-packages\uvicorn\__init__.py`、`requirements-app.txt`、
+  `BUILD_INFO.json`（含 `python_runtime.bundled = true`、`version = 3.12.10`）、启动脚本、`unins000.exe` 都在，
+  `.env`/`.venv`/`.cache`/`node_modules`/`models`/`artifacts`/`.git` 都没被带进去。
+  从安装目录用它自己的启动器起服务（8021 端口）实测：`python_runtime.bundled = true`、解释器在安装目录内、
+  Tectonic 与任务目录都在安装目录内、云端识别如实报未配置。
+  静默卸载（`/VERYSILENT`）退出码 0：程序文件、整个 `runtime\`（含日志）、各层 `__pycache__`、开始菜单组、
+  注册表卸载项全部清掉，事先放进去的 `artifacts\jobs\keepme.txt` **按设计保留**。
+- 打包核对环节自己抓到一个真问题：构建运行时的自检探针 `import workbench.app` 会在包根建出 `artifacts\jobs`
+  （`app.py` 导入时就 `mkdir`），于是"artifacts 不该出现在安装包里"这条核对失败；改成自检后只删空目录，
+  有文件就不动并如实告警。
+- 更早一轮验证中修掉的两个安装器缺陷：① 卸载阶段的弹框判断误用了 `WizardSilent`（安装阶段专用），
   静默卸载直接以退出码 1 失败，日志写明 `Cannot call "WizardSilent" function during Uninstall`，改用 `UninstallSilent`；
   ② `[UninstallDelete]` 只删了顶层 `__pycache__`，`workbench\` 和 `reasoning\` 下的没删，卸载后留垃圾。
 - 没验证的：带界面的安装向导（选目录、勾桌面图标、卸载时问要不要删 `artifacts`）**没有人工点过**，只做了代码审阅；
-  也没在没装过 Python 依赖的干净机器上跑过首次启动。
+  上述所有验证都在**本机**（装了 Python 3.12 的开发机）上做，没在一台真没装 Python 的干净机器上跑过。
 - 上面两个 SHA256 只对**那一次构建**有效：`README.md` 和 `reasoning/TEAM_LOG.md` 本身也在包里，
   所以改完文档再打一次包，哈希必然变（`BUILD_INFO.json` 里的构建时间也会变）。要核对就拿包里的
   `BUILD_INFO.json` 看提交号，别指望哈希长期不变。
