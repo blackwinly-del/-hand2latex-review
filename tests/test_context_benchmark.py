@@ -14,6 +14,40 @@ from reasoning.context_benchmark import (
 )
 
 
+# ---------------------------------------------------------------------------
+# 存档数据是否在仓库里
+#
+# 下面这几个文件不是"可以随手造"的测试夹具，而是**真实 API 响应的存档**：
+#   artifacts/context_conflict_samples.json       —— 一次真实采样的候选集
+#   artifacts/context_conflict_samples_v2.json    —— 扩到 10 条均衡冲突
+#   artifacts/context_stability_samples_8_9_run_{1,2,3}.json —— sample_8/9 各跑三轮的稳定性
+#
+# 它们的价值恰恰在于"是真实模型输出"——自己合成一份再让测试通过，测试就变成了
+# 自证（断言"我造的数据符合我造的数据"），比直接跳过更糟。
+#
+# 这 5 个文件在 2026-11-25 核对时已不在工作区，也不在 h2l-backups 的备份里，
+# 说明不是那次改动弄丢的。README 第 9 节引用的同类证据文件也一并缺失，
+# 已在 docs/成果汇报_2026-11-25.md 的 7.2 节列出全部清单和处理选项。
+#
+# 处理方式：只给依赖这些文件的 4 个用例加前置条件，其余 15 个用临时构造数据的
+# 用例照常运行——不因为缺存档就把整个上下文基准套件停掉。
+# 把文件补回来（重跑采集）之后，这 4 个用例会自动恢复运行，无需改代码。
+_ARTIFACTS_ROOT = Path(__file__).resolve().parent.parent / "artifacts"
+
+_CONFLICT_SAMPLES = _ARTIFACTS_ROOT / "context_conflict_samples.json"
+_CONFLICT_SAMPLES_V2 = _ARTIFACTS_ROOT / "context_conflict_samples_v2.json"
+_STABILITY_RUNS = [
+    _ARTIFACTS_ROOT / f"context_stability_samples_8_9_run_{index}.json"
+    for index in (1, 2, 3)
+]
+
+_NEED_REAL_SAMPLES = "缺少真实 API 响应存档（artifacts/context_conflict_samples*.json），跳过"
+
+
+def _has(paths) -> bool:
+    return all(path.is_file() for path in paths)
+
+
 def make_sample(sample_id, ground_truth, expected_index, latexes):
     return {
         "sample_id": sample_id,
@@ -71,6 +105,7 @@ class ContextBenchmarkTests(unittest.TestCase):
         self.assertFalse(report["results"][0]["refine_result"]["need_review"])
         self.assertTrue(report["results"][1]["refine_result"]["need_review"])
 
+    @unittest.skipUnless(_has([_CONFLICT_SAMPLES_V2]), _NEED_REAL_SAMPLES)
     @patch("reasoning.context_benchmark.check_renderable")
     @patch("reasoning.context_benchmark.choose_with_context")
     def test_expanded_dataset_offline_preserves_inputs_and_structure_review(self, choose_mock, render_mock):
@@ -102,6 +137,7 @@ class ContextBenchmarkTests(unittest.TestCase):
         self.assertEqual(structure_sample["refine_result"]["confidence"], "low")
         self.assertTrue(structure_sample["refine_result"]["need_review"])
 
+    @unittest.skipUnless(_has([_CONFLICT_SAMPLES]), _NEED_REAL_SAMPLES)
     @patch("reasoner.choose_with_context")
     def test_real_structural_repair_failure_now_requires_review(self, choose_mock):
         dataset = json.loads(DEFAULT_INPUT.read_text(encoding="utf-8"))
@@ -158,6 +194,7 @@ class ContextBenchmarkTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             replay_context_benchmark("same.json", "same.json")
 
+    @unittest.skipUnless(_has(_STABILITY_RUNS), _NEED_REAL_SAMPLES)
     def test_sample_9_saved_responses_all_require_review(self):
         for run_index in range(1, 4):
             with self.subTest(run=run_index):
@@ -178,6 +215,7 @@ class ContextBenchmarkTests(unittest.TestCase):
                 self.assertEqual(result["final_latex"], sample["refine_result"]["final_latex"])
                 self.assertEqual(result["changes"], sample["refine_result"]["changes"])
 
+    @unittest.skipUnless(_has([_CONFLICT_SAMPLES_V2]), _NEED_REAL_SAMPLES)
     def test_expanded_dataset_has_ten_valid_balanced_conflicts(self):
         input_path = DEFAULT_INPUT.with_name("context_conflict_samples_v2.json")
         dataset = json.loads(input_path.read_text(encoding="utf-8"))

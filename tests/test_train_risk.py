@@ -1,11 +1,25 @@
+"""本地风险模型的训练测试（需要 torch）。
+
+同 tests/test_risk_mlp.py：torch 是可选依赖，`requirements-app.txt`（随包运行时）
+故意不装它，因为装上会让交付包从 57 MB 涨到几百 MB。而 `reasoning/risk_mlp.py`
+第 1 行就 `import torch`，是内核文件不能改成延迟导入——所以这里把导入包进
+if 判断，让模块能正常加载，再用类级 skipUnless 表达跳过。
+（模块级 raise SkipTest 会被 unittest 记成 ERROR，不是 skip。）
+"""
+
+import importlib.util
 import unittest
 
-import torch
+_HAS_TORCH = importlib.util.find_spec("torch") is not None
 
-from reasoning.risk_mlp import RiskMLP
-from reasoning.train_risk import train_risk
+if _HAS_TORCH:
+    import torch
+
+    from reasoning.risk_mlp import RiskMLP
+    from reasoning.train_risk import train_risk
 
 
+@unittest.skipUnless(_HAS_TORCH, "torch 未安装（requirements.txt，本地风险模型支线），跳过")
 class TrainRiskTests(unittest.TestCase):
     def setUp(self):
         self.features = torch.tensor(
