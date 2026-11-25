@@ -332,26 +332,39 @@ function Invoke-Menu {
         Write-Host '   Hand2LaTeX 手写公式工作台 - 一键启动' -ForegroundColor White
         Write-Host '==============================================' -ForegroundColor White
         Write-Host '   [1] 体检        只检查环境，不安装不启动'
-        Write-Host '   [2] 打开工作台  桌面窗口（推荐，日常就用它）'
+        Write-Host '   [2] 打开工作台  桌面窗口（推荐，日常就用它）' -ForegroundColor Green
         Write-Host '   [3] 在浏览器打开 网页版，适合排查问题'
         Write-Host '   [4] 重启服务    改完代码后用这个'
         Write-Host '   [5] 查看状态    看服务是否还在运行'
         Write-Host '   [6] 停止服务'
         Write-Host '   [0] 退出'
         Write-Host ''
-        $choice = Read-Host '请输入 1-6 或 0'
+        # 直接回车 = 打开工作台。双击进来的人九成就是想用它，
+        # 让他必须先读菜单再敲数字是多余的门槛。
+        $choice = Read-Host '直接回车打开工作台，或输入 1-6 / 0'
+        if ([string]::IsNullOrWhiteSpace($choice)) { $choice = '2' }
+        $choice = $choice.Trim()
+        $shouldPause = $true
         switch ($choice) {
             '1' { Invoke-MenuChild '-CheckOnly' }
-            '2' { Invoke-MenuChild '-Desktop' }
-            '3' { Invoke-MenuChild '' }
-            '4' { Invoke-MenuChild '-Restart' }
+            '2' { Invoke-MenuChild '-Desktop'; $shouldPause = $false }
+            '3' { Invoke-MenuChild ''; $shouldPause = $false }
+            '4' { Invoke-MenuChild '-Restart'; $shouldPause = $false }
             '5' { Show-StatusSummary }
             '6' { Stop-RunningServer }
             '0' { return }
+            'q' { return }
+            'quit' { return }
+            'exit' { return }
             default { Write-Line '无效输入，请重新选择。' 'warn' }
         }
-        Write-Host ''
-        Read-Host '按回车返回菜单' | Out-Null
+        # 打开窗口/重启这类操作成功后窗口已经在了，再按一次回车是多余的。
+        if ($shouldPause) {
+            Write-Host ''
+            Read-Host '按回车返回菜单' | Out-Null
+        } else {
+            return
+        }
     }
 }
 
@@ -640,6 +653,16 @@ Write-Step '启动工作台'
 if ($Desktop -and -not $NoBrowser) {
     if (-not $venvReady) {
         Stop-WithHint '虚拟环境不可用，无法启动桌面窗口。' '请先运行不带 -CheckOnly 的本脚本完成安装。'
+    }
+    # 已经有服务在跑就直接把窗口指向它，不要再起第二个服务。
+    # 双击图标是重复动作里最常见的一种：用户忘了自己还开着，结果又起一个进程、
+    # 又占一个端口，关窗口时也搞不清该关哪个。
+    $existingDesktop = Get-RunningServerProcess
+    if ($existingDesktop -and (Test-HttpOk $Url) -and -not $Restart) {
+        Write-Line "工作台已在运行：PID $($existingDesktop.Id)，正在打开窗口" 'ok'
+        & $VenvPython -m workbench.desktop --attach $Url
+        if ($LASTEXITCODE -eq 0) { exit 0 }
+        Write-Line '没能复用已有服务，改为新起一个。' 'warn'
     }
     Write-Line "正在打开桌面窗口（端口从 $Port 起自动选择）…" 'info'
     Write-Line '关闭窗口即可退出；这个窗口关掉后服务也会一起停。' 'info'

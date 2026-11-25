@@ -199,12 +199,26 @@ def _open_browser(url: str) -> None:
 # ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
-def run(port: int | None = None, headless_seconds: float = 0.0) -> int:
+def run(port: int | None = None, headless_seconds: float = 0.0, attach: str | None = None) -> int:
     """启动桌面工作台。
 
     headless_seconds > 0 时不打开任何窗口，只把服务跑指定秒数后退出——
     给自动化验收用（CI、无头浏览器截图）。
+
+    attach 给一个已经在跑的地址时，只开窗口、不起服务、也不在退出时停服务——
+    用户重复双击时用它挂到已有的那个窗口上，避免起第二个服务。
     """
+    if attach:
+        if not _wait_ready(attach, timeout_seconds=10.0):
+            # 调用方（launch.ps1）会据此回退到"新起一个服务"。
+            print(f"目标地址没有响应：{attach}", file=sys.stderr)
+            return 2
+        print(f"{_APP_TITLE} 已在运行：{attach}")
+        if _open_app_window_edge(attach):
+            return 0
+        _open_browser(attach)
+        return 0
+
     chosen = _pick_port(port)
     url = f"http://127.0.0.1:{chosen}"
 
@@ -253,11 +267,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=None, help="固定端口（默认 8760，被占用会自动往后找）")
     parser.add_argument("--headless-seconds", type=float, default=0.0, help="只起服务不开窗口，指定秒数后退出（自动化用）")
     parser.add_argument("--no-window", action="store_true", help="等价于 --headless-seconds 的一个很长值，仅供调试")
+    parser.add_argument("--attach", default=None, help="连到已在运行的服务地址（只开窗口，不起也不停服务）")
     args = parser.parse_args(argv)
     seconds = args.headless_seconds
     if args.no_window and seconds <= 0:
         seconds = 3600.0
-    return run(port=args.port, headless_seconds=seconds)
+    return run(port=args.port, headless_seconds=seconds, attach=args.attach)
 
 
 if __name__ == "__main__":
