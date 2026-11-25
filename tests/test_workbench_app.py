@@ -1002,13 +1002,37 @@ class WorkbenchAppTests(unittest.TestCase):
             ensure_ascii=False,
         )
         with tempfile.TemporaryDirectory() as tmp:
-            build_info = Path(tmp) / "BUILD_INFO.json"
+            root = Path(tmp)
+            build_info = root / "BUILD_INFO.json"
             build_info.write_text(payload, encoding="utf-8-sig")
-            with patch("workbench.app._BUILD_INFO_PATH", build_info):
+            # 安装包/绿色包里没有 .git，所以 _PROJECT_ROOT 也要指到没有 .git 的临时目录，
+            # 否则会被判成开发仓库（见 test_build_info_ignores_stale_file_in_dev_checkout）。
+            with patch("workbench.app._PROJECT_ROOT", root), patch("workbench.app._BUILD_INFO_PATH", build_info):
                 info = _build_info()
         self.assertEqual(info["source"], "安装包")
         self.assertEqual(info["commit"], "abc1234")
         self.assertEqual(info["built_at"], "2026-11-23 10:00:00 +08:00")
+
+    def test_build_info_ignores_stale_file_in_dev_checkout(self):
+        """开发仓库（有 .git）里即使躺着 BUILD_INFO.json，也不许报成"安装包"。
+
+        这个文件曾经被提交进仓库，于是开发仓库里永远有一份上一次打包的
+        commit/built_at。/api/status 照着它报，就把排查引到一个早已不存在的提交上。
+        """
+        payload = json.dumps(
+            {"version": "1.0.0", "commit": "b9fae78", "built_at": "2026-11-25 07:47:38 +08:00", "source": "安装包"},
+            ensure_ascii=False,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".git").mkdir()
+            build_info = root / "BUILD_INFO.json"
+            build_info.write_text(payload, encoding="utf-8-sig")
+            with patch("workbench.app._PROJECT_ROOT", root), patch("workbench.app._BUILD_INFO_PATH", build_info):
+                info = _build_info()
+        self.assertEqual(info["source"], "开发仓库")
+        self.assertNotEqual(info["commit"], "b9fae78")
+        self.assertIsNone(info["built_at"])
 
     def test_python_runtime_tells_bundled_from_local(self):
         bundled = str(_PROJECT_ROOT / "runtime" / "python" / "python.exe")
@@ -1103,9 +1127,12 @@ class WorkbenchAppTests(unittest.TestCase):
 
         def worker(tag: str) -> None:
             tex = base + f"\n%{tag}"
+            # 读也要在锁内：另一个线程的 _write_main_tex 用的是 write_text，
+            # 它是"先截断再写"——锁外读会撞上截断后、写回前的空文件，
+            # 于是这个测试会自己抖出一个和产品代码无关的假失败。
             with _job_write_lock(job_id):
                 _compile_locked(job_id, directory, tex)
-            results.append((directory / "main.tex").read_text(encoding="utf-8"))
+                results.append((directory / "main.tex").read_text(encoding="utf-8"))
 
         try:
             with patch("workbench.app.compile_tex") as compile_mock:

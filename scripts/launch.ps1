@@ -302,10 +302,11 @@ function Stop-WithHint {
 
 function Test-PortFree {
     param([int]$PortNumber)
-    # 不要用 TcpListener 的 Start()/Stop() 来判断：它在 Windows 上能被本进程
-    # 成功绑到别人正在监听的端口上（和 SO_REUSEADDR 的表现一致），于是把一个
-    # 明确被占用的端口报成"空闲"，后面 uvicorn 自己 bind 失败，用户只会看到
-    # 一句"启动失败"。这里改成主动连一下：能连上就说明有人在那儿听着。
+    # 不用 TcpListener 的 Start()/Stop() 来判断端口占用：.NET 的
+    # TcpListener.ExclusiveAddressUse 默认为 False，不会设 SO_EXCLUSIVEADDRUSE，
+    # 当占用方自己也设了 SO_REUSEADDR 时，探测方仍可能绑成功，
+    # 于是把已被占用的端口报成"空闲"，随后 uvicorn 自己 bind 失败，
+    # 用户只看到一句"启动失败"。改成主动连一下：能连上就说明有人在那儿听着。
     $client = New-Object System.Net.Sockets.TcpClient
     try {
         $connect = $client.BeginConnect([System.Net.IPAddress]::Loopback, $PortNumber, $null, $null)

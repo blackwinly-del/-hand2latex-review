@@ -11,7 +11,7 @@
 | --- | --- |
 | `workbench/static/**`（整个前端） | `recognizer.py`（B 层识别引擎） |
 | `workbench/desktop.py` 及桌面启动相关脚本 | `reasoner.py`（C 层 refine） |
-| `scripts/launch*.ps1`、`package.ps1`、`make_zip.py`、`check_kernel.py` | `schemas.py`（跨层数据结构） |
+| `scripts/launch*.ps1`、`package.ps1`、`make_package_zip.py`、`check_kernel.py` | `schemas.py`（跨层数据结构） |
 | `README.md` / `docs/` 里**只讲界面与用法**的章节 | `reasoning/**`（C 层规则、契约、校验） |
 | `tests/` 里**只测前端/接口契约**的新文件 | `workbench/full_page.py`、`workbench/fix.py`（识别编排与修复提示词） |
 
@@ -118,9 +118,15 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -IncludeDemoJob c3d
 不用先配密钥、不用先等识别。**不传这个参数时打包脚本会检查"任务产物为空"**，
 避免把自己的实验数据一起发出去。
 
-> 打包用的是 `scripts/make_zip.py` 而不是 `Compress-Archive`。
+> 打包用的是 `scripts/make_package_zip.py` 而不是 `Compress-Archive`。
 > 后者写中文文件名时不打 UTF-8 标记位，对方解压出来会看到
 > `Õà¦Úù¡ÕÀÑõ¢£ÕŦ.bat` 这种乱码文件名——这是真踩过的坑，别改回去。
+>
+> 这个脚本打完会**当场核对** zip 条目：无反斜杠分隔符、非 ASCII 名都带 UTF-8 标志位、
+> 六个入口（`启动工作台.bat`/`关闭工作台.bat`/`安装说明.txt`/`start.bat`/`stop.bat`/`INSTALL.txt`）
+> 必须齐全，不通过就以非 0 退出、打包中止。**别再引入只压不验的版本**——
+> 曾经有个 `make_zip.py` 只负责压缩，而 `tests/test_packaging.py` 锁的是 `make_package_zip.py`，
+> 于是"被测的从来不是被用的那个"，真实打包路径上无人把关。
 
 ### 4.1 做完就往原仓库推，不要停在本地（2026-11-26 起）
 

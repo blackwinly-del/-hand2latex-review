@@ -604,7 +604,8 @@ RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 \
 ## 八、测试
 
 ```bash
-# C + workbench 全量回归（14 个测试模块、180 项，含真实 Tectonic 编译，需要 tools/tectonic）
+# C + workbench 全量回归（含真实 Tectonic 编译，需要 tools/tectonic）
+# 2026-11-26 实测：20 个测试模块、244 项通过、11 项跳过
 ./.venv/Scripts/python.exe -m unittest discover -s tests -v
 
 # 单个模块
@@ -806,7 +807,7 @@ python -m scripts.import_page_dataset --zip <page_math_dataset.zip 路径>
 | `hand2latex-workbench-2026-11-25` | 12 | 今天新增的全部内容 | 不含 mvp 的 16 个独有提交 |
 
 队友打开仓库首页看到的是默认分支，所以**今天做的都看不到**。现在合并成
-`hand2latex-complete-2026-11-25`（55 个提交、538 个文件），并把默认分支快进过去，
+`hand2latex-complete-2026-11-25`（合并当时为 55 个提交、538 个文件），并把默认分支快进过去，
 三条分支指向同一个提交 `5bdd02b`。
 
 合并时踩到一个坑，值得记下来：**第一次我只合了 `mvp`，把队友的工作覆盖了**。
@@ -825,12 +826,12 @@ python -m scripts.import_page_dataset --zip <page_math_dataset.zip 路径>
 `review` 版还是旧的 `SO_REUSEADDR` 写法——**取 review 那一版是退步**。
 所以取哪边不能看提交时间，要看内容。
 
-合并后核对的四件事：
+合并后核对的四件事（数字是**合并当时**的快照，之后有新增提交，现况以文末"实测状态"为准）：
 
 1. 全量 **234 passed / 0 failed / 11 skipped**（19 个测试模块）
-2. 内核 5 个文件 blob 与 11-25 备份**逐字节一致**，基线之后零改动
+2. 内核 8 个文件 blob 与 11-25 备份**逐字节一致**，基线之后零改动
 3. `review` 的 145 个文件、`mvp` 的 31 个提交全部包含，无一处丢失
-4. 远端树的 538 个 blob 与本地**逐一比对哈希，零差异**（匿名访问即可拉到）
+4. 远端树的全部 blob 与本地**逐一比对哈希，零差异**（匿名访问即可拉到）
 
 **合并后发现并修掉一处脚本缺陷**：`python scripts/check_kernel.py` 原本会报
 `recognizer.py` 与 `workbench/full_page.py` 两个文件"改动"。查下来**内核本身没被改**，

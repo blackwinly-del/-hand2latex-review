@@ -33,3 +33,9 @@ runtime/workbench.pid
 workbench.log
 workbench.pid
 
+# BUILD_INFO.json 是打包产物，只应存在于安装包/绿色包里。
+# 一旦入库存进开发仓库，workbench/app.py 的 _build_info() 只要看到文件就无条件报
+# "source=安装包"，于是开发仓库的 /api/status 会显示上一次打包的 commit 与 built_at，
+# 而不是当前 HEAD —— 状态面板报假话，排查时会被误导。
+BUILD_INFO.json
+

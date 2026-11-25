@@ -144,17 +144,35 @@ if (Test-DemoHealthy) {
     exit 0
 }
 
+function Test-PortFree {
+    param([int]$PortNumber)
+    # 不用 TcpListener 的 Start()/Stop() 来判断端口占用：那种判据依赖
+    # Windows 的端口重用语义（.NET 的 TcpListener.ExclusiveAddressUse 默认为 False，
+    # 不会设 SO_EXCLUSIVEADDRUSE），当占用方自己也设了 SO_REUSEADDR 时，
+    # 探测方仍可能绑成功，于是把已被占用的端口报成"空闲"，
+    # 随后 Streamlit 自己 bind 失败，用户只看到一句"启动失败"。
+    # 直接主动连一次更可靠：能连上就说明确实有人在监听。
+    # 与 scripts/launch.ps1 里的同名函数保持一致——那边修过这个问题，这边曾漏改。
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $connect = $client.BeginConnect([System.Net.IPAddress]::Loopback, $PortNumber, $null, $null)
+        if ($connect.AsyncWaitHandle.WaitOne(300, $false) -and $client.Connected) {
+            return $false   # 有人在监听 => 端口不空闲
+        }
+        return $true
+    } catch {
+        return $true
+    } finally {
+        try { $client.Close() } catch { }
+    }
+}
+
 Write-Step '检查端口'
-$listener = $null
-try {
-    $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $Port)
-    $listener.Start()
+if (Test-PortFree -PortNumber $Port) {
     Write-Line "端口 $Port 可用" 'ok'
-} catch {
+} else {
     Stop-WithHint "端口 $Port 被别的程序占用，且不是画板服务。" `
         "可以换一个端口：.\scripts\launch_demo.ps1 -Port $($Port + 1)"
-} finally {
-    if ($listener) { $listener.Stop() }
 }
 
 Write-Step '启动画板（前台运行）'

@@ -284,6 +284,27 @@ if (Test-Path -LiteralPath $notesSource) {
     Write-Warn '仓库里没有 installer\安装说明.txt，安装包不含使用说明'
 }
 
+# 与解压工具无关的保险：再放一份纯 ASCII 名字的入口。
+# 有些解压工具不认 zip 的 UTF-8 文件名标志位（Info-ZIP 的 unzip 就是），
+# 中文名解出来是一片乱码，用户连哪个是启动脚本都认不出。
+# 三个英文名与中文名同内容，名字全乱时至少还有得选。
+# make_package_zip.py 会核对这六个入口都在，缺一个就让打包失败——所以这里必须真的写出来，
+# 不能只写在文档里。
+$asciiEntries = @{
+    'start.bat'   = '启动工作台.bat'
+    'stop.bat'    = '关闭工作台.bat'
+    'INSTALL.txt' = '安装说明.txt'
+}
+foreach ($asciiName in $asciiEntries.Keys) {
+    $source = Join-Path $Staging $asciiEntries[$asciiName]
+    if (Test-Path -LiteralPath $source) {
+        Copy-Item -LiteralPath $source -Destination (Join-Path $Staging $asciiName) -Force
+    } else {
+        Write-Warn "暂存目录里没有 $($asciiEntries[$asciiName])，跳过同名英文入口 $asciiName"
+    }
+}
+Write-Ok '已放入英文名入口 start.bat / stop.bat / INSTALL.txt（解压工具把中文名弄乱时的兜底）'
+
 # 汇报文档必须放在包的最外层，对方解压第一眼就能看到。
 # 以前这份文档没有源码树里的位置：它是手工拷进 staging 的，所以既进不了版本管理，
 # 下次打包也很容易被忘掉——2026-11-25 那一版就是这样漏掉性能修复说明的。
@@ -370,6 +391,10 @@ Test-StagedFile 'BUILD_INFO.json' '构建信息'
 Test-StagedFile 'requirements-app.txt' '网页工作台依赖清单（随包运行时装的是这一份）'
 Test-StagedFile '成果汇报_先看这个.md' '成果汇报（对方解压第一眼要看的）'
 Test-StagedFile '安装说明.txt' '使用说明'
+# 三个英文名入口是"解压工具把中文名弄乱"时的兜底，缺了就等于没有兜底。
+Test-StagedFile 'start.bat' '英文名启动入口（乱码兜底）'
+Test-StagedFile 'stop.bat' '英文名关闭入口（乱码兜底）'
+Test-StagedFile 'INSTALL.txt' '英文名说明（乱码兜底）'
 Test-StagedAbsent '.env' 'API 密钥文件'
 Test-StagedAbsent '.venv' '本机虚拟环境'
 Test-StagedAbsent '.cache' '打包用的下载缓存'
@@ -447,7 +472,13 @@ if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force 
 # 用 Python 的 zipfile 而不是 Compress-Archive：后者在 Windows PowerShell 5.1 下
 # 用 GBK 写中文文件名、却不置 zip 的 UTF-8 标志位，解压后 `启动工作台.bat` 会变成
 # `Õà¦Úù¡ÕÀÑõ¢£ÕŦ.bat`，用户根本认不出哪个是启动脚本。
-$zipScript = Join-Path $PSScriptRoot 'make_zip.py'
+#
+# 用 make_package_zip.py 而不是 make_zip.py：前者打完会当场核对条目名
+# （没有反斜杠分隔符、非 ASCII 条目都带 UTF-8 标志位、六个入口文件齐全），
+# 不通过就以非 0 退出。make_zip.py 只压不验——以前这里调的是它，
+# 而 tests/test_packaging.py 锁的却是 make_package_zip.py，
+# 结果是"被测的那个从来不是被用的那个"，zip 里的名字问题在真实打包路径上无人把关。
+$zipScript = Join-Path $PSScriptRoot 'make_package_zip.py'
 if (-not (Test-Path -LiteralPath $zipScript)) { Stop-WithMessage "找不到 $zipScript" }
 # 用暂存目录里那份随包 Python：它一定存在（除非 -NoPython），且能在目标机器上跑。
 $zipPython = Join-Path $Staging 'runtime\python\python.exe'
@@ -455,8 +486,20 @@ if (-not (Test-Path -LiteralPath $zipPython)) {
     $zipPython = (Get-Command python -ErrorAction SilentlyContinue).Source
 }
 if (-not $zipPython) { Stop-WithMessage '打包 zip 需要一个 Python 解释器，但既没有随包运行时也找不到系统 python' }
-& $zipPython $zipScript $Staging $zipPath
-if ($LASTEXITCODE -ne 0) { Stop-WithMessage "打包 zip 失败（退出码 $LASTEXITCODE）" }
+# make_package_zip.py 把核对结果打成一行 JSON（避免中文在控制台变乱码），退出码非 0 表示核对没通过。
+$zipReport = & $zipPython $zipScript $Staging $zipPath
+$zipExit = $LASTEXITCODE
+if ($zipExit -ne 0) {
+    Write-Host $zipReport -ForegroundColor Red
+    Stop-WithMessage "打包 zip 失败或核对没通过（退出码 $zipExit）"
+}
+try {
+    $zipInfo = $zipReport | ConvertFrom-Json
+    Write-Ok ("zip 核对通过：{0} 个条目，其中 {1} 个非 ASCII 名全部带 UTF-8 标志位；六个入口齐全、无反斜杠分隔符" -f `
+        $zipInfo.entries, $zipInfo.non_ascii_entries)
+} catch {
+    Write-Warn "zip 已生成，但核对报告解析失败：$zipReport"
+}
 $zipMb = [math]::Round((Get-Item -LiteralPath $zipPath).Length / 1MB, 1)
 $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash
 Write-Ok "已生成 dist\$PackageName.zip（$zipMb MB）"

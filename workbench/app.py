@@ -264,8 +264,16 @@ def _cached_status(key: str, producer):
 
 
 def _build_info() -> dict:
-    """安装包会写入 BUILD_INFO.json；开发仓库则如实报告 git 短提交号。"""
-    if _BUILD_INFO_PATH.is_file():
+    """安装包会写入 BUILD_INFO.json；开发仓库则如实报告 git 短提交号。
+
+    BUILD_INFO.json 是打包产物，只该存在于安装包/绿色包里。它在 git 历史里待过一段时间，
+    于是开发仓库里也留着一份（内容永远是上一次打包的 commit 与 built_at），
+    而这里原先只看"文件在不在"就报 source=安装包 —— 开发仓库的 /api/status 因此会
+    显示一个早就过期的提交号，排查时会被引到错误方向。
+    判据改成：仓库里有 .git 就是开发仓库（打包会排除 .git），此时一律以 git 为准。
+    """
+    is_dev_checkout = (_PROJECT_ROOT / ".git").exists()
+    if not is_dev_checkout and _BUILD_INFO_PATH.is_file():
         try:
             # Windows 上写出来的 JSON 可能带 BOM，用 utf-8-sig 才读得动。
             info = json.loads(_BUILD_INFO_PATH.read_text(encoding="utf-8-sig"))
@@ -274,7 +282,7 @@ def _build_info() -> dict:
         if isinstance(info, dict):
             return {"source": "安装包", "version": VERSION, "commit": None, "built_at": None, **info}
     commit = None
-    if (_PROJECT_ROOT / ".git").exists():
+    if is_dev_checkout:
         try:
             completed = subprocess.run(
                 ["git", "rev-parse", "--short", "HEAD"],

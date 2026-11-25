@@ -96,5 +96,34 @@ class MakePackageZipTests(unittest.TestCase):
         self.assertEqual(report["problems"], [])
 
 
+class PackageScriptWiringTests(unittest.TestCase):
+    """锁住"真实打包路径用的确实是带核对的脚本"。
+
+    这里出过一次真事故：package.ps1 调的是 make_zip.py（只压不验），
+    而 tests/test_packaging.py 锁的是 make_package_zip.py。
+    两边都"通过"，但真实打出来的 zip 从来没人核对文件名，
+    测试锁住的只是一个用户走不到的脚本。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Path(__file__).resolve().parent.parent
+        cls.ps1 = (cls.root / "scripts" / "package.ps1").read_text(encoding="utf-8-sig")
+
+    def test_package_script_uses_the_auditing_zip_script(self):
+        self.assertIn("make_package_zip.py", self.ps1)
+        # 只压不验的旧脚本不该再出现在调用位置。
+        self.assertNotIn("'make_zip.py'", self.ps1)
+
+    def test_auditing_zip_script_exists(self):
+        self.assertTrue(_SCRIPT.is_file(), f"打包脚本调用的 {_SCRIPT} 不存在")
+
+    def test_package_script_creates_ascii_fallback_entries(self):
+        # make_package_zip.py 要求六个入口齐全，所以 package.ps1 必须真的写出那三个英文名，
+        # 否则打包会在 zip 阶段直接失败。
+        for name in ("start.bat", "stop.bat", "INSTALL.txt"):
+            self.assertIn(name, self.ps1, f"package.ps1 没有生成 {name}，打包会在核对入口时失败")
+
+
 if __name__ == "__main__":
     unittest.main()
