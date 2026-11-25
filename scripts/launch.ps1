@@ -38,6 +38,7 @@ param(
     [switch]$Stop,
     [switch]$Status,
     [switch]$NoBrowser,
+    [switch]$Desktop,
     [switch]$Lite,
     [ValidateRange(1, 65535)]
     [int]$Port = 8000
@@ -51,8 +52,17 @@ $ErrorActionPreference = 'Continue'
 $env:PYTHONIOENCODING = 'utf-8'
 
 $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$VenvRoot = Join-Path $Root '.venv'
-$VenvPython = Join-Path $VenvRoot 'Scripts\python.exe'
+# 安装包会随包带一份 Python 运行时（runtime\python\python.exe）。有它就完全不碰 .venv：
+# 不建虚拟环境、不装依赖、不需要目标机器装 Python。日志与 PID 也改放 runtime\ 下。
+$BundledPython = Join-Path $Root 'runtime\python\python.exe'
+$BundledRuntime = Test-Path -LiteralPath $BundledPython
+if ($BundledRuntime) {
+    $VenvRoot = Join-Path $Root 'runtime'
+    $VenvPython = $BundledPython
+} else {
+    $VenvRoot = Join-Path $Root '.venv'
+    $VenvPython = Join-Path $VenvRoot 'Scripts\python.exe'
+}
 $LogFile = Join-Path $VenvRoot 'workbench.log'
 $PidFile = Join-Path $VenvRoot 'workbench.pid'
 $Url = "http://127.0.0.1:$Port/"
@@ -91,33 +101,40 @@ function Test-CommandAvailable {
 
 # 运行外部命令并拿到退出码 + 合并输出。参数一律用不含空格的相对文件名或 -- 开关，
 # 绕开 Windows 命令行引号问题。
+#
+# 为什么不用 Start-Process -RedirectStandardOutput：
+# 那种写法在"同时存在 HTTP_PROXY 和 http_proxy"的机器上会直接抛
+#   已添加项。字典中的关键字:"HTTPS_PROXY"所添加的关键字:"https_proxy"
+# 因为 .NET 的进程环境变量字典区分大小写，而 Windows 环境变量不区分。
+# 挂了代理工具的电脑经常两个都设，于是体检会误报"无法执行"。
+# 这里改成直接调用 + 管道收集，完全不碰那个字典。
 function Invoke-Captured {
     param(
         [string]$FilePath,
         [string[]]$Arguments = @(),
         [string]$WorkingDirectory = $Root
     )
-    $outPath = [System.IO.Path]::GetTempFileName()
-    $errPath = [System.IO.Path]::GetTempFileName()
+    $previous = $null
+    $switched = $false
     try {
-        $process = Start-Process -FilePath $FilePath -ArgumentList $Arguments `
-            -WorkingDirectory $WorkingDirectory -NoNewWindow -Wait -PassThru `
-            -RedirectStandardOutput $outPath -RedirectStandardError $errPath
-        if (-not $process) {
-            return [pscustomobject]@{ ExitCode = 1; Output = "无法启动 $FilePath" }
-        }
-        $text = ''
-        foreach ($file in @($outPath, $errPath)) {
-            if (Test-Path -LiteralPath $file) {
-                $text += [System.IO.File]::ReadAllText($file, [System.Text.Encoding]::UTF8)
-                $text += [Environment]::NewLine
+        if ($WorkingDirectory -and (Test-Path -LiteralPath $WorkingDirectory)) {
+            $previous = (Get-Location).ProviderPath
+            if ($previous -ne $WorkingDirectory) {
+                Push-Location -LiteralPath $WorkingDirectory
+                $switched = $true
             }
         }
-        return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $text.Trim() }
+        $global:LASTEXITCODE = 0
+        # 2>&1 把 stderr 合并进来（编辑器/编译器把进度写到 stderr 很常见），
+        # 再用 Out-String 变成可读文本；不会因为"写了 stderr"就当成失败。
+        $text = (& $FilePath @Arguments 2>&1 | Out-String)
+        $code = $LASTEXITCODE
+        if ($null -eq $code) { $code = 0 }
+        return [pscustomobject]@{ ExitCode = $code; Output = ($text -as [string]).Trim() }
     } catch {
         return [pscustomobject]@{ ExitCode = 1; Output = $_.Exception.Message }
     } finally {
-        Remove-Item -LiteralPath $outPath, $errPath -Force -ErrorAction SilentlyContinue
+        if ($switched) { Pop-Location }
     }
 }
 
@@ -315,19 +332,21 @@ function Invoke-Menu {
         Write-Host '   Hand2LaTeX 手写公式工作台 - 一键启动' -ForegroundColor White
         Write-Host '==============================================' -ForegroundColor White
         Write-Host '   [1] 体检        只检查环境，不安装不启动'
-        Write-Host '   [2] 准备并启动  首次装环境 / 日常启动都用它'
-        Write-Host '   [3] 重启服务    改完代码后用这个'
-        Write-Host '   [4] 查看状态    看服务是否还在运行'
-        Write-Host '   [5] 停止服务'
+        Write-Host '   [2] 打开工作台  桌面窗口（推荐，日常就用它）'
+        Write-Host '   [3] 在浏览器打开 网页版，适合排查问题'
+        Write-Host '   [4] 重启服务    改完代码后用这个'
+        Write-Host '   [5] 查看状态    看服务是否还在运行'
+        Write-Host '   [6] 停止服务'
         Write-Host '   [0] 退出'
         Write-Host ''
-        $choice = Read-Host '请输入 1-5 或 0'
+        $choice = Read-Host '请输入 1-6 或 0'
         switch ($choice) {
             '1' { Invoke-MenuChild '-CheckOnly' }
-            '2' { Invoke-MenuChild '' }
-            '3' { Invoke-MenuChild '-Restart' }
-            '4' { Show-StatusSummary }
-            '5' { Stop-RunningServer }
+            '2' { Invoke-MenuChild '-Desktop' }
+            '3' { Invoke-MenuChild '' }
+            '4' { Invoke-MenuChild '-Restart' }
+            '5' { Show-StatusSummary }
+            '6' { Stop-RunningServer }
             '0' { return }
             default { Write-Line '无效输入，请重新选择。' 'warn' }
         }
@@ -367,8 +386,15 @@ if ($Stop) {
 # ---------------------------------------------------------------------------
 # 1. 虚拟环境
 # ---------------------------------------------------------------------------
-Write-Step '检查 Python 虚拟环境（要求 3.10 / 3.11 / 3.12）'
-if (Test-Path -LiteralPath $VenvPython) {
+Write-Step '检查 Python 运行时'
+if ($BundledRuntime) {
+    $venvInfo = Get-PythonVersionText -Command $VenvPython
+    if (-not $venvInfo.Found) {
+        Stop-WithHint '随包 Python 运行时无法执行（runtime\python\python.exe）' `
+            '安装包可能不完整：重新解压 zip，或重新运行 setup.exe。'
+    }
+    Write-Line "使用随包 Python 运行时（Python $($venvInfo.Version)），不建虚拟环境、不装依赖" 'ok'
+} elseif (Test-Path -LiteralPath $VenvPython) {
     $venvInfo = Get-PythonVersionText -Command $VenvPython
     if (-not $venvInfo.Found) {
         Stop-WithHint '.venv 里的 python.exe 无法执行' '请删除 .venv 后重跑本脚本重建。'
@@ -411,31 +437,44 @@ if ($venvReady) {
     $webDepsReady = ($webProbe.ExitCode -eq 0)
     if ($webDepsReady) {
         Write-Line '网页服务所需 Python 依赖已就绪' 'ok'
+    } elseif ($BundledRuntime) {
+        Stop-WithHint "随包运行时里缺网页依赖：$($webProbe.Output)" `
+            '这说明安装包不完整。重新解压 zip，或重新运行 setup.exe（不要自己 pip install 到 runtime 里）。'
     } else {
         Write-Line "缺少网页依赖：$($webProbe.Output)" 'warn'
     }
 
-    $paddleProbe = Invoke-ImportProbe -FileName 'probe_paddle.py' -Modules @('paddleocr') -SpecOnly
-    $paddleReady = ($paddleProbe.ExitCode -eq 0)
-    if ($paddleReady) {
-        Write-Line '公式识别后端（paddleocr）已安装' 'ok'
-    } elseif ($Lite) {
-        Write-Line '-Lite 模式跳过 paddle，B 侧公式识别不可用' 'warn'
+    if ($BundledRuntime) {
+        Write-Line '随包运行时只覆盖网页工作台：画板演示与本地公式识别（paddle / torch）不在里面' 'info'
+        $paddleReady = $false
     } else {
-        Write-Line 'paddleocr 未安装，公式识别（B 侧）会失败' 'warn'
+        $paddleProbe = Invoke-ImportProbe -FileName 'probe_paddle.py' -Modules @('paddleocr') -SpecOnly
+        $paddleReady = ($paddleProbe.ExitCode -eq 0)
+        if ($paddleReady) {
+            Write-Line '公式识别后端（paddleocr）已安装' 'ok'
+        } elseif ($Lite) {
+            Write-Line '-Lite 模式跳过 paddle，B 侧公式识别不可用' 'warn'
+        } else {
+            Write-Line 'paddleocr 未安装，公式识别（B 侧）会失败' 'warn'
+        }
     }
 } else {
     Write-Line '虚拟环境不可用，跳过 Python 依赖检查' 'warn'
 }
 
-$frontendReady = Test-Path -LiteralPath (Join-Path $Root 'node_modules\vue\dist')
+$frontendReady = Test-Path -LiteralPath (Join-Path $Root 'node_modules\vue\dist\vue.global.js')
 if ($frontendReady) {
     Write-Line '前端依赖已就绪（node_modules\vue\dist）' 'ok'
+} elseif (Test-Path -LiteralPath (Join-Path $Root 'workbench\static\vendor\vue\vue.global.js')) {
+    # 安装包会随包带一份 vue.global.js，这样目标机器不装 Node.js 也能打开网页。
+    $frontendReady = $true
+    Write-Line '前端依赖已就绪（安装包自带副本 workbench\static\vendor\vue）' 'ok'
 } else {
-    Write-Line '缺少 node_modules\vue\dist，打开页面会报 "Vue is not defined"' 'warn'
+    Write-Line '缺少 vue.global.js，打开页面会报 "Vue is not defined"' 'warn'
 }
 
-$needsPythonInstall = $venvReady -and (-not $webDepsReady -or (-not $Lite -and -not $paddleReady))
+# 随包运行时的依赖是打包时预装好的，绝不在用户机器上 pip install。
+$needsPythonInstall = -not $BundledRuntime -and $venvReady -and (-not $webDepsReady -or (-not $Lite -and -not $paddleReady))
 $needsFrontendInstall = -not $frontendReady
 
 if (-not $needsPythonInstall -and -not $needsFrontendInstall) {
@@ -528,24 +567,49 @@ if (Test-Path -LiteralPath $tectonicExe) {
     Write-Line '获取：tectonic-typesetting/tectonic 的 Releases 页下载 Windows 版，解压到 tools\tectonic\。' 'info'
 }
 
-$modelDir = Join-Path $Root 'models\PP-FormulaNet-L'
-if (Test-Path -LiteralPath $modelDir) {
+$modelFound = $false
+foreach ($candidate in @(
+    @{ Name = 'UniMERNet'; MinMb = 1000 },
+    @{ Name = 'PP-FormulaNet-L'; MinMb = 500 }
+)) {
+    $modelDir = Join-Path $Root "models\$($candidate.Name)"
+    if (-not (Test-Path -LiteralPath $modelDir)) { continue }
     $modelBytes = (Get-ChildItem -LiteralPath $modelDir -Recurse -File -ErrorAction SilentlyContinue |
         Measure-Object -Property Length -Sum).Sum
     $modelMb = [Math]::Round(($modelBytes / 1MB), 0)
-    if ($modelBytes -ge 500MB) {
-        Write-Line "本地公式模型就绪：models\PP-FormulaNet-L（约 $modelMb MB）" 'ok'
+    if ($modelBytes -ge ($candidate.MinMb * 1MB)) {
+        Write-Line "本地公式模型就绪：models\$($candidate.Name)（约 $modelMb MB）" 'ok'
     } else {
-        Write-Line "models\PP-FormulaNet-L 只有 $modelMb MB，可能下载不完整。删除该目录后重跑会自动重下。" 'warn'
+        Write-Line "models\$($candidate.Name) 只有 $modelMb MB，可能下载不完整。删除该目录后重跑会自动重下。" 'warn'
     }
-} else {
-    Write-Line '缺少 models\PP-FormulaNet-L：B 侧会返回明确的失败候选（不会崩，但没有识别结果）。' 'warn'
-    Write-Line '获取：装好 paddleocr 后首次运行自动下载，或在 .env 里设置 RECOGNIZER_MODEL_DIR 指向已有目录。' 'info'
+    $modelFound = $true
+    break
+}
+if (-not $modelFound) {
+    if ($BundledRuntime) {
+        Write-Line '没有本地公式模型：随包运行时不含 paddle / torch，画板演示与 B 侧本地识别用不了（网页整页识别走云端 API，不受影响）。' 'info'
+    } else {
+        Write-Line '缺少本地公式模型（models\UniMERNet 或 models\PP-FormulaNet-L）：B 侧会返回明确的失败候选（不会崩，但没有识别结果）。' 'warn'
+        Write-Line '获取：装好 paddleocr 后首次运行自动下载，或在 .env 里设置 RECOGNIZER_MODEL_DIR 指向已有目录。' 'info'
+    }
 }
 
 # ---------------------------------------------------------------------------
-# 4. 接口契约自检
+# 4. 启动前自检
 # ---------------------------------------------------------------------------
+if ($BundledRuntime) {
+    # 随包运行时不含 B 侧本地识别，跑 test_recognizer.py 没有意义；
+    # 真正要确认的是"这个运行时能不能把网页应用 import 起来"。
+    Write-Step '自检：随包运行时能否 import workbench.app'
+    $appProbe = Invoke-ImportProbe -FileName 'probe_app_import.py' -Modules @('workbench.app')
+    if ($appProbe.ExitCode -ne 0) {
+        Write-Block $appProbe.Output
+        Stop-WithHint '随包运行时无法 import workbench.app' `
+            '安装包可能不完整：重新解压 zip，或重新运行 setup.exe。'
+    }
+    Write-Line 'workbench.app 可以被随包运行时导入' 'ok'
+    Write-Line '跳过 test_recognizer.py 契约自检：随包运行时不覆盖 B 侧本地识别（paddle / torch）' 'info'
+} else {
 Write-Step '运行接口契约自检 test_recognizer.py'
 if (-not $venvReady) {
     Write-Line '虚拟环境不可用，跳过自检' 'warn'
@@ -558,6 +622,7 @@ if (-not $venvReady) {
     }
     Write-Line 'test_recognizer.py 通过' 'ok'
 }
+}
 
 if ($CheckOnly) {
     Write-Step '体检结束（-CheckOnly 未启动服务）'
@@ -569,6 +634,20 @@ if ($CheckOnly) {
 # 5. 启动服务
 # ---------------------------------------------------------------------------
 Write-Step '启动工作台'
+
+# 桌面模式：把服务与窗口一起交给 workbench.desktop。
+# 它自己挑端口、自己等 /api/status 就绪、用 Edge 的 --app 模式开独立窗口。
+if ($Desktop -and -not $NoBrowser) {
+    if (-not $venvReady) {
+        Stop-WithHint '虚拟环境不可用，无法启动桌面窗口。' '请先运行不带 -CheckOnly 的本脚本完成安装。'
+    }
+    Write-Line "正在打开桌面窗口（端口从 $Port 起自动选择）…" 'info'
+    Write-Line '关闭窗口即可退出；这个窗口关掉后服务也会一起停。' 'info'
+    # 前台运行：窗口是本进程的子进程，用户关掉终端就等于退出。
+    & $VenvPython -m workbench.desktop --port $Port
+    exit $LASTEXITCODE
+}
+
 if (-not $venvReady) {
     Stop-WithHint '虚拟环境不可用，无法启动服务。' '请先运行不带 -CheckOnly 的本脚本完成安装。'
 }
@@ -601,7 +680,7 @@ if (-not $server) {
     Stop-WithHint '服务进程启动失败' "完整日志可看 $LogFile"
 }
 Set-Content -LiteralPath $PidFile -Value $server.Id -Encoding ASCII
-Write-Line "服务进程 PID $($server.Id)，日志 .venv\workbench.log" 'info'
+Write-Line "服务进程 PID $($server.Id)，日志 $LogFile" 'info'
 
 if (-not (Wait-ForHttp -Process $server -TargetUrl $Url -Seconds 25)) {
     Write-Line '启动失败：服务在 25 秒内没有响应。' 'bad'
