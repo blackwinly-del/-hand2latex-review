@@ -1,0 +1,288 @@
+def _skip_group(latex: str, index: int) -> int:
+    depth = 0
+    while index < len(latex):
+        char = latex[index]
+        if char == "\\":
+            index += 2
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+        index += 1
+    return index
+
+
+def _count_following_atoms(latex: str, index: int) -> int:
+    count = 0
+    while index < len(latex) and count < 2:
+        while index < len(latex) and latex[index].isspace():
+            index += 1
+        if index >= len(latex) or latex[index] in "})]":
+            break
+
+        char = latex[index]
+        if char == "{":
+            index = _skip_group(latex, index)
+        elif char == "\\":
+            index += 1
+            if index < len(latex) and latex[index].isalpha():
+                while index < len(latex) and latex[index].isalpha():
+                    index += 1
+            elif index < len(latex):
+                index += 1
+        else:
+            index += 1
+        count += 1
+    return count
+
+
+def _read_environment(latex: str, index: int) -> tuple[str | None, int]:
+    original_index = index
+    while index < len(latex) and latex[index].isspace():
+        index += 1
+    if index >= len(latex) or latex[index] != "{":
+        return None, original_index
+
+    end = index + 1
+    while end < len(latex) and latex[end] != "}":
+        if latex[end] == "\\":
+            end += 2
+        else:
+            end += 1
+    if end >= len(latex):
+        return None, original_index
+
+    environment = latex[index + 1:end].strip()
+    if not environment:
+        return None, original_index
+    return environment, end + 1
+
+
+def _skip_command(latex: str, index: int) -> int:
+    index += 1
+    if index < len(latex) and latex[index].isalpha():
+        while index < len(latex) and latex[index].isalpha():
+            index += 1
+    elif index < len(latex):
+        index += 1
+    return index
+
+
+def _has_duplicate_scripts(latex: str) -> bool:
+    seen_scripts = set()
+    index = 0
+
+    while index < len(latex):
+        char = latex[index]
+        if char.isspace():
+            index += 1
+            continue
+
+        if char in "^_":
+            if char in seen_scripts:
+                return True
+            seen_scripts.add(char)
+            index += 1
+            while index < len(latex) and latex[index].isspace():
+                index += 1
+            if index >= len(latex):
+                return False
+            if latex[index] == "{":
+                group_end = _skip_group(latex, index)
+                group_content_end = (
+                    group_end - 1 if latex[group_end - 1] == "}" else group_end
+                )
+                if _has_duplicate_scripts(latex[index + 1:group_content_end]):
+                    return True
+                index = group_end
+            elif latex[index] == "\\":
+                index = _skip_command(latex, index)
+            else:
+                index += 1
+            continue
+
+        seen_scripts.clear()
+        if char == "{":
+            group_end = _skip_group(latex, index)
+            group_content_end = (
+                group_end - 1 if latex[group_end - 1] == "}" else group_end
+            )
+            if _has_duplicate_scripts(latex[index + 1:group_content_end]):
+                return True
+            index = group_end
+        elif char == "\\":
+            index = _skip_command(latex, index)
+        else:
+            index += 1
+
+    return False
+
+
+def validate_structure(latex: str) -> list[str]:
+    if not isinstance(latex, str):
+        raise TypeError("latex must be a string")
+    if not latex.strip():
+        return ["empty_latex"]
+
+    opening_to_closing = {"(": ")", "[": "]", "{": "}"}
+    closing_brackets = set(opening_to_closing.values())
+    bracket_stack = []
+    left_right_stack = []
+    environment_stack = []
+    bracket_error = False
+    left_right_error = False
+    environment_error = False
+    frac_error = False
+    script_error = False
+    index = 0
+
+    while index < len(latex):
+        char = latex[index]
+
+        if char == "\\":
+            index += 1
+            if index >= len(latex):
+                break
+            if latex[index] == "\\":
+                index += 1
+                continue
+            if latex[index].isalpha():
+                command_start = index
+                while index < len(latex) and latex[index].isalpha():
+                    index += 1
+                command = latex[command_start:index]
+                if command == "left":
+                    left_right_stack.append(command)
+                elif command == "right":
+                    if left_right_stack:
+                        left_right_stack.pop()
+                    else:
+                        left_right_error = True
+                elif command in {"begin", "end"}:
+                    environment, environment_end = _read_environment(latex, index)
+                    if environment is None:
+                        environment_error = True
+                    else:
+                        if command == "begin":
+                            environment_stack.append(environment)
+                        elif environment_stack and environment_stack[-1] == environment:
+                            environment_stack.pop()
+                        else:
+                            environment_error = True
+                        index = environment_end
+                elif command == "frac":
+                    if _count_following_atoms(latex, index) < 2:
+                        frac_error = True
+                continue
+            index += 1
+            continue
+
+        if char in opening_to_closing:
+            bracket_stack.append(opening_to_closing[char])
+        elif char in closing_brackets:
+            if not bracket_stack or bracket_stack.pop() != char:
+                bracket_error = True
+        elif char in "^_":
+            previous_index = index - 1
+            next_index = index + 1
+            while previous_index >= 0 and latex[previous_index].isspace():
+                previous_index -= 1
+            while next_index < len(latex) and latex[next_index].isspace():
+                next_index += 1
+            if (
+                previous_index < 0
+                or next_index >= len(latex)
+                or latex[previous_index] in "{([=+-*/^_"
+                or latex[next_index] in "})]^_"
+            ):
+                script_error = True
+
+        index += 1
+
+    issues = []
+    if bracket_error or bracket_stack:
+        issues.append("unbalanced_brackets")
+    if left_right_error or left_right_stack:
+        issues.append("unbalanced_left_right")
+    if environment_error or environment_stack:
+        issues.append("unbalanced_environments")
+    if frac_error:
+        issues.append("invalid_frac")
+    if script_error or _has_duplicate_scripts(latex):
+        issues.append("invalid_scripts")
+    return issues
+
+
+def _make_glyph_span(
+    candidate_index: int, other_index: int, position: int, text: str, message: str
+) -> dict:
+    return {
+        "span_id": (
+            f"candidate:{candidate_index}:with_candidate:{other_index}:"
+            f"{position}-{position + 1}:ambiguous_glyph_conflict"
+        ),
+        "source_revision": 0,
+        "target": f"candidate:{candidate_index}",
+        "start": position,
+        "end": position + 1,
+        "text": text,
+        "source": "ambiguous_glyph_rule",
+        "issue_type": "ambiguous_glyph_conflict",
+        "severity": "review",
+        "message": message,
+    }
+
+
+def find_ambiguous_glyph_conflicts(candidates: list[dict]) -> list[dict]:
+    if not isinstance(candidates, list):
+        raise TypeError("candidates must be a list")
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            raise TypeError("each candidate must be a dict")
+        if "latex" not in candidate:
+            raise ValueError("candidate is missing latex")
+        if not isinstance(candidate["latex"], str):
+            raise TypeError("latex must be a string")
+        if not candidate["latex"].strip():
+            raise ValueError("candidate latex must not be blank")
+        if candidate.get("error") is not None:
+            raise ValueError("ambiguous glyph candidates must not contain errors")
+
+    conflicts = []
+    for first_index in range(len(candidates)):
+        for second_index in range(first_index + 1, len(candidates)):
+            first_latex = candidates[first_index]["latex"]
+            second_latex = candidates[second_index]["latex"]
+            if len(first_latex) != len(second_latex):
+                continue
+            for position, (first_char, second_char) in enumerate(
+                zip(first_latex, second_latex)
+            ):
+                if first_char == second_char or {first_char, second_char} != {"0", "o"}:
+                    continue
+                message = (
+                    f"Candidates {first_index} and {second_index} use digit 0 and "
+                    f"letter o at position {position}; manual review is required"
+                )
+                conflicts.append(
+                    {
+                        "issue_type": "ambiguous_glyph_conflict",
+                        "glyph_pair": ["0", "o"],
+                        "candidate_indices": [first_index, second_index],
+                        "position": position,
+                        "severity": "review",
+                        "message": message,
+                        "spans": [
+                            _make_glyph_span(
+                                first_index, second_index, position, first_char, message
+                            ),
+                            _make_glyph_span(
+                                second_index, first_index, position, second_char, message
+                            ),
+                        ],
+                    }
+                )
+    return conflicts

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "sample_type": "real_handwritten_multipage_structural_smoke",
+  "evaluation_scope": "Validate page recognition completion, upload order, page-break placement, Tectonic compilation, and PDF page count. Human-visible section markers are ordering evidence only, not full-page transcription truth.",
+  "transcription_accuracy": "not_evaluated_without_full_page_truth",
+  "pages": {
+    "page_2": {
+      "image": "data/pdf_pages/page_2.png",
+      "marker": "10月26号",
+      "source_kind": "handwritten_content"
+    },
+    "page_3": {
+      "image": "data/pdf_pages/page_3.png",
+      "marker": "3.6.6",
+      "source_kind": "handwritten_content"
+    },
+    "page_4": {
+      "image": "data/pdf_pages/page_4.png",
+      "marker": "3.6.8",
+      "source_kind": "handwritten_content"
+    },
+    "page_5": {
+      "image": "data/pdf_pages/page_5.png",
+      "expected_blank": true,
+      "source_kind": "blank_ruled_page"
+    }
+  },
+  "cases": [
+    {
+      "id": "contiguous_2_3_4",
+      "description": "Three consecutive handwritten content pages.",
+      "page_ids": ["page_2", "page_3", "page_4"]
+    },
+    {
+      "id": "reverse_4_2",
+      "description": "Two non-chronological pages; upload order must still be preserved.",
+      "page_ids": ["page_4", "page_2"]
+    },
+    {
+      "id": "trailing_blank_4_5",
+      "description": "A handwritten page followed by a blank page; invented blank-page content is a failure.",
+      "page_ids": ["page_4", "page_5"]
+    }
+  ],
+  "excluded_pages": {
+    "page_1": "Cover ruling without handwritten note content; excluded from this round."
+  }
+}

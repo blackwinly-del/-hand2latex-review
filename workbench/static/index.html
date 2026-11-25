@@ -1,0 +1,1559 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hand2LaTeX 智能工作台</title>
+  <!-- 内联 SVG 图标：不发额外请求，也不会在控制台留下 /favicon.ico 404。
+       图形与左上角品牌块一致（蓝紫渐变上的白色 H），任务栏/标签页用它辨识。 -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233563e9'/%3E%3Cstop offset='1' stop-color='%236f3ff5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ctext x='16' y='23' font-family='Segoe UI,Arial,sans-serif' font-size='19' font-weight='700' fill='%23fff' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1b2434;
+      --ink-2: #46536b;
+      --muted: #7c879b;
+      --faint: #a3adbf;
+      --paper: #eef1f5;
+      --surface: #ffffff;
+      --surface-2: #f7f9fc;
+      --line: #dfe4ec;
+      --line-2: #eceff5;
+      --accent: #3563e9;
+      --accent-soft: #eaf0ff;
+      --accent-ink: #2149b8;
+      --danger: #c0392b;
+      --danger-soft: #fdeceb;
+      --warn: #a1650a;
+      --warn-soft: #fdf5e4;
+      --ok: #16794a;
+      --ok-soft: #e8f6ee;
+      --code-bg: #0f1626;
+      --code-bg-2: #0b1220;
+      --code-ink: #e6edfa;
+      --code-gutter: #55637d;
+      --code-lh: 20px;
+      --shadow-1: 0 1px 2px rgba(21, 33, 56, .06), 0 4px 14px rgba(21, 33, 56, .05);
+      --shadow-2: 0 10px 34px rgba(21, 33, 56, .14);
+      --radius: 12px;
+      --sidebar-w: 276px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--paper); color: var(--ink);
+      font: 14px/1.55 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+    button { font: inherit; cursor: pointer; border: 0; background: none; color: inherit; }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+    input, select, textarea { font: inherit; color: inherit; }
+    a { color: var(--accent-ink); }
+    /* 键盘 Tab 走查时必须看得见焦点在哪。默认 outline 被各家重置掉了，
+       这里统一给一个高对比度焦点环；鼠标点击不显示，避免视觉噪音。 */
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 6px;
+    }
+    .btn:focus-visible, .job-item:focus-visible, .thumb:focus-visible { outline-offset: 1px; }
+    /* 系统开了"减少动效"就别再转圈/滑动了。 */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: #c7cede; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background: #aab4c8; background-clip: content-box; }
+
+    /* ---------- 通用按钮 ---------- */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; justify-content: center;
+      height: 34px; padding: 0 14px; border-radius: 9px; font-size: 13px; font-weight: 600;
+      background: var(--accent); color: #fff; white-space: nowrap;
+      transition: background .15s, box-shadow .15s, transform .06s;
+    }
+    .btn:hover:not(:disabled) { background: #2b55d0; }
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+    .btn.ghost { background: var(--surface); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line); }
+    .btn.ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); box-shadow: inset 0 0 0 1px #c9d2e2; }
+    .btn.quiet { background: transparent; color: var(--ink-2); }
+    .btn.quiet:hover:not(:disabled) { background: #00000008; color: var(--ink); }
+    .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; border-radius: 7px; }
+    .btn.danger { background: var(--danger); }
+    .btn.danger:hover:not(:disabled) { background: #a5301f; }
+    .btn.block { width: 100%; }
+
+    /* ---------- 顶栏 ---------- */
+    .topbar {
+      position: relative; z-index: 30;
+      display: flex; align-items: center; gap: 14px;
+      height: 52px; padding: 0 14px 0 16px;
+      background: var(--surface); border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .brand-mark {
+      width: 26px; height: 26px; border-radius: 8px; flex: none;
+      background: linear-gradient(135deg, #3563e9, #6f3ff5);
+      color: #fff; font: 700 13px/26px "Segoe UI", sans-serif; text-align: center;
+    }
+    .brand-name { font-size: 14px; font-weight: 700; letter-spacing: .2px; }
+    .brand-sub { font-size: 12px; color: var(--faint); margin-left: 2px; }
+    .topbar-spacer { flex: 1; }
+    .status-cluster { display: flex; align-items: center; gap: 4px; }
+    .sdot {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 28px; padding: 0 9px; border-radius: 7px;
+      font-size: 12px; color: var(--ink-2); white-space: nowrap;
+      transition: background .15s;
+    }
+    .sdot:hover { background: #f1f4f9; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--faint); }
+    .dot.ok { background: #1fa15c; box-shadow: 0 0 0 3px #1fa15c1f; }
+    .dot.warn { background: #dfa012; box-shadow: 0 0 0 3px #dfa0121f; }
+    .dot.bad { background: #d33b2b; box-shadow: 0 0 0 3px #d33b2b1f; }
+    .icon-btn {
+      width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center;
+      color: var(--ink-2); font-size: 15px;
+    }
+    .icon-btn:hover { background: #f1f4f9; color: var(--ink); }
+
+    /* 状态详情抽屉 */
+    .status-drawer {
+      position: absolute; top: 52px; right: 14px; z-index: 40;
+      width: min(720px, calc(100vw - 28px)); max-height: calc(100vh - 90px); overflow: auto;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+      box-shadow: var(--shadow-2); padding: 16px 18px;
+    }
+    .status-drawer h3 { margin: 0 0 12px; font-size: 14px; }
+    .kv { display: grid; grid-template-columns: 116px 1fr; gap: 6px 12px; font-size: 13px; }
+    .kv dt { color: var(--muted); }
+    .kv dd { margin: 0; word-break: break-all; }
+    .drawer-note {
+      margin-top: 14px; padding: 10px 12px; border-radius: 9px;
+      background: var(--surface-2); border: 1px solid var(--line-2);
+      font-size: 12.5px; line-height: 1.7; color: var(--ink-2);
+    }
+
+    /* ---------- 主体 ---------- */
+    .body { display: flex; height: calc(100vh - 52px); min-height: 0; }
+
+    /* ---------- 侧栏 ---------- */
+    .sidebar {
+      width: var(--sidebar-w); flex: none; display: flex; flex-direction: column;
+      background: var(--surface); border-right: 1px solid var(--line); min-height: 0;
+    }
+    .sidebar-head { padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 8px; }
+    .search-wrap { position: relative; }
+    .search-wrap input {
+      width: 100%; height: 32px; padding: 0 10px 0 30px; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--surface-2); font-size: 13px; outline: none;
+    }
+    .search-wrap input:focus { background: #fff; border-color: #b9c8ea; box-shadow: 0 0 0 3px #3563e914; }
+    .search-icon { position: absolute; left: 9px; top: 8px; color: var(--faint); font-size: 13px; }
+    .list-label {
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding: 6px 14px 6px 14px; font-size: 11.5px; font-weight: 700; letter-spacing: .6px;
+      color: var(--faint); text-transform: uppercase;
+    }
+    .job-list { flex: 1; overflow-y: auto; padding: 0 8px 8px; min-height: 0; }
+    .job-item {
+      display: block; width: 100%; text-align: left; padding: 9px 10px; border-radius: 9px;
+      border: 1px solid transparent; margin-bottom: 2px; transition: background .12s;
+    }
+    .job-item:hover { background: var(--surface-2); }
+    .job-item.on { background: var(--accent-soft); border-color: #c8d7fb; }
+    .job-title {
+      font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .job-item.on .job-title { color: var(--accent-ink); }
+    .job-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; color: var(--faint); }
+    .mini-tag { padding: 0 5px; border-radius: 4px; font-size: 10.5px; font-weight: 700; line-height: 15px; }
+    .mini-tag.bad { background: var(--danger-soft); color: var(--danger); }
+    .mini-tag.ok { background: var(--ok-soft); color: var(--ok); }
+    .sidebar-foot { padding: 8px 12px; border-top: 1px solid var(--line-2); display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    .sidebar-foot .btn { height: 26px; padding: 0 8px; font-size: 12px; }
+    .empty-list { padding: 24px 16px; text-align: center; color: var(--faint); font-size: 12.5px; line-height: 1.7; }
+
+    /* 上传进度卡 */
+    .run-card { margin: 0 10px 8px; padding: 10px 12px; border-radius: 9px; background: var(--accent-soft); border: 1px solid #c8d7fb; }
+    .run-card .t { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; color: var(--accent-ink); }
+    .bar { height: 5px; background: #cddaf8; border-radius: 999px; overflow: hidden; margin: 7px 0 6px; }
+    .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .4s ease; }
+    .run-page { display: flex; align-items: center; gap: 6px; font-size: 11.5px; padding: 1px 0; color: var(--ink-2); }
+    .run-page .st { font-weight: 700; }
+    .st.pending { color: var(--faint); } .st.running { color: var(--accent); } .st.done { color: var(--ok); } .st.failed { color: var(--danger); }
+    .run-note { font-size: 11px; color: var(--ink-2); margin-top: 5px; line-height: 1.5; }
+
+    /* ---------- 工作区 ---------- */
+    .workspace { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
+
+    /* 空状态 */
+    .empty-state {
+      flex: 1; display: grid; place-items: center; padding: 32px; overflow: auto;
+    }
+    .empty-inner { width: min(620px, 100%); text-align: center; }
+    .empty-inner h2 { margin: 0 0 8px; font-size: 21px; letter-spacing: .2px; }
+    .empty-inner p { margin: 0 0 22px; color: var(--muted); font-size: 13.5px; line-height: 1.75; }
+    .dropzone {
+      border: 2px dashed #c2cddf; border-radius: 16px; background: var(--surface);
+      padding: 34px 24px; transition: border-color .15s, background .15s, transform .1s;
+      cursor: pointer;
+    }
+    .dropzone:hover { border-color: #9db4e6; background: #fbfcff; }
+    .dropzone.hot { border-color: var(--accent); background: var(--accent-soft); transform: scale(1.006); }
+    .dz-icon { font-size: 30px; line-height: 1; margin-bottom: 12px; opacity: .8; }
+    .dz-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .dz-sub { font-size: 12.5px; color: var(--muted); line-height: 1.7; }
+    .empty-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 22px; text-align: left; }
+    .step-card { background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 12px 13px; }
+    .step-card .n { font-size: 11px; font-weight: 800; color: var(--accent); letter-spacing: .5px; }
+    .step-card .h { font-size: 13px; font-weight: 700; margin: 3px 0 4px; }
+    .step-card .d { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+    /* 三栏 */
+    .panes {
+      flex: 1; min-height: 0; display: grid; gap: 10px; padding: 10px;
+      grid-template-columns: minmax(238px, .74fr) minmax(420px, 1.52fr) minmax(296px, 1fr);
+    }
+    .pane {
+      display: flex; flex-direction: column; min-width: 0; min-height: 0;
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+      box-shadow: var(--shadow-1); overflow: hidden;
+    }
+    .pane-head {
+      flex: none; display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px; border-bottom: 1px solid var(--line-2); background: var(--surface);
+    }
+    .pane-title { font-size: 12.5px; font-weight: 700; letter-spacing: .3px; color: var(--ink); display: flex; align-items: center; gap: 7px; }
+    .pane-no {
+      width: 18px; height: 18px; border-radius: 5px; flex: none; background: var(--accent-soft);
+      color: var(--accent-ink); font: 700 11px/18px "Segoe UI", sans-serif; text-align: center;
+    }
+    .pane-head .spacer { flex: 1; }
+    .pane-body { flex: 1; min-height: 0; overflow: auto; }
+    .pane-foot {
+      flex: none; padding: 7px 12px; border-top: 1px solid var(--line-2);
+      font-size: 11.5px; color: var(--muted); line-height: 1.55; background: var(--surface-2);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .pane-foot .grow { flex: 1; }
+
+    /* 分段控件 */
+    .seg { display: inline-flex; background: #eef1f6; border-radius: 8px; padding: 2px; gap: 2px; }
+    .seg button {
+      height: 24px; padding: 0 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      color: var(--ink-2); display: inline-flex; align-items: center; gap: 5px;
+    }
+    .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(21,33,56,.12); }
+    .seg .n { font-size: 10.5px; font-weight: 800; padding: 0 4px; border-radius: 4px; background: #d7dce6; color: #4a5468; }
+    .seg button.on .n { background: var(--accent-soft); color: var(--accent-ink); }
+    .seg .n.bad { background: #f6d5d1; color: var(--danger); }
+
+    /* ---------- 原图栏 ---------- */
+    .thumbs { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+    .thumb {
+      border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface);
+      transition: border-color .15s, box-shadow .15s; cursor: pointer;
+    }
+    .thumb:hover { border-color: #b9c8ea; }
+    .thumb.on { border-color: var(--accent); box-shadow: 0 0 0 3px #3563e914; }
+    .thumb-img { display: block; width: 100%; height: 178px; object-fit: contain; background: #f0efe9; }
+    .thumb-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--line-2); }
+    .thumb-bar .cap { font-size: 11.5px; font-weight: 700; color: var(--ink-2); }
+    .thumb.on .thumb-bar .cap { color: var(--accent-ink); }
+    .thumb-bar .grow { flex: 1; }
+    .chk {
+      height: 22px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 700;
+      background: var(--warn-soft); color: var(--warn); border: 1px solid #eddcb5;
+    }
+    .chk.done { background: var(--ok-soft); color: var(--ok); border-color: #bfe3ce; }
+    .chk.retry { background: var(--danger-soft); color: var(--danger); border-color: #f2c9c4; }
+    .flags { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 8px 7px; }
+    .flag { font-size: 10.5px; padding: 1px 6px; border-radius: 999px; background: #f1f3f7; color: var(--muted); }
+    .flag.bad { background: var(--danger-soft); color: var(--danger); font-weight: 700; }
+    .flag.warn { background: var(--warn-soft); color: var(--warn); font-weight: 700; }
+
+    /* ---------- 代码栏 ---------- */
+    .editor {
+      flex: 1; min-height: 0; display: grid; grid-template-columns: 46px minmax(0, 1fr);
+      background: var(--code-bg);
+    }
+    .gutter {
+      overflow: hidden; background: var(--code-bg-2); color: var(--code-gutter);
+      font: 13px/20px Consolas, "Cascadia Mono", monospace; text-align: right;
+      padding: 12px 9px 12px 0; user-select: none;
+    }
+    .gutter > div > div { height: var(--code-lh); }
+    .gutter .err { color: #ff9d92; font-weight: 700; }
+    .gutter .review { color: #ffc95c; font-weight: 700; }
+    .gutter .flash { color: #9fe0ff; font-weight: 700; }
+    .code-wrap { position: relative; min-width: 0; }
+    pre.hl {
+      position: absolute; inset: 0; margin: 0; padding: 12px; overflow: hidden;
+      font: 13px/20px Consolas, "Cascadia Mono", monospace; color: var(--code-ink); pointer-events: none;
+    }
+    pre.hl .c-line { height: var(--code-lh); white-space: pre; }
+    pre.hl .c-line.err { background: #4d1f1f; box-shadow: inset 3px 0 0 #ff8a7a; }
+    pre.hl .c-line.review { background: #42371a; box-shadow: inset 3px 0 0 #ffc95c; }
+    pre.hl .c-line.flash { background: #17364d; box-shadow: inset 3px 0 0 #6ec8ff; }
+    .tk-cmd { color: #7cc7ff; }
+    .tk-comment { color: #67768f; font-style: italic; }
+    .tk-math { color: #ffd479; }
+    .tk-brace { color: #c79bff; }
+    textarea.code {
+      position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 12px;
+      border: 0; background: transparent; color: transparent; caret-color: #7cc7ff;
+      font: 13px/20px Consolas, "Cascadia Mono", monospace; white-space: pre; overflow: auto;
+      resize: none; outline: none; tab-size: 2;
+    }
+    textarea.code::selection { background: #3563e966; color: transparent; }
+
+    /* ---------- 预览栏 ---------- */
+    .preview-wrap { flex: 1; min-height: 0; position: relative; background: #525659; }
+    .preview-wrap iframe { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+    .preview-empty {
+      position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+      background: var(--surface); padding: 24px; color: var(--muted); font-size: 13px; line-height: 1.8;
+    }
+    .preview-empty .big { font-size: 26px; opacity: .35; margin-bottom: 10px; }
+    .pdf-open {
+      position: absolute; right: 10px; top: 10px; z-index: 2;
+      height: 26px; padding: 0 10px; border-radius: 7px; display: inline-flex; align-items: center;
+      font-size: 11.5px; font-weight: 600; text-decoration: none;
+      background: #ffffffdd; color: var(--ink-2); box-shadow: 0 1px 4px #0003;
+      backdrop-filter: blur(4px);
+    }
+    .pdf-open:hover { background: #fff; color: var(--accent-ink); }
+
+    /* 问题列表 */
+    .issues { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .issue {
+      border-radius: 9px; padding: 9px 11px; cursor: pointer; border-left: 3px solid var(--danger);
+      background: var(--danger-soft); transition: filter .12s;
+    }
+    .issue:hover { filter: brightness(.97); }
+    .issue.warn { border-left-color: #dfa012; background: var(--warn-soft); }
+    .issue .where { font-size: 11.5px; font-weight: 800; color: var(--danger); margin-bottom: 3px; }
+    .issue.warn .where { color: var(--warn); }
+    .issue .plain { font-size: 12.5px; line-height: 1.65; color: var(--ink-2); }
+    .issue .raw { font: 11px/1.5 Consolas, monospace; color: #7c6a6a; margin-top: 4px; word-break: break-all; }
+    .note {
+      margin: 0 10px 10px; padding: 10px 12px; border-radius: 9px; font-size: 12.5px; line-height: 1.7;
+      background: var(--warn-soft); border: 1px dashed #e2cd9e; color: #6d4f08;
+    }
+    .note.ok { background: var(--ok-soft); border-color: #bfe3ce; color: #145c39; }
+    .note.bad { background: var(--danger-soft); border-color: #f3c9c4; color: #8e2b1e; }
+    .note strong { font-weight: 700; }
+    details.rawlog { margin: 0 10px 10px; }
+    details.rawlog summary { cursor: pointer; font-size: 12.5px; color: var(--ink-2); padding: 4px 0; }
+    details.rawlog pre {
+      max-height: 260px; overflow: auto; background: var(--code-bg); color: #cfdcf5;
+      padding: 10px; border-radius: 8px; font: 11px/1.55 Consolas, monospace; white-space: pre-wrap;
+    }
+
+    /* 历史 */
+    .hist { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .hist-item { border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; background: var(--surface-2); }
+    .hist-item.cur { border-color: #bfe3ce; background: var(--ok-soft); }
+    .hist-item .meta { font-size: 11.5px; color: var(--muted); }
+    .hist-item .prev { font: 11.5px/1.5 Consolas, monospace; color: var(--ink-2); margin: 4px 0; word-break: break-all; }
+
+    /* ---------- 浮动提示 ---------- */
+    .toasts {
+      position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 80;
+      display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto; max-width: min(760px, calc(100vw - 32px));
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 1.6;
+      background: #1c2536; color: #f2f5fb; box-shadow: var(--shadow-2);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .toast.bad { background: #7f2318; }
+    .toast.ok { background: #145233; }
+    .toast button { color: #ffffffaa; font-size: 15px; line-height: 1; padding: 0 2px; }
+    .toast button:hover { color: #fff; }
+
+    /* ---------- 弹层（AI 建议） ---------- */
+    .modal-mask {
+      position: fixed; inset: 0; z-index: 90; background: #0d152480; backdrop-filter: blur(2px);
+      display: grid; place-items: center; padding: 24px;
+    }
+    .modal {
+      width: min(900px, 100%); max-height: calc(100vh - 60px); display: flex; flex-direction: column;
+      background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-2); overflow: hidden;
+    }
+    .modal-head { padding: 14px 18px; border-bottom: 1px solid var(--line-2); }
+    .modal-head h3 { margin: 0 0 4px; font-size: 15px; }
+    .modal-head p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.65; }
+    .modal-body { flex: 1; min-height: 0; padding: 14px 18px; }
+    .modal-body textarea {
+      width: 100%; height: 100%; min-height: 320px; resize: none; outline: none;
+      border-radius: 10px; padding: 12px; background: var(--code-bg); color: var(--code-ink);
+      font: 13px/20px Consolas, "Cascadia Mono", monospace; white-space: pre; tab-size: 2;
+    }
+    .modal-foot { padding: 12px 18px; border-top: 1px solid var(--line-2); display: flex; gap: 8px; justify-content: flex-end; background: var(--surface-2); }
+
+    /* 顶部忙碌细线 */
+    .busy-line { position: fixed; top: 0; left: 0; height: 2px; z-index: 100; background: var(--accent); animation: slide 1.1s ease-in-out infinite; }
+    @keyframes slide { 0% { width: 0; left: 0; } 50% { width: 55%; left: 22%; } 100% { width: 0; left: 100%; } }
+
+    .kbd {
+      font: 11px/1.4 Consolas, monospace; background: #00000010; border: 1px solid #0000001f;
+      border-radius: 4px; padding: 0 4px; color: var(--ink-2);
+    }
+
+    /* 窄屏降级 */
+    @media (max-width: 1180px) {
+      .panes { grid-template-columns: minmax(210px, .7fr) minmax(300px, 1.15fr) minmax(260px, 1fr); }
+      .sdot span { display: none; }
+      .sdot { padding: 0 7px; }
+    }
+    @media (max-width: 900px) {
+      body { overflow: auto; }
+      .body { flex-direction: column; height: auto; }
+      .sidebar { width: 100%; border-right: 0; border-bottom: 1px solid var(--line); max-height: 40vh; }
+      .panes { grid-template-columns: 1fr; }
+      .pane { min-height: 360px; }
+      .empty-steps { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="busy-line" v-if="busy"></div>
+
+    <!-- ================= 顶栏 ================= -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">H</span>
+        <span class="brand-name">Hand2LaTeX</span>
+        <span class="brand-sub">手写笔记 → LaTeX → PDF</span>
+      </div>
+      <div class="topbar-spacer"></div>
+      <div class="status-cluster">
+        <button class="sdot" v-for="check in statusChecks" :key="check.id"
+                :title="check.label + '：' + check.detail">
+          <i class="dot" :class="check.level"></i><span>{{ check.label }}</span>
+        </button>
+        <button class="sdot" v-if="!caps.status" title="当前后端没有 /api/status 接口，环境自检不可用；识别与排版不受影响"
+                style="color:var(--ink-2)">
+          <i class="dot warn"></i><span>精简模式</span>
+        </button>
+        <button class="sdot" v-else-if="statusError" :title="statusError" style="color:var(--danger)">
+          <i class="dot bad"></i><span>状态读取失败</span>
+        </button>
+      </div>
+      <button class="icon-btn" :title="statusOpen ? '收起环境详情' : '查看环境详情'"
+              :aria-label="statusOpen ? '收起环境详情' : '查看环境详情'" :aria-expanded="statusOpen ? 'true' : 'false'"
+              aria-controls="status-drawer" @click="statusOpen = !statusOpen">☰</button>
+      <button class="icon-btn" title="刷新状态与任务列表" aria-label="刷新状态与任务列表" @click="refreshAll">⟳</button>
+    </header>
+
+    <!-- 环境详情 -->
+    <div class="status-drawer" id="status-drawer" v-if="statusOpen && status" role="region" aria-label="环境自检详情">
+      <h3>环境自检</h3>
+      <dl class="kv">
+        <dt>云端识别</dt><dd>{{ status.openai.model || '未配置模型' }} · 单页超时 {{ status.openai.timeout_seconds }} 秒 · 输出预算 {{ status.openai.max_tokens }} token</dd>
+        <dt>API 密钥</dt><dd>{{ status.openai.configured ? '已配置（长度 ' + status.openai.key_length + '，不显示内容）' : '未配置：上传识别与 AI 修复都用不了' }}</dd>
+        <dt>接口地址</dt><dd>{{ status.openai.base_url || '未设置（直连 OpenAI 官方接口，国内网络通常连不上）' }}</dd>
+        <dt>PDF 编译器</dt><dd>{{ status.tectonic.available ? ((status.tectonic.version || '可用') + ' · ' + status.tectonic.path) : '未找到 Tectonic：能识别和改代码，但排不出 PDF' }}</dd>
+        <dt>中文字体</dt><dd>{{ status.fontset ? 'ctex fontset = ' + status.fontset : 'LATEX_FONTSET 配置有误' }}</dd>
+        <dt>多页并发</dt><dd>最多同时识别 {{ status.page_concurrency }} 页（WORKBENCH_PAGE_CONCURRENCY 可调）</dd>
+        <dt>本地公式后端</dt><dd>{{ status.recognizer.model || '未指定' }} · 设备 {{ status.recognizer.device || 'cpu' }} · 已下载模型 {{ status.recognizer.local_models.join('、') || '无' }}</dd>
+        <dt>运行环境</dt><dd>Python {{ status.python }} · {{ status.platform }}</dd>
+        <dt>Python 运行时</dt><dd>{{ status.python_runtime.source }}<br><span style="color:var(--muted)">{{ status.python_runtime.executable }}</span></dd>
+        <dt>前端资源</dt><dd>{{ status.frontend.available ? 'vue.global.js 来自' + status.frontend.source : '缺少 vue.global.js：页面会白屏' }}</dd>
+        <dt>任务目录</dt><dd>{{ status.jobs.directory }}（{{ status.jobs.count }} 个任务 · {{ formatBytes(status.jobs.total_bytes) }}）</dd>
+        <dt>版本</dt><dd>{{ status.version }}<template v-if="status.build && status.build.commit"> · {{ status.build.commit }}</template> · 来源 {{ status.build.source }}</dd>
+      </dl>
+      <div class="drawer-note">
+        这里只列<strong>能当场核对的事实</strong>：文件在不在、配置填没填、编译器能不能跑。
+        系统<strong>不会给"识别可信度百分比"</strong>——那个数无法验证，只会误导。判断抄得对不对，只能对照左侧原图。
+      </div>
+    </div>
+
+    <!-- ================= 主体 ================= -->
+    <div class="body">
+      <!-- ---------- 侧栏：任务 ---------- -->
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <button class="btn block" :disabled="busy" @click="pickFiles">＋ 新建识别</button>
+          <input ref="fileInput" type="file" hidden multiple accept=".png,.jpg,.jpeg,.webp" @change="selectFile">
+          <div class="search-wrap">
+            <span class="search-icon">⌕</span>
+            <input v-model="jobQuery" placeholder="搜索任务标题或任务号" @keyup.enter="searchJobs" @keyup.esc="clearQuery">
+          </div>
+        </div>
+
+        <!-- 上传进度 -->
+        <div class="run-card" v-if="busy && run">
+          <div class="t"><span>正在识别</span><span>{{ run.done_pages }} / {{ run.total_pages }} 页</span></div>
+          <div class="bar"><i :style="{ width: (100 * run.done_pages / Math.max(1, run.total_pages)) + '%' }"></i></div>
+          <div class="run-page" v-for="page in run.pages" :key="page.page">
+            <span>第 {{ page.page }} 页</span>
+            <span class="st" :class="page.state">{{ stateText(page.state) }}</span>
+            <span v-if="page.latency_ms" style="color:var(--faint)">{{ formatSeconds(page.latency_ms) }}</span>
+          </div>
+          <div class="run-note">已用 {{ formatSeconds(run.elapsed_ms) }}，最多同时 {{ run.concurrency }} 页。全部识别完后还要合并排版，请别关窗口。</div>
+        </div>
+        <div class="run-card" v-else-if="busy">
+          <div class="t"><span>正在处理</span></div>
+          <div class="run-note">请稍候，不要重复点击。</div>
+        </div>
+
+        <div class="list-label">
+          <span>任务</span>
+          <span v-if="jobTotal">{{ jobTotal }} 个</span>
+        </div>
+
+        <div class="job-list">
+          <button class="job-item" v-for="job in recentJobs" :key="job.job_id"
+                  :class="{ on: job.job_id === jobId }" :disabled="busy"
+                  @click="openJob(job.job_id)">
+            <div class="job-title">{{ job.title || '未命名任务' }}</div>
+            <div class="job-meta">
+              <span>{{ job.page_count }} 页</span>
+              <span>·</span>
+              <span>{{ formatJobTime(job.updated_at) }}</span>
+              <span class="mini-tag bad" v-if="job.failed_pages">{{ job.failed_pages }} 页失败</span>
+              <span class="mini-tag ok" v-else-if="job.has_pdf">PDF</span>
+            </div>
+          </button>
+          <div class="empty-list" v-if="!recentJobs.length">
+            <template v-if="jobQuery">没有匹配「{{ jobQuery }}」的任务</template>
+            <template v-else-if="!caps.jobs">
+              当前后端版本没有任务列表接口，<br>这里只显示你本机打开过的任务。<br>
+              <span style="color:var(--faint)">点「新建识别」上传，或直接输入任务号打开。</span>
+            </template>
+            <template v-else>还没有任务。<br>点上面的「新建识别」上传手写笔记。</template>
+          </div>
+        </div>
+
+        <div class="sidebar-foot" v-if="jobTotal > jobLimit">
+          <button class="btn ghost" :disabled="jobOffset === 0" @click="prevJobs">上一页</button>
+          <span style="flex:1;text-align:center">{{ jobPage }} / {{ jobPages }}</span>
+          <button class="btn ghost" :disabled="jobOffset + jobLimit >= jobTotal" @click="nextJobs">下一页</button>
+        </div>
+      </aside>
+
+      <!-- ---------- 工作区 ---------- -->
+      <main class="workspace"
+            @dragover.prevent="onDragOver"
+            @dragleave.prevent="onDragLeave"
+            @drop.prevent="onDrop">
+
+        <!-- 空状态 -->
+        <div class="empty-state" v-if="!jobId">
+          <div class="empty-inner">
+            <h2>把手写笔记变成能改的 LaTeX</h2>
+            <p>上传整页照片，系统逐页识别并排版成中文 PDF。识别结果一定会带着原图给你核对，不会替你假装"已经准确"。</p>
+
+            <div class="dropzone" :class="{ hot: dragActive }" @click="pickFiles">
+              <div class="dz-icon">⇪</div>
+              <div class="dz-title">{{ dragActive ? '松手就开始识别' : '把图片拖到这里，或点击选择' }}</div>
+              <div class="dz-sub">支持 PNG / JPG / WebP，一次可多选（按选择顺序合成一份 PDF）<br>单张不超过 20 MB，最多 10 页</div>
+            </div>
+
+            <div class="empty-steps">
+              <div class="step-card">
+                <div class="n">第 1 步</div>
+                <div class="h">上传照片</div>
+                <div class="d">整页拍清楚，光影均匀，识别会更稳。</div>
+              </div>
+              <div class="step-card">
+                <div class="n">第 2 步</div>
+                <div class="h">对照原图核对</div>
+                <div class="d">左栏原图、中栏代码一一对照，黄色行是需要你看一眼的位置。</div>
+              </div>
+              <div class="step-card">
+                <div class="n">第 3 步</div>
+                <div class="h">改完导 PDF</div>
+                <div class="d">直接改代码重新排版，历史版本随时可退回。</div>
+              </div>
+            </div>
+
+            <div class="empty-list" v-if="recentJobs.length" style="margin-top:20px">
+              也可以直接打开左侧任意一个历史任务。
+            </div>
+          </div>
+        </div>
+
+        <!-- 三栏 -->
+        <div class="panes" v-else>
+          <!-- ① 原图 -->
+          <section class="pane">
+            <div class="pane-head">
+              <div class="pane-title"><span class="pane-no">1</span>原图</div>
+              <div class="spacer"></div>
+              <span style="font-size:11.5px;color:var(--muted)">{{ reviewedCount }} / {{ pages.length }} 已核对</span>
+            </div>
+            <div class="pane-body">
+              <div class="thumbs">
+                <div class="thumb" v-for="page in pages" :key="page.page"
+                     :class="{ on: activePage === page.page }" @click="jumpToPage(page.page)"
+                     role="button" tabindex="0" :aria-label="'跳到第 ' + page.page + ' 页'"
+                     @keydown.enter.prevent="jumpToPage(page.page)" @keydown.space.prevent="jumpToPage(page.page)">
+                  <img class="thumb-img" :src="page.source_url" :alt="'第 ' + page.page + ' 页手写原图'" loading="lazy">
+                  <div class="thumb-bar">
+                    <span class="cap">第 {{ page.page }} 页</span>
+                    <span class="grow"></span>
+                    <button v-if="page.error" class="chk retry" :disabled="busy" @click.stop="retryPage(page.page)">重试</button>
+                    <button v-else class="chk" :class="{ done: reviewedPages[page.page] }"
+                            :title="reviewedPages[page.page] ? '点一下取消标记' : '标记这一页已经对照原图核对过'"
+                            @click.stop="togglePage(page.page)">{{ reviewedPages[page.page] ? '已核对 ✓' : '标为已核对' }}</button>
+                  </div>
+                  <div class="flags" v-if="page.error || pageReviewCount(page.page) || page.latency_ms">
+                    <span class="flag bad" v-if="page.error">识别失败</span>
+                    <span class="flag warn" v-else-if="pageReviewCount(page.page)">{{ pageReviewCount(page.page) }} 处待复核</span>
+                    <span class="flag" v-if="page.latency_ms">识别 {{ formatSeconds(page.latency_ms) }}</span>
+                    <span class="flag warn" v-if="page.signals && page.signals.retried">输出被截断，重试过</span>
+                    <span class="flag warn" v-else-if="page.signals && page.signals.near_token_budget">接近输出上限</span>
+                  </div>
+                </div>
+                <div class="empty-list" v-if="!pages.length">这个任务只有一页，直接对照中栏代码即可。</div>
+              </div>
+            </div>
+            <div class="pane-foot">
+              点某页，中栏代码跳到那一页的位置。小标签是识别过程的真实记录，不是"可信度分数"。
+            </div>
+          </section>
+
+          <!-- ② 代码 -->
+          <section class="pane">
+            <div class="pane-head">
+              <div class="pane-title"><span class="pane-no">2</span>LaTeX 代码</div>
+              <div class="spacer"></div>
+              <span v-if="dirty" style="font-size:11.5px;color:var(--warn);font-weight:700">未提交</span>
+              <span v-else-if="reused" style="font-size:11.5px;color:var(--ok);font-weight:700">已复用上次编译</span>
+            </div>
+
+            <div class="draft-note note" v-if="draft" style="margin:8px 10px 0">
+              这个任务有一份<strong>上次没提交的修改</strong>（{{ formatClock(draft.savedAt) }} 存在本机浏览器），和服务器上的版本不同。
+              <div style="margin-top:8px;display:flex;gap:8px">
+                <button class="btn sm" @click="restoreDraft">恢复我的修改</button>
+                <button class="btn sm ghost" @click="discardDraft">丢弃，用服务器版本</button>
+              </div>
+            </div>
+
+            <div class="editor">
+              <div class="gutter">
+                <div :style="{ transform: 'translateY(' + (-scrollTop) + 'px)' }">
+                  <div v-for="n in lineCount" :key="n"
+                       :class="{ err: errorLines.has(n), review: !errorLines.has(n) && reviewLines.has(n), flash: flashLine === n }">{{ n }}</div>
+                </div>
+              </div>
+              <div class="code-wrap">
+                <pre class="hl" ref="hl" v-html="highlighted"></pre>
+                <textarea class="code" ref="ta" v-model="tex" spellcheck="false"
+                          @scroll="onScroll" @input="onEdit"></textarea>
+              </div>
+            </div>
+
+            <div class="pane-foot" style="gap:6px;flex-wrap:wrap">
+              <button class="btn sm" :disabled="busy" title="Ctrl+S" @click="recompile">重新排版</button>
+              <button class="btn sm ghost" :disabled="busy || !reviewItems.length" title="F2" @click="nextReview">
+                下一处复核<span v-if="reviewItems.length"> ({{ reviewItems.length }})</span>
+              </button>
+              <span class="grow"></span>
+              <button class="btn sm ghost" :disabled="!tex" :title="'把当前代码复制到剪贴板（Ctrl+Shift+C）'"
+                      @click="copyTex">{{ copied ? '已复制 ✓' : '复制' }}</button>
+              <a v-if="hasPdf" class="btn sm ghost" :href="pdfUrl" download title="下载排版好的 PDF">PDF ↓</a>
+              <a class="btn sm ghost" :href="texUrl" download title="下载当前代码">tex ↓</a>
+              <button class="btn sm quiet" :disabled="busy" title="用最初的识别原稿覆盖当前修改（当前版本会留在历史里）" @click="restoreOriginal">恢复原稿</button>
+              <button class="btn sm quiet" v-if="hasFigurePlaceholder" :disabled="busy" title="把图形页的文字描述换回原图截图" @click="rebuildFigures">图形页改用原图</button>
+            </div>
+          </section>
+
+          <!-- ③ 预览 -->
+          <section class="pane">
+            <div class="pane-head">
+              <div class="pane-title"><span class="pane-no">3</span>预览与检查</div>
+              <div class="spacer"></div>
+              <div class="seg" role="tablist" aria-label="预览与检查">
+                <button role="tab" :aria-selected="tab === 'pdf' ? 'true' : 'false'" aria-controls="pane-pdf"
+                        :class="{ on: tab === 'pdf' }" @click="tab = 'pdf'">排版</button>
+                <button role="tab" :aria-selected="tab === 'log' ? 'true' : 'false'" aria-controls="pane-log"
+                        :class="{ on: tab === 'log' }" @click="tab = 'log'">
+                  问题<span class="n" :class="{ bad: issues.length + reviewItems.length }">{{ issues.length + reviewItems.length }}</span>
+                </button>
+                <button role="tab" :aria-selected="tab === 'history' ? 'true' : 'false'" aria-controls="pane-history"
+                        :class="{ on: tab === 'history' }" @click="openHistory">历史<span class="n">{{ history.length }}</span></button>
+              </div>
+            </div>
+
+            <div class="preview-wrap" id="pane-pdf" v-show="tab === 'pdf'" role="tabpanel" aria-label="排版预览">
+              <iframe v-if="hasPdf" :src="pdfUrl" :key="pdfVersion" title="排版后的 PDF"></iframe>
+              <div class="preview-empty" v-else>
+                <div>
+                  <div class="big">▤</div>
+                  还没有排出 PDF。<br>
+                  <span style="font-size:12.5px">看「问题」里的原因，或点中栏「重新排版」。</span>
+                </div>
+              </div>
+              <a v-if="hasPdf" class="pdf-open" :href="pdfUrl" target="_blank" rel="noopener"
+                 title="在系统 PDF 阅读器里打开（内嵌预览不可用时用这个）">在阅读器中打开 ↗</a>
+            </div>
+
+            <div class="pane-body" id="pane-log" v-show="tab === 'log'" role="tabpanel" aria-label="问题列表">
+              <!-- 三种状态分开说，不能混：有编译错误 / 只有需复核项 / 都没有。
+                   原来"有错误"时也显示"没有发现问题"，跟下面的红条自相矛盾。 -->
+              <div class="note bad" style="margin:10px 10px 8px" v-if="issues.length">
+                <strong>排版没有成功，有 {{ issues.length }} 个问题。</strong><br>
+                下面是编译器的原始报错，不是"大概"。改完点中栏「重新排版」再试。
+              </div>
+              <div class="note" :class="{ ok: !reviewItems.length }" style="margin:10px 10px 8px" v-else-if="reviewItems.length">
+                <strong>{{ reviewItems.length }} 处需要人工复核</strong>：{{ reviewKinds }}。<br>
+                这些是"很可能抄错、缺字或编码出错"的位置，系统无法替你判断对错，请对照左栏原图逐条确认。
+              </div>
+              <div class="note ok" style="margin:10px 10px 8px" v-else>
+                <strong>排版成功，没有发现可自动判定的缺字/编码问题。</strong><br>
+                但"没有警告"不等于"抄对了"，识别内容仍需对照原图检查。
+              </div>
+
+              <div class="issues">
+                <div class="issue" v-for="(item, index) in reviewItems" :key="'r' + index" @click="jumpToLine(item.line)">
+                  <div class="where">需复核 · {{ item.label }}<template v-if="item.line"> · 第 {{ item.line }} 行</template></div>
+                  <div class="plain">{{ item.plain }}</div>
+                  <div class="raw" v-if="item.message">{{ item.message }}</div>
+                </div>
+
+                <div class="issue" v-for="(item, index) in issues" :key="'i' + index"
+                     :class="{ warn: item.kind === 'warn' }" @click="jumpToLine(item.line)">
+                  <div class="where">{{ item.kind === 'warn' ? '警告' : '错误' }}<template v-if="item.line"> · 第 {{ item.line }} 行</template><template v-else> · 位置未标出</template></div>
+                  <div class="plain">{{ item.plain }}</div>
+                  <div class="raw">{{ item.message }}</div>
+                </div>
+              </div>
+
+              <div style="padding:0 10px 10px;display:flex;gap:8px;flex-wrap:wrap" v-if="compileResult && compileResult.errors && compileResult.errors.length">
+                <button class="btn sm" :disabled="busy" @click="requestFix">让 AI 给我改一版</button>
+              </div>
+
+              <details class="rawlog" v-if="compileResult && compileResult.log">
+                <summary>完整编译日志（给懂 LaTeX 的人看）</summary>
+                <pre>{{ compileResult.log }}</pre>
+              </details>
+            </div>
+
+            <div class="pane-body" id="pane-history" v-show="tab === 'history'" role="tabpanel" aria-label="历史版本">
+              <div class="hist">
+                <div class="note" style="margin:0 0 2px">
+                  每次重新排版、恢复原稿、应用 AI 修改都会在服务器留一份。最多显示最近 50 份，恢复会覆盖中栏代码并重新排版。
+                </div>
+                <div style="color:var(--danger);font-size:12.5px" v-if="historyError">{{ historyError }}</div>
+                <div style="color:var(--muted);font-size:12.5px" v-if="historyLoading">正在读取历史版本…</div>
+                <div class="hist-item" v-for="entry in history" :key="entry.name" :class="{ cur: entry.is_current }">
+                  <div class="meta">{{ formatClock(entry.saved_at) }} · {{ entry.lines }} 行 · {{ formatBytes(entry.bytes) }}<template v-if="entry.is_current"> · <strong>当前版本</strong></template></div>
+                  <div class="prev">{{ entry.first_line }}</div>
+                  <button class="btn sm ghost" v-if="!entry.is_current" :disabled="busy" @click="restoreHistory(entry.name)">恢复到这一版</button>
+                </div>
+                <div class="empty-list" v-if="!history.length && !historyLoading && !historyError">还没有历史版本记录。</div>
+              </div>
+            </div>
+
+            <div class="pane-foot">
+              <span class="grow">
+                <span class="kbd">Ctrl+S</span> 重新排版 · <span class="kbd">F2</span> 下一处复核
+              </span>
+              <span v-if="dirty" style="color:var(--warn)">改过代码，PDF 还是上一版</span>
+              <span v-else-if="hasPdf" style="color:var(--ok)">PDF 与代码一致</span>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <!-- AI 修复建议 -->
+    <div class="modal-mask" v-if="suggestedTex" @click.self="suggestedTex = ''">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>AI 建议改成这样 —— 用不用你决定</h3>
+          <p>{{ fixSummary }}。下面可以再手动改，确认后才会覆盖中栏代码并重新排版。</p>
+        </div>
+        <div class="modal-body">
+          <textarea v-model="suggestedTex" spellcheck="false"></textarea>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" @click="suggestedTex = ''">不用了</button>
+          <button class="btn" :disabled="busy" @click="applyFix">采用并重新排版</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 提示 -->
+    <div class="toasts" role="status" aria-live="polite" aria-atomic="false">
+      <div class="toast" :class="toast.kind" v-for="toast in toasts" :key="toast.id">
+        <span style="flex:1">{{ toast.text }}</span>
+        <button @click="dismissToast(toast.id)" title="关闭" aria-label="关闭这条提示">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/vendor/vue/vue.global.js"></script>
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue;
+    const LINE_HEIGHT = 20;
+    const escapeHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const TOKEN = /(\\(?:[a-zA-Z]+@?|.))|(%.*$)|(\$[^$\n]*\$)|([{}])/g;
+
+    const highlightLine = line => {
+      let out = '', last = 0, match;
+      TOKEN.lastIndex = 0;
+      while ((match = TOKEN.exec(line)) !== null) {
+        out += escapeHtml(line.slice(last, match.index));
+        const cls = match[1] ? 'tk-cmd' : match[2] ? 'tk-comment' : match[3] ? 'tk-math' : 'tk-brace';
+        out += '<span class="' + cls + '">' + escapeHtml(match[0]) + '</span>';
+        last = match.index + match[0].length;
+        if (match[0] === '') TOKEN.lastIndex += 1;
+      }
+      out += escapeHtml(line.slice(last));
+      return out || '&#8203;';
+    };
+
+    // 把编译器术语翻译成人话；只解释，绝不替用户改内容。
+    const plainReason = (message, kind) => {
+      const m = message || '';
+      if (/Missing character|could not represent character/i.test(m)) return '有个符号在当前字体里不存在（∈、≤ 这类手写数学符号最常见），PDF 里会变成空白或缺字。换成 LaTeX 写法（比如 $\\in$、$\\le$）就能正常显示。';
+      if (/fontspec.*package|choose a different font/i.test(m)) return '这是上一条"符号缺字"的补充建议，不用单独处理。';
+      if (/accessing absolute path/i.test(m)) return '这是在读取系统里的中文字体，属于正常提示，可以忽略。';
+      if (/No \\author given/i.test(m)) return '没有填写作者，不影响使用，可以忽略。';
+      if (/Undefined control sequence/i.test(m)) return '有条命令 LaTeX 不认识，多半是拼写错了，或者识别时多写了一个反斜杠。';
+      if (/Missing \$|math mode/i.test(m)) return '公式没有用数学符号包起来。行内公式写成 $...$，单独一行的公式用 \\[ ... \\]。';
+      if (/fontset.*unavailable|Font .*not found|font.*not found/i.test(m)) return '字体问题：中文或某个符号的字体没找到。本地编译需要中文字体；在线平台要把编译器改成 XeLaTeX。';
+      if (/Runaway argument|Paragraph ended|Missing }|Missing {/i.test(m)) return '大括号没有成对关上，检查这一行附近的 { 和 }。';
+      if (/Overfull \\hbox|Underfull \\hbox/i.test(m)) return '这一行太宽或太松，只是排版不好看，不影响打开 PDF。';
+      if (/File .* not found|not found.*\.sty|Package .* not found/i.test(m)) return '缺文件或缺宏包，不是手写内容的问题。';
+      if (/Misplaced alignment tab|Extra alignment tab/i.test(m)) return '表格里的 & 用错了，或者该换行的地方没换行。';
+      if (/^\s*$/.test(m)) return '编译器没有给出具体原因，看下面的完整日志。';
+      if (kind === 'warn') return '这是排版警告，一般不影响出 PDF。具体含义看上面的原文。';
+      return '编译器在这一行附近看不懂。点这条跳过去，对照原图看看是不是识别写错了。';
+    };
+
+    // 窗口标题：桌面窗口的任务栏只认标题，加上任务名才能在多开时分清。
+    const _BASE_TITLE = 'Hand2LaTeX 智能工作台';
+    const _jobTitle = data => {
+      const t = (data && data.title || '').trim();
+      return t || ('任务 ' + String((data && data.job_id) || '').slice(0, 8));
+    };
+
+    createApp({
+      setup() {
+        // ---- 状态 ----
+        const files = ref([]);
+        const busy = ref(false);
+        const jobId = ref('');
+        const tex = ref('');
+        const sourceUrl = ref('');
+        const compileResult = ref(null);
+        const pdfVersion = ref(0);
+        const suggestedTex = ref('');
+        const fixSummary = ref('');
+        const pages = ref([]);
+        const pageCount = ref(0);
+        const tab = ref('pdf');
+        const scrollTop = ref(0);
+        const flashLine = ref(0);
+        const activePage = ref(0);
+        const hasPdf = ref(false);
+        const hasFigures = ref(false);
+        const dirty = ref(false);
+        const recentJobs = ref([]);
+        const selectedJob = ref('');
+        const jobQuery = ref('');
+        const jobOffset = ref(0);
+        const jobTotal = ref(0);
+        const jobLimit = 10;
+        const status = ref(null);
+        const statusOpen = ref(false);
+        const statusError = ref('');
+        const run = ref(null);
+        const draft = ref(null);
+        const reused = ref(false);
+        const reviewCursor = ref(-1);
+        const history = ref([]);
+        const historyLoading = ref(false);
+        const historyError = ref('');
+        const reviewedPages = ref({});
+        const dragActive = ref(false);
+        const copied = ref(false);
+        const toasts = ref([]);
+        const fileInput = ref(null);
+        const ta = ref(null);
+        const hl = ref(null);
+        let dragDepth = 0, runTimer = null, draftTimer = null, toastSeq = 0;
+
+        // ---- 提示条 ----
+        const notify = (text, kind = '', ttl = 6000) => {
+          const id = ++toastSeq;
+          toasts.value = [...toasts.value, { id, text, kind }];
+          if (ttl) setTimeout(() => dismissToast(id), ttl);
+        };
+        const dismissToast = id => { toasts.value = toasts.value.filter(item => item.id !== id); };
+
+        // ---- 复制当前 LaTeX ----
+        // 用户改完代码最常做的事就是把它贴到别处（Overleaf、自己的编辑器）。
+        // navigator.clipboard 只在 https/localhost 下可用——这里是 127.0.0.1，满足条件；
+        // 但仍留 execCommand 兜底，免得某些受限环境直接失败。
+        const copyTex = async () => {
+          const text = tex.value || '';
+          if (!text) return;
+          let ok = false;
+          try {
+            await navigator.clipboard.writeText(text);
+            ok = true;
+          } catch {
+            try {
+              const helper = document.createElement('textarea');
+              helper.value = text;
+              helper.setAttribute('readonly', '');
+              helper.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+              document.body.appendChild(helper);
+              helper.select();
+              ok = document.execCommand('copy');
+              document.body.removeChild(helper);
+            } catch { ok = false; }
+          }
+          if (ok) {
+            copied.value = true;
+            setTimeout(() => { copied.value = false; }, 1800);
+            notify(`已复制 ${text.split('\n').length} 行 LaTeX 代码`);
+          } else {
+            notify('复制没成功：浏览器不允许访问剪贴板，请手动全选复制（Ctrl+A 再 Ctrl+C）。');
+          }
+        };
+
+        // ---- 基础派生 ----
+        const jobPage = computed(() => Math.floor(jobOffset.value / jobLimit) + 1);
+        const jobPages = computed(() => Math.max(1, Math.ceil(jobTotal.value / jobLimit)));
+        const sourceLines = computed(() => tex.value.split('\n'));
+        const lineCount = computed(() => sourceLines.value.length);
+        const errorLines = computed(() => new Set((compileResult.value?.errors || []).map(item => item.line).filter(Boolean)));
+        const pdfUrl = computed(() => `/api/jobs/${jobId.value}/pdf?v=${pdfVersion.value}`);
+        const texUrl = computed(() => `/api/jobs/${jobId.value}/tex`);
+        const originalUrl = computed(() => `/api/jobs/${jobId.value}/original`);
+        const activePageData = computed(() => pages.value.find(page => page.page === activePage.value) || null);
+        const hasFigurePlaceholder = computed(() => hasFigures.value && tex.value.includes('原始示意图（未重新绘制）'));
+        const reviewedCount = computed(() => Object.values(reviewedPages.value).filter(Boolean).length);
+        const statusChecks = computed(() => status.value?.checks || []);
+
+        // ---- 人工复核：只用可验证的信号，不猜"识别对不对" ----
+        const RAW_MATH = /[∈≤≥≠≈∑∏∫∞παβγθλμσφΩ→←↔×÷±]/;
+        const reviewItems = computed(() => {
+          const result = [];
+          const lines = sourceLines.value;
+          const log = compileResult.value?.log || '';
+          const glyphLines = new Set();
+          const glyphEntries = [];
+          const seen = new Set();
+          for (const raw of log.split('\n')) {
+            if (!/Missing character|could not represent character/i.test(raw)) continue;
+            const text = raw.trim();
+            if (!text || seen.has(text)) continue;
+            seen.add(text);
+            const lineMatch = text.match(/main\.tex[:.](\d+)/) || text.match(/(?:line|l\.)\s*(\d+)/i);
+            const codeMatch = text.match(/\(U\+([0-9A-Fa-f]{4,6})\)/) || text.match(/\(0x([0-9A-Fa-f]+)\)/);
+            glyphEntries.push({ text, line: lineMatch ? Number(lineMatch[1]) : 0, code: codeMatch ? codeMatch[1].toUpperCase() : '' });
+          }
+          const locatedCodes = new Set(glyphEntries.filter(entry => entry.line && entry.code).map(entry => entry.code));
+          for (const entry of glyphEntries) {
+            if (!entry.line && entry.code && locatedCodes.has(entry.code)) continue;
+            if (entry.line) glyphLines.add(entry.line);
+            result.push({
+              kind: 'glyph', line: entry.line,
+              label: '缺字/编码',
+              message: entry.text,
+              plain: '编译器说这个符号在当前字体里不存在，PDF 里会缺字。请对照原图，把符号换成 LaTeX 写法（例如 $\\in$、$\\le$）。',
+            });
+          }
+          lines.forEach((line, index) => {
+            const n = index + 1;
+            if (glyphLines.has(n)) return;
+            if (/^\s*%/.test(line) || /^\s*\\(documentclass|usepackage|title|begin|end|maketitle|newpage|null)\b/.test(line)) return;
+            if (line.includes('\\$')) {
+              result.push({
+                kind: 'inline-math', line: n,
+                label: '公式被当成了普通文字',
+                message: line.trim(),
+                plain: '这一行里的 $ 被转义成了普通字符。如果原图上这里夹着公式，需要把公式写成 $...$，不能只留文字。',
+              });
+              return;
+            }
+            if (RAW_MATH.test(line) && !line.includes('$')) {
+              result.push({
+                kind: 'unicode', line: n,
+                label: '数学符号写法',
+                message: line.trim(),
+                plain: '这行里有个数学符号没有用 LaTeX 写法，PDF 可能缺字或样式不对。对照原图，把它写成 $\\in$、$\\le$ 这样的命令。',
+              });
+            }
+          });
+          return result.sort((a, b) => (a.line || 999999) - (b.line || 999999));
+        });
+        const reviewLines = computed(() => new Set(reviewItems.value.map(item => item.line).filter(Boolean)));
+        const reviewKinds = computed(() => [...new Set(reviewItems.value.map(item => item.label))].join('、'));
+
+        const highlighted = computed(() => sourceLines.value.map((line, index) => {
+          const n = index + 1;
+          const cls = errorLines.value.has(n) ? 'c-line err'
+            : (flashLine.value === n ? 'c-line flash'
+              : (reviewLines.value.has(n) ? 'c-line review' : 'c-line'));
+          return '<div class="' + cls + '">' + highlightLine(line) + '</div>';
+        }).join(''));
+
+        const issues = computed(() => {
+          const result = [];
+          for (const item of (compileResult.value?.errors || [])) {
+            result.push({ kind: 'error', line: item.line || 0, message: item.message, plain: plainReason(item.message, 'error') });
+          }
+          const log = compileResult.value?.log || '';
+          const seen = new Set();
+          for (const raw of log.split('\n')) {
+            if (!/warning|overfull|underfull/i.test(raw)) continue;
+            const text = raw.trim();
+            if (!text || seen.has(text)) continue;
+            seen.add(text);
+            const lineMatch = text.match(/(?:line|l\.)\s*(\d+)/i) || text.match(/main\.tex[:.](\d+)/);
+            result.push({ kind: 'warn', line: lineMatch ? Number(lineMatch[1]) : 0, message: text, plain: plainReason(text, 'warn') });
+          }
+          return result;
+        });
+
+        // ---- 页 ↔ 代码位置 ----
+        const pageAnchors = computed(() => {
+          const anchors = [];
+          const lines = sourceLines.value;
+          const first = lines.findIndex(line => line.includes('\\maketitle'));
+          anchors.push(first >= 0 ? first + 1 : 0);
+          lines.forEach((line, index) => { if (line.includes('\\newpage')) anchors.push(index + 1); });
+          return anchors;
+        });
+        const pageRanges = computed(() => pageAnchors.value.map((start, index) => ({
+          start,
+          end: index + 1 < pageAnchors.value.length ? pageAnchors.value[index + 1] - 1 : lineCount.value,
+        })));
+        // merged_page 是该原图页在合并 TeX 中的页序；失败页为 null，不能按原图页号硬跳。
+        const mergedPageNumber = page => page.merged_page || (page.error ? 0 : page.page);
+        const pageReviewCount = pageNumber => {
+          const page = pages.value.find(item => item.page === pageNumber);
+          if (!page) return 0;
+          const merged = mergedPageNumber(page);
+          if (!merged) return 0;
+          const range = pageRanges.value[merged - 1];
+          if (!range) return 0;
+          return reviewItems.value.filter(item => item.line >= range.start && item.line <= range.end).length;
+        };
+
+        // ---- 核对标记（存本机浏览器） ----
+        const reviewedStorageKey = id => 'hand2latex:reviewed:' + id;
+        const loadReviewed = id => {
+          if (!id) return {};
+          try {
+            const value = JSON.parse(localStorage.getItem(reviewedStorageKey(id)) || '{}');
+            return value && typeof value === 'object' ? value : {};
+          } catch { return {}; }
+        };
+        const togglePage = page => {
+          reviewedPages.value = { ...reviewedPages.value, [page]: !reviewedPages.value[page] };
+          if (jobId.value) {
+            try { localStorage.setItem(reviewedStorageKey(jobId.value), JSON.stringify(reviewedPages.value)); } catch { /* 隐私模式下只保留当页状态 */ }
+          }
+        };
+
+        // ---- 编辑区交互 ----
+        const onScroll = () => {
+          const el = ta.value;
+          if (!el) return;
+          scrollTop.value = el.scrollTop;
+          if (hl.value) { hl.value.scrollTop = el.scrollTop; hl.value.scrollLeft = el.scrollLeft; }
+        };
+        const jumpToLine = n => {
+          if (!n) { tab.value = 'log'; return; }
+          const el = ta.value;
+          const lines = sourceLines.value;
+          const target = Math.min(Math.max(1, n), lines.length);
+          if (el) {
+            const start = lines.slice(0, target - 1).reduce((sum, line) => sum + line.length + 1, 0);
+            el.focus();
+            el.setSelectionRange(start, start + lines[target - 1].length);
+            el.scrollTop = Math.max(0, (target - 1) * LINE_HEIGHT - el.clientHeight / 2);
+            onScroll();
+          }
+          flashLine.value = target;
+          setTimeout(() => { if (flashLine.value === target) flashLine.value = 0; }, 2600);
+        };
+        const jumpToPage = page => {
+          activePage.value = page;
+          const merged = mergedPageNumber(pages.value.find(item => item.page === page) || { page, error: null });
+          if (!merged) return;
+          let anchor = pageAnchors.value[merged - 1];
+          if (anchor === undefined) return;
+          const lines = sourceLines.value;
+          while (anchor < lines.length - 1 && !lines[anchor].trim()) anchor += 1;
+          jumpToLine(anchor + 1);
+        };
+        const nextReview = () => {
+          const items = reviewItems.value;
+          if (!items.length) return;
+          reviewCursor.value = (reviewCursor.value + 1) % items.length;
+          tab.value = 'log';
+          jumpToLine(items[reviewCursor.value].line);
+        };
+
+        // ---- 格式化 ----
+        const formatJobTime = value => (value || '').replace('T', ' ').slice(0, 16);
+        const formatBytes = value => {
+          if (value === null || value === undefined) return '未知';
+          const units = ['B', 'KB', 'MB', 'GB'];
+          let size = value, index = 0;
+          while (size >= 1024 && index < units.length - 1) { size /= 1024; index += 1; }
+          return (index ? size.toFixed(1) : String(Math.round(size))) + ' ' + units[index];
+        };
+        const formatSeconds = ms => {
+          if (ms === null || ms === undefined || ms === '') return '';
+          return ms >= 1000 ? (ms / 1000).toFixed(1) + ' 秒' : Math.round(ms) + ' 毫秒';
+        };
+        const formatClock = value => { try { return new Date(value).toLocaleString(); } catch { return value || ''; } };
+        const stateText = state => ({ pending: '排队中', running: '识别中…', done: '已完成', failed: '失败' }[state] || state);
+
+        // ---- 选择文件 / 拖拽 ----
+        const pickFiles = () => { if (!busy.value && fileInput.value) fileInput.value.click(); };
+        const selectFile = event => {
+          const picked = Array.from(event.target.files || []);
+          if (picked.length) { files.value = picked; upload(); }
+          event.target.value = '';
+        };
+        const onDragOver = () => {
+          // 只在"还没打开任务"时接受拖入。已经打开任务时上传会新建一个任务，
+          // 等于把当前正在改的东西顶掉——拖到代码区就误触发，风险太大。
+          if (jobId.value) return;
+          if (!dragActive.value) dragActive.value = true;
+          dragDepth += 1;
+        };
+        const onDragLeave = () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dragActive.value = false; };
+        const onDrop = event => {
+          dragDepth = 0; dragActive.value = false;
+          const incoming = Array.from((event.dataTransfer && event.dataTransfer.files) || []);
+          if (jobId.value) {
+            if (incoming.length) notify('已经在看某个任务了。要识别新图片，先点左上「＋ 新建识别」。');
+            return;
+          }
+          if (busy.value) { notify('正在处理上一个任务，等它完成再拖入新图片。'); return; }
+          const dropped = incoming.filter(item => /\.(png|jpe?g|webp)$/i.test(item.name || ''));
+          if (!dropped.length) { notify('只支持 PNG / JPG / WebP 图片。'); return; }
+          if (dropped.length > 10) { notify('一次最多 10 页，请分批上传。'); return; }
+          files.value = dropped;
+          upload();
+        };
+
+        // ---- 错误读取 ----
+        const readError = async response => {
+          try {
+            const data = await response.json();
+            const responseTex = data.tex || data.detail?.tex;
+            if (responseTex) tex.value = responseTex;
+            compileResult.value = null; suggestedTex.value = ''; fixSummary.value = '';
+            return typeof data.detail === 'string' ? data.detail : (data.detail?.message || `请求失败（${response.status}）`);
+          } catch { return `请求失败（${response.status}）`; }
+        };
+
+        // ---- 状态 & 任务列表 ----
+        // 后端能力探测：仓库里的后端可能比界面旧（少 /api/status、/api/jobs、
+        // /api/runs、/history、/retry 等）。缺了就降级，不让界面变成"状态未知 + 空列表"。
+        const caps = ref({ status: true, jobs: true, runs: true, history: true, retry: true, figures: true, restore: true });
+
+        const loadStatus = async () => {
+          try {
+            const response = await fetch('/api/status');
+            if (response.status === 404) { caps.value = { ...caps.value, status: false }; status.value = null; statusError.value = ''; return; }
+            if (!response.ok) throw new Error('状态接口返回 ' + response.status);
+            status.value = await response.json();
+            statusError.value = '';
+            caps.value = { ...caps.value, status: true };
+          } catch (err) { statusError.value = '读不到系统状态：' + err.message; }
+        };
+        const loadJobs = async () => {
+          try {
+            const params = new URLSearchParams({ limit: String(jobLimit), offset: String(jobOffset.value) });
+            if (jobQuery.value.trim()) params.set('q', jobQuery.value.trim());
+            const response = await fetch('/api/jobs?' + params);
+            if (response.status === 404) {
+              // 旧后端没有任务列表接口：只能靠"打开过的任务"记住，用本机记录补位。
+              caps.value = { ...caps.value, jobs: false };
+              recentJobs.value = readLocalJobs();
+              jobTotal.value = recentJobs.value.length;
+              return;
+            }
+            if (!response.ok) return;
+            const data = await response.json();
+            recentJobs.value = data.jobs || [];
+            jobTotal.value = data.total || 0;
+            caps.value = { ...caps.value, jobs: true };
+            rememberJobs(recentJobs.value);
+          } catch { recentJobs.value = recentJobs.value.length ? recentJobs.value : readLocalJobs(); jobTotal.value = recentJobs.value.length; }
+        };
+
+        // 旧后端没有 /api/jobs，就把打开过的任务记在本机，至少能再点回去。
+        const LOCAL_JOBS_KEY = 'hand2latex:recent-jobs';
+        const readLocalJobs = () => {
+          try {
+            const list = JSON.parse(localStorage.getItem(LOCAL_JOBS_KEY) || '[]');
+            return Array.isArray(list) ? list.slice(0, 20) : [];
+          } catch { return []; }
+        };
+        const rememberJobs = jobs => {
+          if (!jobs || !jobs.length) return;
+          try {
+            const byId = new Map(readLocalJobs().map(item => [item.job_id, item]));
+            for (const job of jobs) {
+              byId.set(job.job_id, {
+                job_id: job.job_id, title: job.title || '未命名任务',
+                updated_at: job.updated_at || new Date().toISOString(),
+                page_count: job.page_count || 1, failed_pages: job.failed_pages || 0,
+                has_pdf: !!job.has_pdf,
+              });
+            }
+            const merged = [...byId.values()].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 20);
+            localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(merged));
+          } catch { /* 隐私模式写不了就算了 */ }
+        };
+        const searchJobs = () => { jobOffset.value = 0; selectedJob.value = ''; loadJobs(); };
+        const clearQuery = () => { jobQuery.value = ''; searchJobs(); };
+        const prevJobs = () => { jobOffset.value = Math.max(0, jobOffset.value - jobLimit); loadJobs(); };
+        const nextJobs = () => { if (jobOffset.value + jobLimit < jobTotal.value) { jobOffset.value += jobLimit; loadJobs(); } };
+        const refreshAll = () => { loadStatus(); loadJobs(); };
+
+        // ---- 上传进度轮询 ----
+        const newRunId = () => (window.crypto && crypto.randomUUID
+          ? crypto.randomUUID().replace(/-/g, '')
+          : (Date.now().toString(16) + Math.random().toString(16).slice(2)).slice(0, 32).padEnd(32, '0'));
+        const stopRunPolling = () => { if (runTimer) { clearInterval(runTimer); runTimer = null; } };
+        const fetchRun = async runId => {
+          try {
+            const response = await fetch('/api/runs/' + runId);
+            if (response.status === 404) {
+              // 旧后端没有逐页进度接口：停止轮询，界面回到"正在处理"的朴素状态。
+              caps.value = { ...caps.value, runs: false };
+              stopRunPolling();
+              return null;
+            }
+            if (response.ok) run.value = await response.json();
+          } catch { /* 网络抖动时保留上一次进度 */ }
+          return run.value;
+        };
+        const startRunPolling = runId => {
+          stopRunPolling();
+          const tick = async () => {
+            const snapshot = await fetchRun(runId);
+            if (snapshot && snapshot.status !== 'running') stopRunPolling();
+          };
+          tick();
+          runTimer = setInterval(tick, 1200);
+        };
+
+        // ---- 草稿 ----
+        const draftKey = id => 'hand2latex:draft:' + id;
+        const readDraft = (id, serverTex) => {
+          if (!id) return null;
+          try {
+            const stored = JSON.parse(localStorage.getItem(draftKey(id)) || 'null');
+            return stored && typeof stored.tex === 'string' && stored.tex !== serverTex ? stored : null;
+          } catch { return null; }
+        };
+        const saveDraft = () => {
+          if (!jobId.value) return;
+          try { localStorage.setItem(draftKey(jobId.value), JSON.stringify({ tex: tex.value, savedAt: new Date().toISOString() })); } catch { /* 隐私模式存不了就算了 */ }
+        };
+        const discardDraft = () => {
+          if (jobId.value) { try { localStorage.removeItem(draftKey(jobId.value)); } catch { /* 同上 */ } }
+          draft.value = null;
+        };
+        const restoreDraft = () => {
+          if (!draft.value) return;
+          tex.value = draft.value.tex;
+          draft.value = null;
+          onEdit();
+        };
+
+        // ---- 打开任务 ----
+        const applyJob = data => {
+          jobId.value = data.job_id;
+          tex.value = data.tex;
+          sourceUrl.value = data.source_url || '';
+          compileResult.value = data.compile || null;
+          pages.value = data.pages || [];
+          pageCount.value = data.page_count || 1;
+          pdfVersion.value += 1;
+          hasPdf.value = !!(data.compile && data.compile.success);
+          hasFigures.value = !!data.has_figures;
+          activePage.value = pages.value.length ? 1 : 0;
+          selectedJob.value = data.job_id;
+          reviewedPages.value = loadReviewed(data.job_id);
+          draft.value = readDraft(data.job_id, data.tex);
+          history.value = []; historyError.value = ''; reviewCursor.value = -1; reused.value = false;
+          dirty.value = false;
+          suggestedTex.value = '';
+          fixSummary.value = '';
+          flashLine.value = 0;
+          scrollTop.value = 0;
+          tab.value = hasPdf.value ? 'pdf' : 'log';
+          location.hash = 'job=' + data.job_id;
+          // 桌面窗口的任务栏/切换器只显示窗口标题。多开几个任务时，
+          // 不改标题就全是"Hand2LaTeX 智能工作台"，分不清哪个是哪个。
+          document.title = `${_jobTitle(data)} · ${_BASE_TITLE}`;
+          // 记进本机最近任务：旧后端没有 /api/jobs 时，这是唯一能回到任务的办法。
+          rememberJobs([{
+            job_id: data.job_id, title: data.title || '未命名任务',
+            updated_at: new Date().toISOString(), page_count: data.page_count || 1,
+            failed_pages: (data.failed_pages || []).length, has_pdf: hasPdf.value,
+          }]);
+          const failed = (data.failed_pages || []).length;
+          if (failed) notify(`已打开任务，但有 ${failed} 页识别失败，可在左栏点「重试」。`, 'bad', 9000);
+        };
+        const openJob = async id => {
+          if (!id || busy.value) return;
+          busy.value = true;
+          try {
+            const response = await fetch(`/api/jobs/${id}`);
+            if (!response.ok) throw new Error(await readError(response));
+            applyJob(await response.json());
+          } catch (err) { notify('打开任务失败：' + err.message, 'bad', 9000); }
+          finally { busy.value = false; }
+        };
+        const clearJob = () => {
+          jobId.value = ''; tex.value = ''; sourceUrl.value = ''; compileResult.value = null;
+          pages.value = []; pageCount.value = 0; hasPdf.value = false; hasFigures.value = false; activePage.value = 0;
+          reviewedPages.value = {}; suggestedTex.value = ''; fixSummary.value = '';
+          selectedJob.value = ''; dirty.value = false;
+          draft.value = null; history.value = []; historyError.value = ''; reused.value = false;
+          stopRunPolling(); run.value = null;
+          document.title = _BASE_TITLE;
+          if (location.hash) location.hash = '';
+        };
+
+        // ---- 上传 ----
+        const upload = async () => {
+          if (!files.value.length) return;
+          busy.value = true; jobId.value = ''; compileResult.value = null; suggestedTex.value = '';
+          fixSummary.value = ''; hasPdf.value = false; dirty.value = false; reviewedPages.value = {};
+          flashLine.value = 0; reused.value = false; run.value = null;
+          const runId = newRunId();
+          const count = files.value.length;
+          try {
+            const form = new FormData();
+            files.value.forEach(item => form.append('image', item));
+            form.append('run_id', runId);
+            const endpoint = count > 1 ? '/api/documents/batch' : '/api/documents';
+            startRunPolling(runId);
+            const response = await fetch(endpoint, { method: 'POST', body: form });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            applyJob(data);
+            const failed = (data.failed_pages || []).length;
+            if (failed) notify(`识别完成，但有 ${failed} 页失败，可在左栏点「重试」。`, 'bad', 9000);
+            else notify(`识别完成：${data.page_count || count} 页已排版，请对照原图核对。`, 'ok', 7000);
+            jobOffset.value = 0;
+            loadJobs();
+            loadStatus();
+          } catch (err) { notify(err.message, 'bad', 12000); }
+          finally { await fetchRun(runId); stopRunPolling(); busy.value = false; files.value = []; }
+        };
+
+        // ---- 编译 / 修复 / 历史 ----
+        const recompile = async () => {
+          busy.value = true; suggestedTex.value = ''; fixSummary.value = ''; reused.value = false;
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/compile`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tex: tex.value }),
+            });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            compileResult.value = data.compile; tex.value = data.tex; pdfVersion.value += 1;
+            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false;
+            reused.value = !!data.reused; discardDraft();
+            if (data.compile && !data.compile.success) { tab.value = 'log'; notify('排版失败，右侧「问题」里有原因。', 'bad', 8000); }
+            else notify(data.reused ? '代码没变，直接复用了上次的编译结果。' : '排版成功，PDF 已更新。', 'ok', 4000);
+          } catch (err) { notify(err.message, 'bad', 10000); }
+          finally { busy.value = false; }
+        };
+        const onEdit = () => {
+          dirty.value = true; compileResult.value = null; suggestedTex.value = ''; fixSummary.value = '';
+          flashLine.value = 0; reused.value = false;
+          if (draftTimer) clearTimeout(draftTimer);
+          draftTimer = setTimeout(saveDraft, 1200);
+        };
+        const restoreOriginal = async () => {
+          if (!window.confirm('会用最初的识别原稿覆盖当前修改。当前版本会留在「历史」里，可以再退回来。\n\n继续吗？')) return;
+          busy.value = true; suggestedTex.value = ''; fixSummary.value = ''; reused.value = false;
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/restore-original`, { method: 'POST' });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            tex.value = data.tex; compileResult.value = data.compile; pdfVersion.value += 1;
+            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false; discardDraft();
+            if (data.compile && !data.compile.success) tab.value = 'log';
+            else notify('已恢复到识别原稿。', 'ok', 4000);
+          } catch (err) { notify(err.message, 'bad', 10000); }
+          finally { busy.value = false; }
+        };
+        const rebuildFigures = async () => {
+          if (!window.confirm('会把图形页的文字描述替换成原图截图，并覆盖当前手动修改。\n\n继续吗？')) return;
+          busy.value = true; suggestedTex.value = ''; fixSummary.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/figures/use-source`, { method: 'POST' });
+            if (response.status === 404) { caps.value = { ...caps.value, figures: false }; throw new Error('当前后端版本没有"图形页改用原图"接口，请升级后端后再用。'); }
+            if (!response.ok) throw new Error(await readError(response));
+            applyJob(await response.json());
+            loadJobs();
+            notify('图形页已改用原图截图。', 'ok', 4000);
+          } catch (err) { notify(err.message, 'bad', 10000); }
+          finally { busy.value = false; }
+        };
+        const retryPage = async pageNumber => {
+          if (!window.confirm(`重试第 ${pageNumber} 页会再调用一次整页识别（付费），已成功的页不会重跑。\n\n继续吗？`)) return;
+          busy.value = true;
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/pages/${pageNumber}/retry`, { method: 'POST' });
+            if (response.status === 404) { caps.value = { ...caps.value, retry: false }; throw new Error('当前后端版本没有"单页重试"接口，请升级后端后再用。'); }
+            if (!response.ok) throw new Error(await readError(response));
+            applyJob(await response.json());
+            jobOffset.value = 0;
+            loadJobs();
+            notify(`第 ${pageNumber} 页已重新识别。`, 'ok', 5000);
+          } catch (err) { notify(err.message, 'bad', 10000); }
+          finally { busy.value = false; }
+        };
+        const requestFix = async () => {
+          busy.value = true; suggestedTex.value = ''; fixSummary.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/suggest-fix`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tex: tex.value, log: compileResult.value.log }),
+            });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            suggestedTex.value = data.fixed_tex; fixSummary.value = data.summary;
+          } catch (err) { notify(err.message, 'bad', 10000); }
+          finally { busy.value = false; }
+        };
+        const applyFix = async () => {
+          busy.value = true; reused.value = false;
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/apply-fix`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tex: suggestedTex.value, summary: fixSummary.value }),
+            });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            tex.value = data.tex; compileResult.value = data.compile; suggestedTex.value = '';
+            fixSummary.value = ''; pdfVersion.value += 1;
+            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false; discardDraft();
+            if (data.compile && !data.compile.success) { tab.value = 'log'; notify('采用后仍然排版失败，看「问题」里的新原因。', 'bad', 8000); }
+            else notify('已采用 AI 修改并重新排版。', 'ok', 4000);
+          } catch (err) { notify(err.message, 'bad', 10000); }
+          finally { busy.value = false; }
+        };
+        const loadHistory = async () => {
+          if (!jobId.value) return;
+          historyLoading.value = true; historyError.value = '';
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/history`);
+            if (response.status === 404) {
+              caps.value = { ...caps.value, history: false };
+              history.value = [];
+              historyError.value = '当前后端版本没有历史版本接口。每次重新排版仍会在任务目录的 history 文件夹里留底，可用命令行查看。';
+              return;
+            }
+            if (!response.ok) throw new Error(await readError(response));
+            history.value = (await response.json()).history || [];
+            caps.value = { ...caps.value, history: true };
+          } catch (err) { historyError.value = err.message; history.value = []; }
+          finally { historyLoading.value = false; }
+        };
+        const openHistory = () => { tab.value = 'history'; loadHistory(); };
+        const restoreHistory = async name => {
+          if (!window.confirm('会用这个历史版本覆盖中栏代码并重新排版。当前版本也会留在历史里，可以再换回来。\n\n继续吗？')) return;
+          busy.value = true; suggestedTex.value = ''; fixSummary.value = ''; reused.value = false;
+          try {
+            const response = await fetch(`/api/jobs/${jobId.value}/restore-history`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+            });
+            if (!response.ok) throw new Error(await readError(response));
+            const data = await response.json();
+            tex.value = data.tex; compileResult.value = data.compile; pdfVersion.value += 1;
+            hasPdf.value = !!(data.compile && data.compile.success); dirty.value = false; discardDraft();
+            await loadHistory();
+            if (data.compile && !data.compile.success) tab.value = 'log';
+            else notify('已恢复到该历史版本。', 'ok', 4000);
+          } catch (err) { notify(err.message, 'bad', 10000); }
+          finally { busy.value = false; }
+        };
+
+        // ---- 快捷键 ----
+        const onKeydown = event => {
+          const key = (event.key || '').toLowerCase();
+          if ((event.ctrlKey || event.metaKey) && key === 's') {
+            event.preventDefault();
+            if (jobId.value && !busy.value && (dirty.value || !hasPdf.value)) recompile();
+            return;
+          }
+          // Ctrl+Shift+C 复制全部代码；Ctrl+C 本身留给正常选择复制，不拦。
+          if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === 'c') {
+            event.preventDefault();
+            copyTex();
+            return;
+          }
+          if (event.key === 'F2') { event.preventDefault(); nextReview(); return; }
+          if (event.key === 'Escape' && suggestedTex.value) { suggestedTex.value = ''; }
+        };
+        window.addEventListener('hashchange', () => {
+          const match = location.hash.match(/^#job=([0-9a-f]{32})$/);
+          if (match) { if (match[1] !== jobId.value) openJob(match[1]); }
+          else if (jobId.value) clearJob();
+        });
+        window.addEventListener('beforeunload', event => {
+          if (dirty.value) { saveDraft(); event.preventDefault(); event.returnValue = ''; }
+        });
+
+        onMounted(async () => {
+          loadStatus();
+          window.addEventListener('keydown', onKeydown);
+          await loadJobs();
+          const match = location.hash.match(/^#job=([0-9a-f]{32})$/);
+          if (match) await openJob(match[1]);
+        });
+
+        return {
+          // state
+          files, busy, jobId, tex, sourceUrl, compileResult, pdfVersion, suggestedTex, fixSummary,
+          pages, pageCount, tab, scrollTop, flashLine, activePage, hasPdf, hasFigures, dirty,
+          recentJobs, selectedJob, jobQuery, jobOffset, jobTotal, jobLimit, jobPage, jobPages,
+          status, statusOpen, statusError, statusChecks, caps, run, draft, reused, reviewCursor,
+          history, historyLoading, historyError, reviewedPages, reviewedCount, dragActive, toasts,
+          // refs
+          fileInput, ta, hl,
+          // computed
+          sourceLines, lineCount, errorLines, pdfUrl, texUrl, originalUrl, activePageData,
+          hasFigurePlaceholder, highlighted, issues, reviewItems, reviewLines, reviewKinds,
+          // actions
+          pickFiles, selectFile, onDragOver, onDragLeave, onDrop, notify, dismissToast,
+          onScroll, jumpToLine, jumpToPage, nextReview, togglePage, pageReviewCount,
+          copyTex, copied,
+          formatJobTime, formatBytes, formatSeconds, formatClock, stateText,
+          loadStatus, loadJobs, searchJobs, clearQuery, prevJobs, nextJobs, refreshAll,
+          openJob, clearJob, upload, recompile, onEdit, restoreOriginal, rebuildFigures,
+          retryPage, requestFix, applyFix, openHistory, restoreHistory, restoreDraft, discardDraft,
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

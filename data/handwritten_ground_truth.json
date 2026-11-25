@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "description": "12 个手写公式裁剪图；ground_truth 由用户逐条确认（2026-11-03），不是自动生成。",
+  "review_status": "ground_truth_user_confirmed",
+  "sample_count": 12,
+  "samples": [
+    {
+      "sample_id": "sample_1",
+      "image_path": "data/handwritten/sample_1.png",
+      "ground_truth": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "human_review": "confirmed_correct",
+      "review_note": "",
+      "source_artifact": "artifacts/handwritten_validation.json"
+    },
+    {
+      "sample_id": "sample_2",
+      "image_path": "data/handwritten/sample_2.png",
+      "ground_truth": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed faithful transcription of their handwriting.",
+      "source_artifact": "artifacts/handwritten_validation.json"
+    },
+    {
+      "sample_id": "sample_3",
+      "image_path": "data/handwritten/sample_3.png",
+      "ground_truth": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed faithful transcription of their handwriting; the source writing caused the structural issue.",
+      "source_artifact": "artifacts/handwritten_validation.json"
+    },
+    {
+      "sample_id": "sample_4",
+      "image_path": "data/handwritten/sample_4.png",
+      "ground_truth": "x^{3}-x^{2}+x^{2}+x-x+3x-3+4",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "source_artifact": "artifacts/handwritten_new_samples.json"
+    },
+    {
+      "sample_id": "sample_5",
+      "image_path": "data/handwritten/sample_5.png",
+      "ground_truth": "y^{\\prime\\prime}=2+\\frac{8}{(x-1)^{3}}",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "source_artifact": "artifacts/handwritten_new_samples.json"
+    },
+    {
+      "sample_id": "sample_6",
+      "image_path": "data/handwritten/sample_6.png",
+      "ground_truth": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the formula-only transcription on 2026-11-03; the problem number and Chinese prose are excluded.",
+      "source_artifact": "artifacts/handwritten_new_samples.json"
+    },
+    {
+      "sample_id": "sample_7",
+      "image_path": "data/handwritten/sample_7.png",
+      "ground_truth": "y^{(n)}=\\frac{4(-1)^{n}\\cdot n!}{(x-1)^{n+1}}",
+      "human_review": "confirmed_correct",
+      "review_note": "User corrected the transcription on 2026-11-03 by adding the numerator factor 4.",
+      "source_artifact": "artifacts/handwritten_samples_7_9.json"
+    },
+    {
+      "sample_id": "sample_8",
+      "image_path": "data/handwritten/sample_8.png",
+      "ground_truth": "y^{\\prime\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "source_artifact": "artifacts/handwritten_samples_7_9.json"
+    },
+    {
+      "sample_id": "sample_9",
+      "image_path": "data/handwritten/sample_9.png",
+      "ground_truth": "=1+x+\\frac{1}{2}x^{2}+o(x^{3})",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "source_artifact": "artifacts/handwritten_samples_7_9.json"
+    },
+    {
+      "sample_id": "sample_10",
+      "image_path": "data/handwritten/sample_10.png",
+      "ground_truth": "y^{\\prime\\prime\\prime}=\\frac{-24}{(x-1)^{4}}",
+      "human_review": "confirmed_correct",
+      "review_note": "User corrected the transcription on 2026-11-03 by adding the numerator minus sign.",
+      "source_artifact": "artifacts/handwritten_samples_10_12.json"
+    },
+    {
+      "sample_id": "sample_11",
+      "image_path": "data/handwritten/sample_11.png",
+      "ground_truth": "y^{\\prime\\prime}=2^{2}\\sin(2x+\\pi)",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "source_artifact": "artifacts/handwritten_samples_10_12.json"
+    },
+    {
+      "sample_id": "sample_12",
+      "image_path": "data/handwritten/sample_12.png",
+      "ground_truth": "y=1+\\sin x+\\frac{\\sin^{2}x}{2!}+\\frac{\\sin^{3}x}{3!}+\\cdots",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "source_artifact": "artifacts/handwritten_samples_10_12.json"
+    }
+  ]
+}

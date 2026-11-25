@@ -1,0 +1,35 @@
+.env
+.venv/
+.venv-check/
+.venv-demo/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+node_modules/
+models/
+tools/
+# 只排除运行产物；artifacts\ 下的其他证据文件（如 README 引用的那些）应当入库。
+artifacts/jobs/
+artifacts/demo/
+dist/
+docs/.qoder-office-docx-locks/
+data/pdf_pages/*
+!data/pdf_pages/page_2.png
+!data/pdf_pages/page_3.png
+!data/pdf_pages/page_4.png
+!data/pdf_pages/page_5.png
+
+# 以下是"仓库能用"的必要排除：这些目录都能从 requirements*.txt / package.json
+# / scripts\build_python_runtime.ps1 重建，或者只是本机运行产物。
+# runtime\ 是随包 Python 运行时（126 MB），漏掉这一行会让每次 clone 都拉一个解释器。
+runtime/
+.cache/
+.paddlex/
+.qoder/
+.workbuddy/
+runtime/workbench.log
+runtime/workbench.pid
+workbench.log
+workbench.pid
+

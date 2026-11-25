@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [hand2latex-review]
+  pull_request:
+
+jobs:
+  tests:
+    # 用 Windows 跑：启动脚本是 .ps1/.bat，与本地目标环境一致。
+    # 注意：GitHub 的 windows-latest runner 是精简版 Windows Server，未预装
+    # SimHei/SimSun 等中文字体，因此 Run tests 里设 LATEX_FONTSET=fandol，
+    # 使用随 Tectonic TeX bundle 分发的开源字体，无需系统字体即可覆盖真实编译链路。
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 不在矩阵里：requirements.txt 的 numpy==2.3.5 仅支持 3.11+
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # --ignore-scripts：跳过 playwright 的浏览器下载（CI 不跑浏览器验收），
+      # vue / katex 是纯 JS 包，不受影响。
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Tectonic
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path tools/tectonic | Out-Null
+          $zip = Join-Path $env:TEMP "tectonic.zip"
+          Invoke-WebRequest `
+            -Uri "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.15.0/tectonic-0.15.0-x86_64-pc-windows-msvc.zip" `
+            -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath tools/tectonic -Force
+          if (-not (Test-Path "tools/tectonic/tectonic.exe")) {
+            throw "tectonic.exe not found after extracting $zip"
+          }
+
+      - name: Run tests
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          # 仅有 1 个测试读取 OPENAI_MODEL 展示模型名，不发起真实请求；
+          # 其余依赖环境变量的测试都用 patch.dict 隔离，不受影响。
+          OPENAI_API_KEY: dummy-key-for-tests
+          OPENAI_MODEL: dummy-model-for-tests
+          # CI runner 没有系统中文字体，改用随 TeX bundle 分发的 fandol 字体，
+          # 让两个真实 CJK 编译测试也能跑通（生产默认仍是 windows）。
+          LATEX_FONTSET: fandol
+        run: python -m unittest discover -s tests -v
