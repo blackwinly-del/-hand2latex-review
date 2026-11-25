@@ -282,6 +282,23 @@ if (Test-Path -LiteralPath $notesSource) {
     Write-Warn '仓库里没有 installer\安装说明.txt，安装包不含使用说明'
 }
 
+# 汇报文档必须放在包的最外层，对方解压第一眼就能看到。
+# 以前这份文档没有源码树里的位置：它是手工拷进 staging 的，所以既进不了版本管理，
+# 下次打包也很容易被忘掉——2026-11-25 那一版就是这样漏掉性能修复说明的。
+# 现在源文件固定在 docs\成果汇报_<日期>.md，由脚本按文件名通配最新一份带出去。
+$reportCandidates = @(Get-ChildItem -LiteralPath (Join-Path $Root 'docs') -Filter '成果汇报_*.md' -File -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending)
+if ($reportCandidates.Count -gt 0) {
+    $reportSource = $reportCandidates[0]
+    Copy-Item -LiteralPath $reportSource.FullName -Destination (Join-Path $Staging '成果汇报_先看这个.md') -Force
+    Write-Ok "已放入 成果汇报_先看这个.md（来自 docs\$($reportSource.Name)）"
+    if ($reportCandidates.Count -gt 1) {
+        Write-Warn "docs\ 下有 $($reportCandidates.Count) 份成果汇报，取了最新的一份（$($reportSource.Name)）；旧的建议归档到 docs\archive\"
+    }
+} else {
+    Write-Warn 'docs\ 下没有 成果汇报_*.md，安装包不含汇报文档'
+}
+
 # ---------------------------------------------------------------------------
 # 4.5 随包 Python 运行时（目标机器不用装 Python）
 # ---------------------------------------------------------------------------
@@ -349,6 +366,8 @@ Test-StagedFile 'requirements.txt' 'Python 依赖清单'
 Test-StagedFile '.env.example' 'API 配置模板'
 Test-StagedFile 'BUILD_INFO.json' '构建信息'
 Test-StagedFile 'requirements-app.txt' '网页工作台依赖清单（随包运行时装的是这一份）'
+Test-StagedFile '成果汇报_先看这个.md' '成果汇报（对方解压第一眼要看的）'
+Test-StagedFile '安装说明.txt' '使用说明'
 Test-StagedAbsent '.env' 'API 密钥文件'
 Test-StagedAbsent '.venv' '本机虚拟环境'
 Test-StagedAbsent '.cache' '打包用的下载缓存'

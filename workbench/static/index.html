@@ -173,7 +173,14 @@
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
     .job-item.on .job-title { color: var(--accent-ink); }
-    .job-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; color: var(--faint); }
+    /* 页数 · 时间 · 状态标签。侧栏在窄屏只剩 220px，这一行必然要折，
+       所以允许换行，但每个小项自己不许断字——否则「1 页失败」会被拆成
+       「1 页失」+「败」两行，看着像坏掉了。 */
+    .job-meta {
+      display: flex; flex-wrap: wrap; align-items: center;
+      column-gap: 6px; row-gap: 2px; margin-top: 4px; font-size: 11.5px; color: var(--faint);
+    }
+    .job-meta > span { white-space: nowrap; flex: none; }
     .mini-tag { padding: 0 5px; border-radius: 4px; font-size: 10.5px; font-weight: 700; line-height: 15px; }
     .mini-tag.bad { background: var(--danger-soft); color: var(--danger); }
     .mini-tag.ok { background: var(--ok-soft); color: var(--ok); }
@@ -231,7 +238,13 @@
       flex: none; display: flex; align-items: center; gap: 8px;
       padding: 9px 12px; border-bottom: 1px solid var(--line-2); background: var(--surface);
     }
-    .pane-title { font-size: 12.5px; font-weight: 700; letter-spacing: .3px; color: var(--ink); display: flex; align-items: center; gap: 7px; }
+    .pane-title {
+      /* 标题让位给右边的分段控件：宁可自己省略，也不把按钮挤到换行。
+         三处都要（nowrap / min-width:0 / ellipsis），少一处中文还是会被逐字断开。 */
+      font-size: 12.5px; font-weight: 700; letter-spacing: .3px; color: var(--ink);
+      display: flex; align-items: center; gap: 7px;
+      min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     .pane-no {
       width: 18px; height: 18px; border-radius: 5px; flex: none; background: var(--accent-soft);
       color: var(--accent-ink); font: 700 11px/18px "Segoe UI", sans-serif; text-align: center;
@@ -246,10 +259,13 @@
     .pane-foot .grow { flex: 1; }
 
     /* 分段控件 */
-    .seg { display: inline-flex; background: #eef1f6; border-radius: 8px; padding: 2px; gap: 2px; }
+    .seg { display: inline-flex; flex: none; background: #eef1f6; border-radius: 8px; padding: 2px; gap: 2px; }
     .seg button {
       height: 24px; padding: 0 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
       color: var(--ink-2); display: inline-flex; align-items: center; gap: 5px;
+      /* 中文默认可以在任意两个字之间断行。不给 nowrap 的话，右栏一窄
+         「排版 / 问题 / 历史」就会被压成三个字竖着排的字柱。 */
+      white-space: nowrap; flex: none;
     }
     .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(21,33,56,.12); }
     .seg .n { font-size: 10.5px; font-weight: 800; padding: 0 4px; border-radius: 4px; background: #d7dce6; color: #4a5468; }
@@ -264,7 +280,14 @@
     }
     .thumb:hover { border-color: #b9c8ea; }
     .thumb.on { border-color: var(--accent); box-shadow: 0 0 0 3px #3563e914; }
-    .thumb-img { display: block; width: 100%; height: 178px; object-fit: contain; background: #f0efe9; }
+    /* 缩略图按纸面比例（A4 竖版）留框，而不是写死一个横向高度。
+       手机拍的整页笔记是 3:4 左右的竖图，塞进 178px 高的横框里会被压成中间
+       一条窄条、两侧大片空白——这一栏就是用来"对照原图核对"的，看不清等于没用。
+       用 aspect-ratio 让框跟着纸的比例走，图片才能基本铺满。 */
+    .thumb-img {
+      display: block; width: 100%; height: auto; aspect-ratio: 210 / 297;
+      object-fit: contain; background: #f0efe9;
+    }
     .thumb-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--line-2); }
     .thumb-bar .cap { font-size: 11.5px; font-weight: 700; color: var(--ink-2); }
     .thumb.on .thumb-bar .cap { color: var(--accent-ink); }
@@ -382,6 +405,25 @@
     .toast button { color: #ffffffaa; font-size: 15px; line-height: 1; padding: 0 2px; }
     .toast button:hover { color: #fff; }
 
+    /* ---------- 上传失败详情 ---------- */
+    /* 逐页原因放这里，而不是塞进底部提示条：一条 422 里可能有 10 页的原因，
+       提示条会把它压成一大坨还自动消失，用户根本来不及看。 */
+    .upload-fail {
+      text-align: left; margin: 0 auto 16px; max-width: 640px;
+      padding: 14px 16px; border-radius: 12px;
+      background: var(--danger-soft); border: 1px solid #f3c9c4;
+    }
+    .uf-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .uf-head strong { flex: 1; color: #8e2b1e; font-size: 14px; }
+    .uf-list { margin: 0 0 10px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .uf-list li { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.6; color: #6b2a20; }
+    .uf-tag {
+      flex: none; min-width: 52px; text-align: center; padding: 1px 8px; border-radius: 999px;
+      background: #ffffffcc; color: #8e2b1e; font-size: 12px; font-weight: 600;
+    }
+    .uf-msg { word-break: break-word; }
+    .uf-hint { font-size: 12.5px; color: #8a5a52; line-height: 1.6; }
+
     /* ---------- 弹层（AI 建议） ---------- */
     .modal-mask {
       position: fixed; inset: 0; z-index: 90; background: #0d152480; backdrop-filter: blur(2px);
@@ -412,10 +454,29 @@
     }
 
     /* 窄屏降级 */
+    @media (max-width: 1340px) {
+      /* 右栏标题和「排版/问题/历史」抢同一行。把分段控件收紧一点，
+         让「预览与检查」能完整显示，而不是被截成「预览与检」。 */
+      .seg button { padding: 0 7px; font-size: 11.5px; gap: 4px; }
+      .seg .n { font-size: 10px; padding: 0 3px; }
+    }
     @media (max-width: 1180px) {
       .panes { grid-template-columns: minmax(210px, .7fr) minmax(300px, 1.15fr) minmax(260px, 1fr); }
       .sdot span { display: none; }
       .sdot { padding: 0 7px; }
+    }
+    @media (max-width: 1100px) {
+      /* 侧栏 276 + 三栏最小 770 + 间距 ≈ 1086，比这更窄就会横向溢出。
+         这里同时收侧栏和栏最小宽，把总量压到 1024 以下。 */
+      :root { --sidebar-w: 220px; }
+      .panes { grid-template-columns: minmax(180px, .62fr) minmax(260px, 1.2fr) minmax(236px, 1fr); }
+      .pane-head { padding: 9px 10px; gap: 6px; }
+      /* 到这一步标题和三个页签实在挤不进一行了：
+         整块下移成两行，标题独占一行，页签在下面，比把标题截成
+         「预览与检」要好读得多。 */
+      .pane-head { flex-wrap: wrap; row-gap: 6px; }
+      .pane-head .spacer { display: none; }
+      .pane-title { flex: 1 0 100%; }
     }
     @media (max-width: 900px) {
       body { overflow: auto; }
@@ -556,6 +617,23 @@
           <div class="empty-inner">
             <h2>把手写笔记变成能改的 LaTeX</h2>
             <p>上传整页照片，系统逐页识别并排版成中文 PDF。识别结果一定会带着原图给你核对，不会替你假装"已经准确"。</p>
+
+            <!-- 上传整体失败时，把每一页的原因摊开说清楚。
+                 这些信息以前只塞进底部提示条，长了就被截断，用户看不到"到底哪页、
+                 为什么"，只能反复重传。 -->
+            <div class="upload-fail" v-if="uploadFailure">
+              <div class="uf-head">
+                <strong>{{ uploadFailure.title }}</strong>
+                <button class="btn sm ghost" @click="uploadFailure = null">知道了</button>
+              </div>
+              <ul class="uf-list">
+                <li v-for="(item, i) in uploadFailure.items" :key="i">
+                  <span class="uf-tag">{{ item.tag }}</span>
+                  <span class="uf-msg">{{ item.text }}</span>
+                </li>
+              </ul>
+              <div class="uf-hint">{{ uploadFailure.hint }}</div>
+            </div>
 
             <div class="dropzone" :class="{ hot: dragActive }" @click="pickFiles">
               <div class="dz-icon">⇪</div>
@@ -876,6 +954,9 @@
         const statusOpen = ref(false);
         const statusError = ref('');
         const run = ref(null);
+        // 上传整体失败时的结构化详情：{ title, items:[{tag,text}], hint }
+        // 为 null 表示没有要显示的错误。
+        const uploadFailure = ref(null);
         const draft = ref(null);
         const reused = ref(false);
         const reviewCursor = ref(-1);
@@ -1126,10 +1207,96 @@
 
         // ---- 选择文件 / 拖拽 ----
         const pickFiles = () => { if (!busy.value && fileInput.value) fileInput.value.click(); };
+
+        // 上传前先在本地挡一道：扩展名、单文件大小、单批页数、批量总大小。
+        // 这些问题后端也会拒，但发一趟再等报错，用户要盯着进度条白等几秒；
+        // 而且后端给的是"某一页失败"，这里是"选文件时就告诉你"，能一次改对。
+        const MAX_IMAGE_MB = 20;
+        const MAX_BATCH_MB = 50;
+        const MAX_PAGES = 10;
+        const precheckFiles = list => {
+          const rejected = [];
+          const accepted = [];
+          for (const item of list) {
+            const name = item.name || '未命名文件';
+            if (!/\.(png|jpe?g|webp)$/i.test(name)) { rejected.push(`${name}：只支持 PNG / JPG / WebP`); continue; }
+            if (item.size === 0) { rejected.push(`${name}：文件是空的`); continue; }
+            if (item.size > MAX_IMAGE_MB * 1024 * 1024) {
+              rejected.push(`${name}：${formatBytes(item.size)}，超过单张 ${MAX_IMAGE_MB} MB 上限`);
+              continue;
+            }
+            accepted.push(item);
+          }
+          if (accepted.length > MAX_PAGES) {
+            rejected.push(`一次最多 ${MAX_PAGES} 页，这次选了 ${accepted.length} 张，请分批上传`);
+            return { accepted: [], rejected };
+          }
+          const totalMb = accepted.reduce((sum, item) => sum + item.size, 0) / 1024 / 1024;
+          if (totalMb > MAX_BATCH_MB) {
+            rejected.push(`这批合计 ${totalMb.toFixed(1)} MB，超过 ${MAX_BATCH_MB} MB 上限，请分两批`);
+            return { accepted: [], rejected };
+          }
+          return { accepted, rejected };
+        };
+        const reportRejected = rejected => {
+          if (!rejected.length) return false;
+          // 一次最多显示 3 条，剩下的用一句"还有 N 个"收尾，避免提示条占满屏幕。
+          const head = rejected.slice(0, 3).join('；');
+          const tail = rejected.length > 3 ? `；还有 ${rejected.length - 3} 个同类问题` : '';
+          notify('这些文件没能加入：' + head + tail, 'bad', 12000);
+          return true;
+        };
+
+        // 把后端"每页都失败"的那句长文案拆成逐页条目。
+        // 后端格式是：每一页都没能识别出来。第 1 页：xxx；第 2 页：yyy
+        // 拆开之后每页占一行，比一整段更好读，也能一眼看出是不是同一类原因。
+        const parsePageFailure = message => {
+          const text = String(message || '').trim();
+          const items = [];
+          const re = /第\s*(\d+)\s*页[：:]\s*([^；;]+)/g;
+          let m;
+          while ((m = re.exec(text)) !== null) {
+            items.push({ tag: `第 ${m[1]} 页`, text: m[2].trim() });
+          }
+          if (!items.length) return null;
+          // 同一类原因（去掉页码后完全一样）超过两页时，多半是配置问题而不是单页问题，
+          // 这时换一句更有用的提示，别让人以为是照片拍坏了。
+          const distinct = new Set(items.map(item => item.text));
+          const hint = distinct.size === 1
+            ? '每一页都是同一个原因，通常是密钥、网络或服务配置的问题，不是照片本身。改好后可以原样重传这几张。'
+            : '逐页原因不同，多半是这几张照片的光线或清晰度问题，可以重拍后再传。';
+          return { items, hint };
+        };
+
+        // 上传整体失败时要显示在页面上的内容。
+        // 能拆成逐页就逐页列；拆不出来（文件不是图片、超限、服务没起）就整段显示。
+        // 两种都落在页面上，而不是只丢一条会自动收掉的提示。
+        const buildUploadFailure = (message, count) => {
+          const text = String(message || '').trim() || '上传没有成功，服务端没有给出原因。';
+          const parsed = parsePageFailure(text);
+          if (parsed) {
+            return {
+              title: count > 1 ? `这 ${count} 页都没能识别出来` : '这一页没能识别出来',
+              items: parsed.items,
+              hint: parsed.hint,
+            };
+          }
+          return {
+            title: '上传没有成功',
+            items: [{ tag: '原因', text }],
+            hint: '图片没有被接收，也没有新建任务。按上面的原因处理完之后，重新选择这几张即可。',
+          };
+        };
+
         const selectFile = event => {
           const picked = Array.from(event.target.files || []);
-          if (picked.length) { files.value = picked; upload(); }
           event.target.value = '';
+          if (!picked.length) return;
+          const { accepted, rejected } = precheckFiles(picked);
+          reportRejected(rejected);
+          if (!accepted.length) return;
+          files.value = accepted;
+          upload();
         };
         const onDragOver = () => {
           // 只在"还没打开任务"时接受拖入。已经打开任务时上传会新建一个任务，
@@ -1147,10 +1314,13 @@
             return;
           }
           if (busy.value) { notify('正在处理上一个任务，等它完成再拖入新图片。'); return; }
-          const dropped = incoming.filter(item => /\.(png|jpe?g|webp)$/i.test(item.name || ''));
-          if (!dropped.length) { notify('只支持 PNG / JPG / WebP 图片。'); return; }
-          if (dropped.length > 10) { notify('一次最多 10 页，请分批上传。'); return; }
-          files.value = dropped;
+          if (!incoming.length) return;
+          // 以前这里会把混在里面的非图片文件悄悄丢掉，用户拖 3 张只识别 2 张却不知道原因。
+          // 现在把每个被拒的文件和理由都说出来。
+          const { accepted, rejected } = precheckFiles(incoming);
+          reportRejected(rejected);
+          if (!accepted.length) return;
+          files.value = accepted;
           upload();
         };
 
@@ -1345,6 +1515,8 @@
           busy.value = true; jobId.value = ''; compileResult.value = null; suggestedTex.value = '';
           fixSummary.value = ''; hasPdf.value = false; dirty.value = false; reviewedPages.value = {};
           flashLine.value = 0; reused.value = false; run.value = null;
+          // 上一次失败的面板先撤掉，否则新一轮报错会被旧内容挡住。
+          uploadFailure.value = null;
           const runId = newRunId();
           const count = files.value.length;
           try {
@@ -1363,7 +1535,15 @@
             jobOffset.value = 0;
             loadJobs();
             loadStatus();
-          } catch (err) { notify(err.message, 'bad', 12000); }
+          } catch (err) {
+            // 整体失败（400/422/502/断网）一律摊在页面上，逐页原因能读清。
+            // 提示条只留一句概览：它会在 12 秒后自己收掉，长文案放在那里既被截断
+            // 又和面板重复，反而看不出重点。
+            const failure = buildUploadFailure(err.message, count);
+            uploadFailure.value = failure;
+            const paged = failure.items.length > 1 || /^第 \d+ 页$/.test(failure.items[0]?.tag || '');
+            notify(paged ? `${failure.title}，原因见页面上的说明。` : failure.items[0].text, 'bad', paged ? 8000 : 12000);
+          }
           finally { await fetchRun(runId); stopRunPolling(); busy.value = false; files.value = []; }
         };
 
@@ -1538,6 +1718,7 @@
           recentJobs, selectedJob, jobQuery, jobOffset, jobTotal, jobLimit, jobPage, jobPages,
           status, statusOpen, statusError, statusChecks, caps, run, draft, reused, reviewCursor,
           history, historyLoading, historyError, reviewedPages, reviewedCount, dragActive, toasts,
+          uploadFailure,
           // refs
           fileInput, ta, hl,
           // computed

@@ -37,7 +37,7 @@
 | 逐页真实识别信号（`finish_reason`、真实 token 用量、是否接近输出上限、重试次数、块统计、耗时） | `workbench/full_page.py` | `tests/test_workbench.py` |
 | TeX 一字未改时复用上一次 PDF，不重跑 Tectonic | `workbench/app.py` | `tests/test_workbench_app.py` |
 | 改稿便捷性：`Ctrl+S` 编译、`F2` 跳下一处复核（带"第 N / M 处"计数）、浏览器草稿自动保存与恢复、历史版本回滚 | `workbench/static/index.html` | 2026-11-23 Playwright 实测 |
-| 打包成绿色 zip（随包带 Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描） | `scripts/package.ps1` | `dist/Hand2LaTeX-1.0.0-win64.zip`，20.4 MB，SHA256 `C30DFA363D75E565B74A08B849EF3EFBBF5B2ED639D7D9520698BD93B6D80E37`；解压后在浏览器里实测可用 |
+| 打包成绿色 zip（随包带 Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描） | `scripts/package.ps1` | `dist/Hand2LaTeX-1.0.0-win64.zip`，56.8 MB；2026-11-25 解压到独立目录后起服务实测：`/` 返回 200、`/api/jobs` 为空、pid 文件指向 uvicorn 子进程、退出时自动清理 |
 | 编译出 setup.exe 安装器（免管理员、装到用户目录、中文安装界面、卸载时问要不要删任务产物） | `scripts/package.ps1 -BuildInstaller` + `installer/hand2latex.iss` | `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，15.5 MB，SHA256 `7BDC80C048D857556142235906065E22BF8D4AE97BF2ACED2BC4985A4C6A8D71`；2026-11-23 静默装机 + 起服务 + 静默卸载实测通过 |
 | 真实付费 API 下的并行提速与真实信号采集（3 页真实手写笔记，并发 3 与串行各跑一轮） | `workbench/app.py` + `workbench/full_page.py` | `artifacts/real_api_parallel/summary.json`：82.7 s vs 232.7 s，**实测提速 2.81 倍**；两轮 completion token 合计 91402，`finish_reason` 全为 `stop`，无重试 |
 
@@ -467,15 +467,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 `
 `OPENAI_API_KEY` 值没有混进包里（扫到就中止）→ 压成 zip 并打印 SHA256。zip 里是一个
 `Hand2LaTeX-<版本>-win64` 顶层文件夹，"解压到当前文件夹"也不会把文件撒得到处都是。
 
-2026-11-23 实测产出（在提交 `8ea79e6` 的干净工作区上打的包，`BUILD_INFO.json` 里记的就是这个提交号）：
+2026-11-25 实测产出（当前工作区打的包；目录不是 git 仓库，所以 `BUILD_INFO.json` 里 `commit` 为空）：
 
-- `dist/Hand2LaTeX-1.0.0-win64.zip`，20.4 MB，SHA256 `C30DFA363D75E565B74A08B849EF3EFBBF5B2ED639D7D9520698BD93B6D80E37`。
-  解压到临时目录、从解压目录起服务（8014 端口）：`/api/status` 报告 `build.source = 安装包`、`commit = 8ea79e6`、
-  构建时间有值、前端来自随包副本、Tectonic 0.17.0 在包内可用、任务数 0、`openai.configured = false`
-  （包里不带 `.env`，如实报未配置）；无头浏览器打开首页 Vue 正常挂载（10 个状态 chip、上传控件在、
-  `pageErrors` 为空），详情里显示“来源 安装包”“vue.global.js 来自随安装包携带的副本”
-  “API 密钥 未配置：上传识别、修复建议都用不了”，页面上没有出现任何密钥长度数字。
+- `dist/Hand2LaTeX-1.0.0-win64.zip`，56.8 MB（3047 个条目）。
+  解压到独立目录、从解压目录起服务（8877 端口）实测：`/` 返回 200、`/api/status` 报 `build.source = 安装包`、
+  `/api/jobs` 返回空列表（新装无残留任务）、`runtime\workbench.pid` 写入的 pid 命令行含 `workbench.app`（能被
+  `launch.ps1` 的 `Get-RunningServerProcess` 认出）、`taskkill` 后 pid 文件自动清理。
+  同一份解压包上用真实 HTTP 复验后端的三个修复：文本改名 `.png` → 400、空文件 → 400、
+  两页都识别失败 → 422 且任务数保持 0（不留孤儿目录）；无头浏览器打开首页 Vue 正常挂载，失败面板逐页显示
+  `OPENAI_API_KEY is not configured`（包里不带 `.env`，如实报未配置），`pageErrors` 为空。
+  包的正确性证明是上面这些实测行为，不是哈希：`README.md` 自己就在包里，改一个字哈希就变，
+  所以这里不记固定值。要校验拿到手的包，取包里的 `BUILD_INFO.json` 看版本与构建时间，或直接解压跑一遍。
 - `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，15.5 MB，SHA256 `7BDC80C048D857556142235906065E22BF8D4AE97BF2ACED2BC4985A4C6A8D71`。
+  （这个安装器是 2026-11-23 在提交 `8ea79e6` 上打的，**不包含** 11-25 的后端修复与界面改动；要用最新代码请用上面的绿色包，或重跑 `-BuildInstaller`。）
   用 ISCC 6.7.3 编译（`Successful compile`，约 17 s）。静默装到临时目录（退出码 0）后核对：启动/关闭脚本、
   `安装说明.txt`、`BUILD_INFO.json`、`tools\tectonic\tectonic.exe`、随包 `vue.global.js`、`unins000.exe` 都在；
   从安装目录起服务（8015 端口），`/api/status` 报告 `build.source = 安装包`、`commit = 8ea79e6`、
@@ -489,7 +493,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 `
   也没在没装过 Python 依赖的干净机器上跑过首次启动。
 - 上面两个 SHA256 只对**那一次构建**有效：`README.md` 和 `reasoning/TEAM_LOG.md` 本身也在包里，
   所以改完文档再打一次包，哈希必然变（`BUILD_INFO.json` 里的构建时间也会变）。要核对就拿包里的
-  `BUILD_INFO.json` 看提交号，别指望哈希长期不变。
+  `BUILD_INFO.json` 看版本与构建时间，别指望哈希长期不变。
 
 ## 七、命令行单模块运行
 

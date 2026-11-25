@@ -143,6 +143,31 @@ _RUNS: dict[str, dict] = {}
 _MAX_STORED_RUNS = 20
 
 
+# ---------------------------------------------------------------------------
+# 按任务粒度的写锁
+#
+# 同一个 job 的 main.tex 可能被多个请求同时改写（重新排版、恢复历史版本、
+# 应用 AI 修复、恢复原稿、图形页改用原图）。这些路径都会"读当前 tex → 写新 tex
+# → 编译 → 落 compile.json"。两个请求交错执行时，后写的会把先写的内容顶掉，
+# 而两个请求都返回 200 成功——先到的那个拿到的是假成功，用户看到的现象是
+# "点了重新排版，PDF 却变成别的版本"，且没有任何报错。
+#
+# 这里用"每个 job 一把锁"把这一整段串起来。锁的创建本身要加元锁，
+# 否则两个线程可能同时给同一个 job 造出两把不同的锁，等于没锁。
+# ---------------------------------------------------------------------------
+_JOB_WRITE_LOCKS: dict[str, threading.Lock] = {}
+_JOB_WRITE_LOCKS_GUARD = threading.Lock()
+
+
+def _job_write_lock(job_id: str) -> threading.Lock:
+    with _JOB_WRITE_LOCKS_GUARD:
+        lock = _JOB_WRITE_LOCKS.get(job_id)
+        if lock is None:
+            lock = threading.Lock()
+            _JOB_WRITE_LOCKS[job_id] = lock
+        return lock
+
+
 def _page_concurrency(page_count: int) -> int:
     """整页识别的并发页数。每页是一次独立的云端请求，可以并行等待。"""
     raw = os.environ.get("WORKBENCH_PAGE_CONCURRENCY", "3")
@@ -505,10 +530,18 @@ def _job_metadata(directory: Path) -> dict:
     path = directory / "job.json"
     if path.is_file():
         metadata = json.loads(path.read_text(encoding="utf-8"))
-        metadata.setdefault("title", _read_job_title(directory))
+        # 这里不能用 d.setdefault(key, 昂贵函数())。setdefault 的默认值参数
+        # 是**先求值再传进去**的，键已存在也照样算一遍：
+        #   metadata.setdefault("has_figures", _has_figure_blocks(directory))
+        # 会对每个任务都 glob 一遍 page_*/document.json 并解析，即使 job.json
+        # 里已经写了 has_figures。实测 300 个任务时 /api/jobs 要 2.2 秒，
+        # 其中这一行占 61%（见下面的计时）。改成键缺失时才算。
+        if "title" not in metadata:
+            metadata["title"] = _read_job_title(directory)
         metadata.setdefault("page_count", 1)
         metadata.setdefault("pages", [])
-        metadata.setdefault("has_figures", _has_figure_blocks(directory))
+        if "has_figures" not in metadata:
+            metadata["has_figures"] = _has_figure_blocks(directory)
         return metadata
 
     pages = []
@@ -602,6 +635,29 @@ def index() -> str:
     return (_STATIC_ROOT / "index.html").read_text(encoding="utf-8")
 
 
+class _AllPagesFailed(Exception):
+    """所有页都没识别出来。和"服务配置坏了"区分开，便于返回 422 而不是 502。"""
+
+
+def _sniff_image_suffix(content: bytes) -> str | None:
+    """按文件头判断真实图片格式，认不出来返回 None。
+
+    只看扩展名是不够的：把文本文件改名成 .png 能混过扩展名校验，然后一路走到
+    识别阶段才失败，最后抛出的是"整页识别或编译失败，请检查服务配置"——用户会
+    被引去查密钥和编译器，而真实原因只是这个文件不是图片。这里提前拦掉，
+    给一句能看懂的话。
+    """
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    # JPEG 以 FF D8 FF 开头；SOI 后面紧跟的 marker 可能是 E0/E1/DB/EE 等，不逐一枚举。
+    if content.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    # WebP 是 RIFF 容器：0-3 是 "RIFF"，8-11 必须是 "WEBP"。
+    if len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return ".webp"
+    return None
+
+
 def _read_image(image: UploadFile) -> tuple[str, bytes]:
     suffix = Path(image.filename or "").suffix.lower()
     if suffix not in _SUPPORTED_SUFFIXES:
@@ -609,7 +665,20 @@ def _read_image(image: UploadFile) -> tuple[str, bytes]:
     content = image.file.read(_MAX_IMAGE_BYTES + 1)
     if len(content) > _MAX_IMAGE_BYTES:
         raise HTTPException(status_code=400, detail="图片不能超过 20 MB")
-    return suffix, content
+    if not content:
+        raise HTTPException(status_code=400, detail=f"文件是空的（{image.filename or '未命名'}），请重新导出后再上传")
+    sniffed = _sniff_image_suffix(content)
+    if sniffed is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"这不是有效的图片文件（{image.filename or '未命名'}）："
+                "内容是 PNG / JPEG / WebP 之外的格式。"
+                "如果它是 HEIC、PDF 或截图工具的特殊格式，请先另存为 PNG 再上传。"
+            ),
+        )
+    # 以文件头的真实格式为准落盘，避免"扩展名 .png 但实际是 JPEG"这种错配。
+    return sniffed, content
 
 
 def _create_document(images: list[UploadFile], run_id: str = "") -> dict:
@@ -626,6 +695,38 @@ def _create_document(images: list[UploadFile], run_id: str = "") -> dict:
     run_key = candidate_run_id if _RUN_ID_PATTERN.fullmatch(candidate_run_id) else job_id
     _new_run(run_key, len(uploads))
 
+    # 从这里开始目录已经建出来了。后面任何一步整体失败（比如所有页都没识别出来）
+    # 都会留下一个只有源图、没有 main.tex 的空任务，既占磁盘又会被任务列表扫到。
+    # 所以统一兜底：失败时把没建成的目录删掉（_discard_job_directory 自己会
+    # 检查 main.tex 是否存在，已写出代码的任务不会被误删）。
+    try:
+        return _build_document(uploads, directory, job_id, run_key)
+    except BaseException:
+        _discard_job_directory(directory)
+        raise
+
+
+def _discard_job_directory(directory: Path) -> None:
+    """删掉一个没成功建起来的任务目录。
+
+    只在"目录里还没有 main.tex"时动手：万一失败发生在很靠后的位置
+    （例如 compile 抛错但 tex 已经写好），那个任务至少有代码可看，
+    不该被当成垃圾删掉。
+    """
+    try:
+        if (directory / "main.tex").is_file():
+            return
+        shutil.rmtree(directory, ignore_errors=True)
+    except OSError:
+        logger.warning("清理失败的上传目录时出错：%s", directory, exc_info=True)
+
+
+def _build_document(
+    uploads: list[tuple[str, bytes]],
+    directory: Path,
+    job_id: str,
+    run_key: str,
+) -> dict:
     # 源图先全部落盘再识别：某页识别失败时，原图与已成功页面都保留下来，
     # 不让第 N 页的失败把前 N-1 页的成果全部丢掉。
     source_paths: list[Path] = []
@@ -716,7 +817,9 @@ def _create_document(images: list[UploadFile], run_id: str = "") -> dict:
 
         if not documents:
             detail = "；".join(f"第 {f['page']} 页：{f['error']}" for f in failures) or "没有可用页面"
-            raise RuntimeError(f"整页识别失败（{detail}），请检查服务配置后重试")
+            # 这是"这次上传本身没成功"，不是服务配置坏了。用 422 + 逐页原因，
+            # 让界面能直接显示"第几页失败、为什么"，而不是一句笼统的 502。
+            raise _AllPagesFailed(f"每一页都没能识别出来。{detail}")
 
         merged = merge_documents(documents)
         merged_tex = build_tex(merged)
@@ -732,6 +835,9 @@ def _create_document(images: list[UploadFile], run_id: str = "") -> dict:
             has_figures=has_figures,
         )
         _store_compile(directory, _public_compile(compile_result, job_id))
+    except _AllPagesFailed as error:
+        _finish_run(run_key, "failed", error=str(error))
+        raise HTTPException(status_code=422, detail=str(error)) from error
     except HTTPException as error:
         _finish_run(run_key, "failed", error=error.detail)
         raise
@@ -999,6 +1105,12 @@ def retry_failed_page(job_id: str, page_number: int) -> dict:
 def use_source_figures(job_id: str) -> dict:
     """把已有任务中的图形块改为嵌入原图，不重新调用识别模型。"""
     directory = _job_dir(job_id)
+    # 这个接口会重写 page_*/document.json 和 main.tex，必须和编译/恢复互斥。
+    with _job_write_lock(job_id):
+        return _use_source_figures_locked(job_id, directory)
+
+
+def _use_source_figures_locked(job_id: str, directory: Path) -> dict:
     metadata = _job_metadata(directory)
     pages = metadata["pages"]
     sources = _source_paths(directory) if pages else []
@@ -1099,17 +1211,18 @@ def restore_original_tex(job_id: str) -> dict:
     original_path = directory / "original.tex"
     if not original_path.is_file():
         raise HTTPException(status_code=404, detail="original tex not found")
-    original = original_path.read_text(encoding="utf-8")
-    _write_main_tex(directory, original)
-    (directory / "suggestion.json").unlink(missing_ok=True)
-    try:
-        result = compile_tex(directory / "main.tex")
-    except Exception as error:
-        logger.exception("restore-original compilation failed")
-        raise HTTPException(status_code=500, detail=f"{type(error).__name__}: 原稿编译失败") from error
-    public_result = _public_compile(result, job_id)
-    _store_compile(directory, public_result)
-    return {"compile": public_result, "tex": original}
+    with _job_write_lock(job_id):
+        original = original_path.read_text(encoding="utf-8")
+        _write_main_tex(directory, original)
+        (directory / "suggestion.json").unlink(missing_ok=True)
+        try:
+            result = compile_tex(directory / "main.tex")
+        except Exception as error:
+            logger.exception("restore-original compilation failed")
+            raise HTTPException(status_code=500, detail=f"{type(error).__name__}: 原稿编译失败") from error
+        public_result = _public_compile(result, job_id)
+        _store_compile(directory, public_result)
+        return {"compile": public_result, "tex": original}
 
 
 @app.post("/api/jobs/{job_id}/compile")
@@ -1117,6 +1230,14 @@ def compile_document(job_id: str, request: CompileRequest) -> dict:
     directory = _job_dir(job_id)
     if not request.tex.strip():
         raise HTTPException(status_code=400, detail="tex 不能为空")
+    # 整个"读旧 tex → 判断能否复用 → 写新 tex → 编译 → 落盘"要在同一把锁里。
+    # 只锁写的那一行没用：两个请求会同时判定"需要重新编译"，然后各编译一遍，
+    # 后落盘的顶掉先落盘的，而两个都返回成功。
+    with _job_write_lock(job_id):
+        return _compile_locked(job_id, directory, request.tex)
+
+
+def _compile_locked(job_id: str, directory: Path, tex: str) -> dict:
     main_tex = directory / "main.tex"
     # 代码没变、PDF 和编译记录都还在时直接复用上次结果：Tectonic 一次要十几秒，
     # 重复点"重新排版"不应该再等一遍。
@@ -1124,12 +1245,12 @@ def compile_document(job_id: str, request: CompileRequest) -> dict:
         main_tex.is_file()
         and (directory / "main.pdf").is_file()
         and (directory / "compile.json").is_file()
-        and main_tex.read_text(encoding="utf-8") == request.tex
+        and main_tex.read_text(encoding="utf-8") == tex
     ):
         stored = _stored_compile(directory, job_id)
         (directory / "suggestion.json").unlink(missing_ok=True)
-        return {"compile": stored, "tex": request.tex, "reused": True}
-    _write_main_tex(directory, request.tex)
+        return {"compile": stored, "tex": tex, "reused": True}
+    _write_main_tex(directory, tex)
     (directory / "suggestion.json").unlink(missing_ok=True)
     try:
         result = compile_tex(directory / "main.tex")
@@ -1138,7 +1259,7 @@ def compile_document(job_id: str, request: CompileRequest) -> dict:
         raise HTTPException(status_code=500, detail=f"{type(error).__name__}: 编译失败") from error
     public_result = _public_compile(result, job_id)
     _store_compile(directory, public_result)
-    return {"compile": public_result, "tex": request.tex}
+    return {"compile": public_result, "tex": tex}
 
 
 @app.get("/api/jobs/{job_id}/history")
@@ -1186,16 +1307,17 @@ def restore_history(job_id: str, request: RestoreHistoryRequest) -> dict:
     text = path.read_text(encoding="utf-8")
     if not text.strip():
         raise HTTPException(status_code=409, detail="这个历史版本是空的，不能恢复")
-    _write_main_tex(directory, text)
-    (directory / "suggestion.json").unlink(missing_ok=True)
-    try:
-        result = compile_tex(directory / "main.tex")
-    except Exception as error:
-        logger.exception("restore-history compilation failed")
-        raise HTTPException(status_code=500, detail=f"{type(error).__name__}: 恢复历史版本后编译失败") from error
-    public_result = _public_compile(result, job_id)
-    _store_compile(directory, public_result)
-    return {"compile": public_result, "tex": text, "restored": name}
+    with _job_write_lock(job_id):
+        _write_main_tex(directory, text)
+        (directory / "suggestion.json").unlink(missing_ok=True)
+        try:
+            result = compile_tex(directory / "main.tex")
+        except Exception as error:
+            logger.exception("restore-history compilation failed")
+            raise HTTPException(status_code=500, detail=f"{type(error).__name__}: 恢复历史版本后编译失败") from error
+        public_result = _public_compile(result, job_id)
+        _store_compile(directory, public_result)
+        return {"compile": public_result, "tex": text, "restored": name}
 
 
 @app.post("/api/jobs/{job_id}/suggest-fix")
@@ -1224,34 +1346,37 @@ def apply_document_fix(job_id: str, request: ApplyFixRequest) -> dict:
     directory = _job_dir(job_id)
     if not request.tex.strip():
         raise HTTPException(status_code=400, detail="修复后的 tex 不能为空")
-    original_tex = (directory / "main.tex").read_text(encoding="utf-8")
-    suggestion_path = directory / "suggestion.json"
-    if not suggestion_path.is_file():
-        raise HTTPException(status_code=409, detail="没有可应用的修复建议")
-    suggestion = json.loads(suggestion_path.read_text(encoding="utf-8"))
-    if suggestion.get("baseline_sha256") != _sha256_text(original_tex):
-        raise HTTPException(status_code=409, detail="源码已变化，请重新生成修复建议")
-    (directory / "fix_applied.json").write_text(
-        json.dumps(
-            {"summary": request.summary, "before": original_tex, "after": request.tex},
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-    _write_main_tex(directory, request.tex)
-    try:
-        result = compile_tex(directory / "main.tex")
-    except Exception as error:
-        logger.exception("fix compilation failed")
-        raise HTTPException(
-            status_code=500,
-            detail={"message": f"{type(error).__name__}: 修复后编译失败", "tex": request.tex},
-        ) from error
-    public_result = _public_compile(result, job_id)
-    _store_compile(directory, public_result)
-    return {
-        "compile": public_result,
-        "tex": request.tex,
-        "summary": request.summary,
-    }
+    # baseline_sha256 校验和写入必须在同一把锁里：否则两个请求都能通过
+    # "源码没变"的检查，然后各自写一版，后写的顶掉先写的。
+    with _job_write_lock(job_id):
+        original_tex = (directory / "main.tex").read_text(encoding="utf-8")
+        suggestion_path = directory / "suggestion.json"
+        if not suggestion_path.is_file():
+            raise HTTPException(status_code=409, detail="没有可应用的修复建议")
+        suggestion = json.loads(suggestion_path.read_text(encoding="utf-8"))
+        if suggestion.get("baseline_sha256") != _sha256_text(original_tex):
+            raise HTTPException(status_code=409, detail="源码已变化，请重新生成修复建议")
+        (directory / "fix_applied.json").write_text(
+            json.dumps(
+                {"summary": request.summary, "before": original_tex, "after": request.tex},
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        _write_main_tex(directory, request.tex)
+        try:
+            result = compile_tex(directory / "main.tex")
+        except Exception as error:
+            logger.exception("fix compilation failed")
+            raise HTTPException(
+                status_code=500,
+                detail={"message": f"{type(error).__name__}: 修复后编译失败", "tex": request.tex},
+            ) from error
+        public_result = _public_compile(result, job_id)
+        _store_compile(directory, public_result)
+        return {
+            "compile": public_result,
+            "tex": request.tex,
+            "summary": request.summary,
+        }

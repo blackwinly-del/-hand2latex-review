@@ -116,5 +116,7 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -IncludeDemoJob c3d
 - `reasoning/CONTRACT.md` — C 层公共契约（**内核同事维护，别改**）
 - `reasoning/TEAM_LOG.md` — 团队实际做过什么、验证到哪一步（有证据边界说明）
 - `docs/UI_CHANGES_2026-11-25.md` — 这轮界面重做改了什么、为什么改
+- `docs/BACKEND_ISSUES_2026-11-25.md` — 后端上传识别链路的已知问题（孤儿目录 /
+  只校验扩展名 / 并发编译覆盖），**归后端同事处理**，附复现步骤与实测结果
 - `README.md` — 用户视角的完整说明
 - `README_B.md` — B 层（本地识别）的说明

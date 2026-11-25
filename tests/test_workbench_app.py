@@ -12,13 +12,51 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from workbench.app import _PROJECT_ROOT, _build_info, _python_runtime, _tectonic_status, app
+from workbench.app import _JOBS_ROOT, _PROJECT_ROOT, _build_info, _job_metadata, _python_runtime, _tectonic_status, app
 from workbench.version import VERSION
+
+
+# 上传接口现在会按文件头校验真实格式（防止把文本改名成 .png 混过去），
+# 所以测试里不能再随手用 b"bytes" 这种假数据。这里给一个 1x1 的合法 PNG，
+# 让测试走的是真实调用路径。
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_PNG_REST = (
+    b"\x00\x00\x00\rIHDR"
+    b"\x00\x00\x00\x01\x00\x00\x00\x01"  # 宽 1 高 1
+    b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+    b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+    b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+def png(tag: bytes = b"") -> bytes:
+    """构造一个签名合法、内容可区分的 PNG。
+
+    内容里带上 tag，是为了让"第 N 页的源图是不是这一张"这类断言仍然能生效
+    （原来靠 b"first"/b"second" 区分，现在靠 tag 区分）。
+    """
+    return _PNG_SIGNATURE + tag + _PNG_REST
 
 
 class WorkbenchAppTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        # 这些测试走的是真实接口，落盘位置就是产品在用的 artifacts/jobs。
+        # 以前不清理，每跑一次就在用户的侧栏里多出几条「测试笔记」「第一页」。
+        # 这里记下开跑前有哪些目录，tearDown 里把新增的删掉——只删自己造的，
+        # 别人（或真实使用）建的目录不碰。
+        self._jobs_before = self._snapshot_jobs()
+
+    def tearDown(self):
+        for name in self._snapshot_jobs() - self._jobs_before:
+            shutil.rmtree(_JOBS_ROOT / name, ignore_errors=True)
+
+    @staticmethod
+    def _snapshot_jobs() -> set[str]:
+        try:
+            return {p.name for p in _JOBS_ROOT.iterdir() if p.is_dir()}
+        except OSError:
+            return set()
 
     def test_index_loads_local_vue_workbench(self):
         response = self.client.get("/")
@@ -53,7 +91,7 @@ class WorkbenchAppTests(unittest.TestCase):
         compile_mock.side_effect = fake_compile
         response = self.client.post(
             "/api/documents",
-            files={"image": ("note.png", b"image-bytes", "image/png")},
+            files={"image": ("note.png", png(), "image/png")},
         )
 
         self.assertEqual(response.status_code, 200, response.text)
@@ -115,8 +153,8 @@ class WorkbenchAppTests(unittest.TestCase):
         response = self.client.post(
             "/api/documents/batch",
             files=[
-                ("image", ("p1.png", b"first", "image/png")),
-                ("image", ("p2.png", b"second", "image/png")),
+                ("image", ("p1.png", png(b"p1"), "image/png")),
+                ("image", ("p2.png", png(b"p2"), "image/png")),
             ],
         )
 
@@ -131,7 +169,7 @@ class WorkbenchAppTests(unittest.TestCase):
         self.assertTrue((Path("artifacts/jobs") / data["job_id"] / "original.tex").is_file())
         self.assertTrue((Path("artifacts/jobs") / data["job_id"] / "page_02" / "original.tex").is_file())
         page_two_source = self.client.get(f"/api/jobs/{data['job_id']}/pages/2/source")
-        self.assertEqual(page_two_source.content, b"second")
+        self.assertEqual(page_two_source.content, png(b"p2"))
 
     @patch("workbench.app.generate_document")
     @patch("workbench.app.compile_tex")
@@ -159,7 +197,7 @@ class WorkbenchAppTests(unittest.TestCase):
         compile_mock.side_effect = fake_compile
         response = self.client.post(
             "/api/documents",
-            files={"image": ("note.png", b"image-bytes", "image/png")},
+            files={"image": ("note.png", png(), "image/png")},
         )
         self.assertEqual(response.status_code, 200, response.text)
         original = response.json()["tex"]
@@ -204,7 +242,7 @@ class WorkbenchAppTests(unittest.TestCase):
             for page, succeeded in ((1, True), (2, False), (3, True)):
                 page_directory = directory / f"page_{page:02d}"
                 page_directory.mkdir()
-                (page_directory / "source.png").write_bytes(b"image")
+                (page_directory / "source.png").write_bytes(png())
                 if succeeded:
                     (page_directory / "main.tex").write_text("page", encoding="utf-8")
 
@@ -336,9 +374,9 @@ class WorkbenchAppTests(unittest.TestCase):
         response = self.client.post(
             "/api/documents/batch",
             files=[
-                ("image", ("p1.png", b"first", "image/png")),
-                ("image", ("p2.png", b"second", "image/png")),
-                ("image", ("p3.png", b"third", "image/png")),
+                ("image", ("p1.png", png(b"p1"), "image/png")),
+                ("image", ("p2.png", png(b"p2"), "image/png")),
+                ("image", ("p3.png", png(b"p3"), "image/png")),
             ],
         )
 
@@ -361,7 +399,7 @@ class WorkbenchAppTests(unittest.TestCase):
         self.assertFalse((Path("artifacts/jobs") / job_id / "page_02" / "original.tex").exists())
         self.assertTrue((Path("artifacts/jobs") / job_id / "page_03" / "original.tex").is_file())
         page_two_source = self.client.get(f"/api/jobs/{job_id}/pages/2/source")
-        self.assertEqual(page_two_source.content, b"second")
+        self.assertEqual(page_two_source.content, png(b"p2"))
         self.assertTrue(data["compile"]["success"])
 
     @patch("workbench.app.generate_document")
@@ -399,9 +437,9 @@ class WorkbenchAppTests(unittest.TestCase):
         response = self.client.post(
             "/api/documents/batch",
             files=[
-                ("image", ("p1.png", b"first", "image/png")),
-                ("image", ("p2.png", b"second", "image/png")),
-                ("image", ("p3.png", b"third", "image/png")),
+                ("image", ("p1.png", png(b"p1"), "image/png")),
+                ("image", ("p2.png", png(b"p2"), "image/png")),
+                ("image", ("p3.png", png(b"p3"), "image/png")),
             ],
         )
         self.assertEqual(response.status_code, 200, response.text)
@@ -431,19 +469,32 @@ class WorkbenchAppTests(unittest.TestCase):
 
     @patch("workbench.app.generate_document")
     @patch("workbench.app.compile_tex")
-    def test_batch_upload_all_pages_fail_returns_502(self, compile_mock, generate_mock):
+    def test_batch_upload_all_pages_fail_returns_422_and_cleans_up(self, compile_mock, generate_mock):
+        """所有页都失败时：返回 422（不是 502），并且不留下空任务目录。
+
+        502 表示"服务端配置坏了"，422 表示"这次上传本身不成立"。
+        全部页识别失败属于后者——把它报成 502 会把人引去查密钥和编译器。
+        同时目录必须清掉：以前这里会留一个只有源图、没有 main.tex 的孤儿目录。
+        """
+        before = {p.name for p in (Path("artifacts/jobs")).iterdir() if p.is_dir()}
         generate_mock.side_effect = [RuntimeError("first down"), RuntimeError("second down")]
 
         response = self.client.post(
             "/api/documents/batch",
             files=[
-                ("image", ("p1.png", b"first", "image/png")),
-                ("image", ("p2.png", b"second", "image/png")),
+                ("image", ("p1.png", png(b"p1"), "image/png")),
+                ("image", ("p2.png", png(b"p2"), "image/png")),
             ],
         )
 
-        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.status_code, 422, response.text)
+        # 逐页原因要能读到，不能只给一句笼统的话
+        self.assertIn("第 1 页", response.text)
+        self.assertIn("first down", response.text)
         compile_mock.assert_not_called()
+
+        after = {p.name for p in (Path("artifacts/jobs")).iterdir() if p.is_dir()}
+        self.assertEqual(after, before, "失败的整批上传不应该留下任务目录")
 
     def test_cleanup_expired_jobs_removes_only_stale_directories(self):
         from workbench.app import _cleanup_expired_jobs
@@ -477,6 +528,41 @@ class WorkbenchAppTests(unittest.TestCase):
             self.assertTrue(stranger.exists())
         finally:
             stranger.unlink(missing_ok=True)
+
+    def test_job_metadata_does_not_recompute_has_figures_when_present(self):
+        """job.json 已写 has_figures 时，不该再去扫 page_*/document.json。
+
+        以前是 metadata.setdefault("has_figures", _has_figure_blocks(directory))。
+        setdefault 的默认值参数是**先求值再传进去**的，键已存在也照样算——
+        也就是说每个任务列表请求都把「所有任务的 pages 全 glob + 解析一遍」做了一次。
+        实测 300 个任务时 /api/jobs 要 2.2 秒，这一行占 61%。
+
+        这里用打桩来固定行为：只要键存在，_has_figure_blocks 就不该被调用。
+        """
+        directory = Path("artifacts/jobs") / uuid.uuid4().hex
+        directory.mkdir(parents=True)
+        try:
+            (directory / "main.tex").write_text("content", encoding="utf-8")
+            (directory / "job.json").write_text(
+                json.dumps({"title": "已有元数据", "page_count": 1, "pages": [], "has_figures": False}),
+                encoding="utf-8",
+            )
+            with patch("workbench.app._has_figure_blocks") as has_figures:
+                metadata = _job_metadata(directory)
+            has_figures.assert_not_called()
+            self.assertFalse(metadata["has_figures"])
+            self.assertEqual(metadata["title"], "已有元数据")
+
+            # 键缺失时仍然要算：老任务没有这个字段，不能默认成 False 就算完。
+            (directory / "job.json").write_text(
+                json.dumps({"title": "老任务"}, ensure_ascii=False), encoding="utf-8"
+            )
+            with patch("workbench.app._has_figure_blocks", return_value=True) as has_figures:
+                metadata = _job_metadata(directory)
+            has_figures.assert_called_once()
+            self.assertTrue(metadata["has_figures"])
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
 
     def test_job_list_supports_search_and_pagination(self):
         directories = []
@@ -519,7 +605,7 @@ class WorkbenchAppTests(unittest.TestCase):
         page_directory = directory / "page_01"
         page_directory.mkdir(parents=True)
         try:
-            (page_directory / "source.png").write_bytes(b"image")
+            (page_directory / "source.png").write_bytes(png())
             description = (
                 "A flowchart illustrating a psychological model. It shows Social Feedback "
                 "and Memory with arrows, plus a legend explaining the relationships."
@@ -615,8 +701,8 @@ class WorkbenchAppTests(unittest.TestCase):
             response = self.client.post(
                 "/api/documents/batch",
                 files=[
-                    ("image", ("p1.png", b"first", "image/png")),
-                    ("image", ("p2.png", b"second", "image/png")),
+                    ("image", ("p1.png", png(b"p1"), "image/png")),
+                    ("image", ("p2.png", png(b"p2"), "image/png")),
                 ],
                 data={"run_id": run_id},
             )
@@ -681,8 +767,8 @@ class WorkbenchAppTests(unittest.TestCase):
         response = self.client.post(
             "/api/documents/batch",
             files=[
-                ("image", ("p1.png", b"first", "image/png")),
-                ("image", ("p2.png", b"second", "image/png")),
+                ("image", ("p1.png", png(b"p1"), "image/png")),
+                ("image", ("p2.png", png(b"p2"), "image/png")),
             ],
             data={"run_id": run_id},
         )
@@ -717,7 +803,7 @@ class WorkbenchAppTests(unittest.TestCase):
             "source_image": "p1.png",
         }
         compile_mock.side_effect = self._fake_compile
-        response = self.client.post("/api/documents", files={"image": ("note.png", b"bytes", "image/png")})
+        response = self.client.post("/api/documents", files={"image": ("note.png", png(), "image/png")})
         data = response.json()
         directory = Path("artifacts/jobs") / data["job_id"]
         try:
@@ -747,7 +833,7 @@ class WorkbenchAppTests(unittest.TestCase):
             "source_image": "p1.png",
         }
         compile_mock.side_effect = self._fake_compile
-        response = self.client.post("/api/documents", files={"image": ("note.png", b"bytes", "image/png")})
+        response = self.client.post("/api/documents", files={"image": ("note.png", png(), "image/png")})
         data = response.json()
         job_id = data["job_id"]
         directory = Path("artifacts/jobs") / job_id
@@ -835,6 +921,107 @@ class WorkbenchAppTests(unittest.TestCase):
             runtime = _python_runtime()
         self.assertFalse(runtime["bundled"])
         self.assertIn("本机", runtime["source"])
+
+    # ---- 以下三个测试针对 2026-11-25 修掉的后端缺陷 ----
+
+    def test_text_file_renamed_png_is_rejected_before_recognition(self):
+        """文本改名 .png 应该在读入时就 400，而不是走到识别再报 502。
+
+        这是"提示不达意"那条缺陷的回归测试：以前会一路走到识别阶段，
+        最后抛出"整页识别或编译失败，请检查服务配置"，把人引去查密钥和编译器。
+        """
+        with patch("workbench.app.generate_document") as generate_mock:
+            response = self.client.post(
+                "/api/documents",
+                files={"image": ("fake.png", b"this is plain text, not an image", "image/png")},
+            )
+
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("不是有效的图片文件", response.text)
+        # 关键：根本没进识别，不浪费配额
+        generate_mock.assert_not_called()
+
+    def test_empty_file_is_rejected_with_clear_message(self):
+        with patch("workbench.app.generate_document") as generate_mock:
+            response = self.client.post(
+                "/api/documents",
+                files={"image": ("empty.png", b"", "image/png")},
+            )
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("空", response.text)
+        generate_mock.assert_not_called()
+
+    def test_jpeg_content_saved_with_true_suffix(self):
+        """扩展名写 .png 但内容其实是 JPEG 时，落盘用真实格式的后缀。
+
+        否则源图存成 source.png 却是 JPEG 内容，后面 \includegraphics 或
+        其他按后缀判断类型的代码会出错。
+        """
+        jpeg = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00" + b"\x00" * 32
+        with patch("workbench.app.generate_document") as generate_mock, \
+             patch("workbench.app.compile_tex") as compile_mock:
+            generate_mock.return_value = {
+                "title": "t",
+                "blocks": [{"type": "paragraph", "text": "x"}],
+                "tex": "\\documentclass{ctexart}\\begin{document}x\\end{document}",
+                "latency_ms": 1.0,
+                "human_review": "required",
+                "signals": {},
+            }
+            compile_mock.return_value = {"success": True, "log": "", "errors": [], "returncode": 0}
+            response = self.client.post(
+                "/api/documents",
+                files={"image": ("photo.png", jpeg, "image/png")},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        directory = Path("artifacts/jobs") / response.json()["job_id"]
+        try:
+            stored = list((directory / "page_01").glob("source.*"))
+            self.assertEqual(len(stored), 1)
+            self.assertEqual(stored[0].suffix, ".jpg", "应按真实格式落盘，而不是扩展名")
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
+    def test_concurrent_compile_does_not_lose_writes(self):
+        """同一任务并发编译时，最终磁盘内容必须是某一个请求的完整结果。
+
+        以前没有按 job 加锁：两个请求都返回 200 成功，但后写的顶掉先写的，
+        先到的那个拿到的是假成功。
+        """
+        from workbench.app import _compile_locked, _job_write_lock
+
+        job_id = uuid.uuid4().hex
+        directory = Path("artifacts/jobs") / job_id
+        directory.mkdir(parents=True)
+        base = "\\documentclass{ctexart}\\begin{document}x\\end{document}"
+        (directory / "main.tex").write_text(base, encoding="utf-8")
+
+        results: list[str] = []
+
+        def worker(tag: str) -> None:
+            tex = base + f"\n%{tag}"
+            with _job_write_lock(job_id):
+                _compile_locked(job_id, directory, tex)
+            results.append((directory / "main.tex").read_text(encoding="utf-8"))
+
+        try:
+            with patch("workbench.app.compile_tex") as compile_mock:
+                compile_mock.return_value = {"success": True, "log": "", "errors": [], "returncode": 0}
+                threads = [threading.Thread(target=worker, args=(t,)) for t in ("A", "B")]
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join()
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
+        # 两个线程各自读到的内容，都必须是"自己写完之后"的完整版本之一，
+        # 而且都得以 \end{document} 收尾（不能被另一个线程截断成半截文件）。
+        self.assertEqual(len(results), 2)
+        for text in results:
+            self.assertIn("\\end{document}", text)
+            self.assertTrue(text.endswith("%A") or text.endswith("%B"), text[-20:])
 
 
 if __name__ == "__main__":
