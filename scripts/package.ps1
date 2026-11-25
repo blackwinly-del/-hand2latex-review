@@ -223,6 +223,23 @@ if (Test-Path -LiteralPath $notesSource) {
     Write-Warn '仓库里没有 installer\安装说明.txt，安装包不含使用说明'
 }
 
+# 再放一套英文名的同内容入口。原因：有些解压工具（例如 Info-ZIP 的 unzip）不认 zip 里的
+# UTF-8 文件名标志，解出来中文名全是乱码，用户连"哪个是启动脚本"都找不到。
+# 有了 start.bat / stop.bat / INSTALL.txt，任何解压工具下都还认得出入口。
+foreach ($pair in @(
+    @{ Source = '启动工作台.bat'; Alias = 'start.bat' },
+    @{ Source = '关闭工作台.bat'; Alias = 'stop.bat' },
+    @{ Source = '安装说明.txt'; Alias = 'INSTALL.txt' }
+)) {
+    $sourcePath = Join-Path $Staging $pair.Source
+    if (Test-Path -LiteralPath $sourcePath) {
+        Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $Staging $pair.Alias) -Force
+        Write-Ok "已放入 $($pair.Alias)（$($pair.Source) 的英文名副本，给不认 UTF-8 文件名的解压工具兜底）"
+    } else {
+        Write-Warn "暂存目录里没有 $($pair.Source)，跳过 $($pair.Alias)"
+    }
+}
+
 # ---------------------------------------------------------------------------
 # 4.5 随包 Python 运行时（目标机器不用装 Python）
 # ---------------------------------------------------------------------------
@@ -272,6 +289,9 @@ function Test-StagedAbsent {
 
 Test-StagedFile '启动工作台.bat' '一键启动脚本'
 Test-StagedFile '关闭工作台.bat' '一键关闭脚本'
+Test-StagedFile 'start.bat' '一键启动脚本（英文名副本）'
+Test-StagedFile 'stop.bat' '一键关闭脚本（英文名副本）'
+Test-StagedFile 'INSTALL.txt' '安装说明（英文名副本）'
 Test-StagedFile 'tools\tectonic\tectonic.exe' 'PDF 编译器'
 Test-StagedFile 'workbench\app.py' '工作台后端'
 Test-StagedFile 'workbench\static\index.html' '工作台页面'
@@ -338,7 +358,35 @@ $zipPath = Join-Path $DistRoot "$PackageName.zip"
 if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
 # 压缩整个暂存目录（不是目录里的 *），这样解压出来是一个 Hand2LaTeX-<版本>-win64 文件夹，
 # 用户"解压到当前文件夹"时不会把几百个文件撒得到处都是。
-Compress-Archive -Path $Staging -DestinationPath $zipPath -CompressionLevel Optimal
+#
+# 这一步故意不用 Compress-Archive：PowerShell 5.1 走 .NET Framework，写出来的条目名用
+# 反斜杠分隔（zip 规范要求正斜杠），第三方解压工具容易因此把中文文件名处理坏，
+# 用户看到的是一堆乱码，连"哪个是启动脚本"都认不出来。改由 scripts\make_package_zip.py
+# 用 Python 的 zipfile 打包，并当场核对：条目名不含反斜杠、非 ASCII 条目都带 UTF-8
+# 标志位、启动工作台.bat / 关闭工作台.bat / 安装说明.txt 三个名字必须原样存在。
+$buildPython = $null
+$venvPythonCandidate = Join-Path $Root '.venv\Scripts\python.exe'
+if (Test-Path -LiteralPath $venvPythonCandidate) {
+    $buildPython = $venvPythonCandidate
+} else {
+    $pathPython = Get-Command python -ErrorAction SilentlyContinue
+    if ($pathPython) { $buildPython = $pathPython.Source }
+}
+if (-not $buildPython) {
+    Stop-WithMessage '找不到可用的 Python 来打 zip（需要它保证中文文件名的编码正确）。先跑一次 启动工作台.bat 建好 .venv，或把 python 加进 PATH。'
+}
+$zipScript = Join-Path $Root 'scripts\make_package_zip.py'
+if (-not (Test-Path -LiteralPath $zipScript)) { Stop-WithMessage "找不到 $zipScript" }
+$previousEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$zipReport = @(& $buildPython $zipScript $Staging $zipPath 2>&1 | ForEach-Object { $_.ToString() })
+$zipExit = $LASTEXITCODE
+$ErrorActionPreference = $previousEap
+if ($zipExit -ne 0) {
+    Write-Host ($zipReport -join "`n")
+    Stop-WithMessage "打 zip 失败，或中文文件名核对没通过（退出码 $zipExit）"
+}
+Write-Ok "已压缩并核对文件名：$($zipReport -join ' ')"
 $zipMb = [math]::Round((Get-Item -LiteralPath $zipPath).Length / 1MB, 1)
 $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash
 Write-Ok "已生成 dist\$PackageName.zip（$zipMb MB）"

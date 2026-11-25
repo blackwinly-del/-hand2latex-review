@@ -140,7 +140,7 @@ Write-Line '画板依赖就绪' 'ok'
 if (Test-DemoHealthy) {
     Write-Step '画板已经在运行'
     Write-Line "地址 $Url，无需重复启动" 'ok'
-    if (-not $NoBrowser) { Start-Process $Url }
+    if (-not $NoBrowser) { try { $null = [System.Diagnostics.Process]::Start($Url) } catch { Write-Line "没能自动打开浏览器，请自己访问 $Url" 'warn' } }
     exit 0
 }
 
@@ -158,9 +158,16 @@ try {
 }
 
 Write-Step '启动画板（前台运行）'
-$server = Start-Process -FilePath $VenvPython `
-    -ArgumentList @('-m','streamlit','run','demo/app.py','--server.headless','true','--server.port',"$Port",'--server.address','127.0.0.1') `
-    -WorkingDirectory $Root -NoNewWindow -PassThru
+# 不用 Start-Process：环境里同时存在只有大小写不同的同名变量（代理软件常这么设，
+# 例如 HTTPS_PROXY 与 https_proxy）时，PowerShell 5.1 的 Start-Process 会抛
+# "已添加项。字典中的关键字..."。直接用 .NET 的 Process.Start 不读环境字典。
+$demoInfo = New-Object System.Diagnostics.ProcessStartInfo
+$demoInfo.FileName = $VenvPython
+$demoInfo.Arguments = '-m streamlit run demo/app.py --server.headless true --server.port ' + $Port + ' --server.address 127.0.0.1'
+$demoInfo.WorkingDirectory = $Root
+$demoInfo.UseShellExecute = $false
+$demoInfo.CreateNoWindow = $false
+$server = [System.Diagnostics.Process]::Start($demoInfo)
 
 $ready = $false
 for ($i = 0; $i -lt 40; $i++) {
@@ -173,7 +180,7 @@ if (-not $ready) {
 }
 
 Write-Line "画板已就绪：$Url" 'ok'
-if (-not $NoBrowser) { Start-Process $Url }
+if (-not $NoBrowser) { try { $null = [System.Diagnostics.Process]::Start($Url) } catch { Write-Line "没能自动打开浏览器，请自己访问 $Url" 'warn' } }
 Write-Line '在左侧画板写字，停笔约 1 秒自动识别；第一次识别要加载本地模型，较慢属正常。'
 Write-Line '本窗口开着画板才在运行，关闭窗口或按 Ctrl+C 即停止。' 'warn'
 

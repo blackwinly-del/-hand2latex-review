@@ -25,7 +25,11 @@
 
 #define MyAppName "Hand2LaTeX 智能工作台"
 #define MyAppPublisher "Hand2LaTeX"
-#define MyAppBat "启动工作台.bat"
+; 快捷方式指向英文名入口：包里两套都有（启动工作台.bat 与 start.bat 内容相同），
+; 用英文名是为了在任何解压/复制路径下都不会因为编码问题指错文件。
+#define MyAppBat "start.bat"
+#define MyAppStopBat "stop.bat"
+#define MyAppNotes "INSTALL.txt"
 
 [Setup]
 AppId={{8F4C2A1E-6B3D-4E57-9A02-1C7D5E3F2B41}
@@ -44,7 +48,7 @@ OutputBaseFilename=Hand2LaTeX-{#AppVersion}-win64-setup
 Compression=lzma2/max
 SolidCompression=yes
 ShowLanguageDialog=no
-InfoBeforeFile={#SourceDir}\安装说明.txt
+InfoBeforeFile={#SourceDir}\{#MyAppNotes}
 UninstallDisplayIcon={app}\tools\tectonic\tectonic.exe
 UninstallDisplayName={#MyAppName}
 SetupLogging=yes
@@ -63,8 +67,8 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppBat}"; WorkingDir: "{app}"; IconFilename: "{sys}\shell32.dll"; IconIndex: 13; Comment: "启动 Hand2LaTeX 智能工作台"
-Name: "{group}\关闭工作台"; Filename: "{app}\关闭工作台.bat"; WorkingDir: "{app}"
-Name: "{group}\安装说明"; Filename: "{app}\安装说明.txt"
+Name: "{group}\关闭工作台"; Filename: "{app}\{#MyAppStopBat}"; WorkingDir: "{app}"
+Name: "{group}\安装说明"; Filename: "{app}\{#MyAppNotes}"
 Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppBat}"; WorkingDir: "{app}"; IconFilename: "{sys}\shell32.dll"; IconIndex: 13; Tasks: desktopicon
 
