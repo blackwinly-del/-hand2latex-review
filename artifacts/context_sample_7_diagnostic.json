@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-03",
+  "sample_id": "sample_7_high_derivative",
+  "expected_index": 1,
+  "original_failure": {
+    "selected_index": null,
+    "error": "KeyError: context selection failed",
+    "latency_ms": 8954.553,
+    "evidence": "choose_with_context requires response[selected_index] and response[reason]; the original raw response was not saved, so the missing field cannot be identified."
+  },
+  "diagnostic_request": {
+    "latency_ms": 3227.349,
+    "response_keys": ["reason", "selected_index"],
+    "selected_index_type": "int",
+    "reason_type": "str",
+    "response": {
+      "selected_index": 0,
+      "reason": "The image visibly shows y^{(n)} equal to a fraction with numerator (x-1)^n �� n! and denominator (x-1)^{n+1}, matching candidate 0; candidate 1 contains 4(-1)^n instead."
+    },
+    "selected_correct_candidate": false
+  },
+  "conclusion": "The original KeyError indicates a missing required field, not an out-of-range index or a demonstrated HTTP failure. A new request returned a valid schema but selected the wrong candidate, showing response variability and no automatic correction for sample 7."
+}

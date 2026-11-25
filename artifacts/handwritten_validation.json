@@ -1,0 +1,105 @@
+{
+  "model": "PP-FormulaNet-L",
+  "device": "cpu",
+  "sample_count": 3,
+  "total_seconds": 41.676,
+  "reviewed_sample_count": 3,
+  "evaluation": {
+    "sample_count": 3,
+    "raw_correct_count": 3,
+    "final_correct_count": 3,
+    "raw_exact_accuracy": 1.0,
+    "final_exact_accuracy": 1.0,
+    "erroneous_rewrite_count": 0,
+    "erroneous_rewrite_rate": 0.0,
+    "rule_review_count": 1,
+    "rule_review_rate": 0.3333333333333333,
+    "recognize_latency_ms": {
+      "median": 7960.823,
+      "p95": 8546.029
+    },
+    "renderable_rate": 1.0
+  },
+  "results": [
+    {
+      "image_path": "data/handwritten/sample_1.png",
+      "ground_truth": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "human_review": "confirmed_correct",
+      "render_result": {
+        "renderable": true,
+        "error": null
+      },
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+          "score": null,
+          "latency_ms": 7960.823,
+          "error": null
+        }
+      ],
+      "refine_result": {
+        "raw_latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+        "final_latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+        "confidence": "medium",
+        "changes": [],
+        "need_review": false,
+        "risk_score": null
+      }
+    },
+    {
+      "image_path": "data/handwritten/sample_2.png",
+      "ground_truth": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed faithful transcription of their handwriting.",
+      "render_result": {
+        "renderable": true,
+        "error": null
+      },
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+          "score": null,
+          "latency_ms": 6302.263,
+          "error": null
+        }
+      ],
+      "refine_result": {
+        "raw_latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+        "final_latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+        "confidence": "medium",
+        "changes": [],
+        "need_review": false,
+        "risk_score": null
+      }
+    },
+    {
+      "image_path": "data/handwritten/sample_3.png",
+      "ground_truth": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed faithful transcription of their handwriting; the source writing caused the structural issue.",
+      "render_result": {
+        "renderable": true,
+        "error": null
+      },
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+          "score": null,
+          "latency_ms": 8546.029,
+          "error": null
+        }
+      ],
+      "refine_result": {
+        "raw_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+        "final_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+        "confidence": "low",
+        "changes": [],
+        "need_review": true,
+        "risk_score": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "date": "2026-11-03",
+  "model": "PP-FormulaNet-L",
+  "sample_count": 3,
+  "review_status": "ground_truth_user_confirmed",
+  "results": [
+    {
+      "sample_id": "sample_4",
+      "image_path": "data/handwritten/sample_4.png",
+      "source_page": "data/pdf_pages/page_2.png",
+      "crop": [500, 10, 855, 85],
+      "ground_truth": "x^{3}-x^{2}+x^{2}+x-x+3x-3+4",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "x^{3}-x^{2}+x^{2}+x-x+3x-3+4",
+          "score": null,
+          "latency_ms": 16564.056,
+          "error": null
+        }
+      ]
+    },
+    {
+      "sample_id": "sample_5",
+      "image_path": "data/handwritten/sample_5.png",
+      "source_page": "data/pdf_pages/page_2.png",
+      "crop": [165, 205, 440, 260],
+      "ground_truth": "y^{\\prime\\prime}=2+\\frac{8}{(x-1)^{3}}",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y^{\\prime\\prime}=2+\\frac{8}{(x-1)^{3}}",
+          "score": null,
+          "latency_ms": 13796.721,
+          "error": null
+        }
+      ]
+    },
+    {
+      "sample_id": "sample_6",
+      "image_path": "data/handwritten/sample_6.png",
+      "source_page": "data/pdf_pages/page_3.png",
+      "crop": [175, 775, 610, 845],
+      "ground_truth": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the formula-only transcription on 2026-11-03; the problem number and Chinese prose are excluded.",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "(3)\\sqrt{\\frac{1}{n}}+1=\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+          "score": null,
+          "latency_ms": 14826.419,
+          "error": null
+        }
+      ]
+    }
+  ]
+}

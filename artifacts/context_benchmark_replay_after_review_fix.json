@@ -1,0 +1,35 @@
+{
+  "source": "artifacts/context_benchmark_results.json",
+  "method": "offline_replay_of_saved_context_results_after_candidate_structure_review_fix",
+  "additional_api_calls": 0,
+  "latency_note": "source_context_latency_ms contains the original real context request latencies, not offline replay timing or independently measured refine latency.",
+  "review_metric_note": "Legacy false_review fields mean the final transcription was exact but review was requested; structural review may still be appropriate.",
+  "summary": {
+    "sample_count": 3,
+    "raw_correct_count": 1,
+    "final_correct_count": 2,
+    "erroneous_rewrite_count": 0,
+    "review_count": 1,
+    "intercepted_error_count": 1,
+    "missed_error_count": 0,
+    "false_review_count": 0,
+    "raw_exact_accuracy": 0.3333333333333333,
+    "final_exact_accuracy": 0.6666666666666666,
+    "erroneous_rewrite_rate": 0.0,
+    "error_interception_rate": 1.0,
+    "false_review_rate": 0.0,
+    "renderable_rate": null,
+    "human_review_rate": 0.3333333333333333,
+    "source_context_latency_ms": {
+      "median": 2260.118,
+      "p95": 2325.435
+    },
+    "context_success_count": 3,
+    "context_selection_correct_count": 2,
+    "context_fallback_count": 0,
+    "context_selection_accuracy": 0.6666666666666666,
+    "context_success_selection_accuracy": 0.6666666666666666,
+    "context_fallback_rate": 0.0
+  },
+  "scope_note": "The saved real responses were replayed locally after changing review policy. Selection accuracy is unchanged; only review behavior improved. This is not a new real API evaluation."
+}

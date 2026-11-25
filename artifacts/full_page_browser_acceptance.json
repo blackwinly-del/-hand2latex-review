@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-14",
+  "job_id": "3ee80c69204b413ba92420412bd35328",
+  "source_image": "data/pdf_pages/page_2.png",
+  "browser_flow": [
+    "upload full-page handwritten image",
+    "generate editable .tex",
+    "compile and preview PDF",
+    "inject \\badmacro before \\end{document}",
+    "observe compilation error at source line 74",
+    "request AI fix suggestion",
+    "confirm suggestion and recompile",
+    "preview and download repaired PDF"
+  ],
+  "error_line": 74,
+  "ai_summary": "Removed the stray undefined \\badmacro command that caused the main.tex:74 compilation error; all other content and the ctex fontset=windows preamble were preserved.",
+  "original_tex_exists": true,
+  "history_file_count": 3,
+  "suggestion_baseline_matches_pre_fix_source": true,
+  "fix_audit_exists": true,
+  "badmacro_removed": true,
+  "pdf_signature_valid": true,
+  "full_regression": {
+    "test_count": 128,
+    "result": "all passed",
+    "seconds": 6.474
+  },
+  "review_required": "Model-generated title, paragraphs, and formulas still require human review; this acceptance verifies the application flow, not transcription accuracy or model stability."
+}

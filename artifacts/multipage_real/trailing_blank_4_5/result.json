@@ -1,0 +1,66 @@
+{
+  "case_id": "trailing_blank_4_5",
+  "description": "A handwritten page followed by a blank page; invented blank-page content is a failure.",
+  "page_ids": [
+    "page_4",
+    "page_5"
+  ],
+  "additional_api_calls": 0,
+  "cache_hits": 2,
+  "pages": [
+    {
+      "page_id": "page_4",
+      "source_image": "data\\pdf_pages\\page_4.png",
+      "model": "deepseek-flash",
+      "human_review": "required",
+      "status": "success",
+      "latency_ms": 28766.162,
+      "cache_hit": true,
+      "normalized_empty_blank": false,
+      "marker": "3.6.8",
+      "expected_blank": false,
+      "blank_page_has_content": null
+    },
+    {
+      "page_id": "page_5",
+      "source_image": "data\\pdf_pages\\page_5.png",
+      "model": "deepseek-flash",
+      "human_review": "required",
+      "status": "success",
+      "latency_ms": 787.772,
+      "cache_hit": true,
+      "normalized_empty_blank": false,
+      "marker": null,
+      "expected_blank": true,
+      "blank_page_has_content": false
+    }
+  ],
+  "transcription_accuracy": null,
+  "human_review": "required",
+  "status": "compiled",
+  "structural_pass": true,
+  "page_break_count": 1,
+  "expected_page_break_count": 1,
+  "markers": [
+    {
+      "marker": "3.6.8",
+      "found_in_expected_segment": true
+    },
+    {
+      "marker": null,
+      "found_in_expected_segment": null
+    }
+  ],
+  "blank_pages_faithful": true,
+  "trailing_blank_pdf_is_blank": true,
+  "compile": {
+    "success": true,
+    "pdf_path": "D:\\latex\\artifacts\\multipage_real\\trailing_blank_4_5\\main.pdf",
+    "log": "note: Running TeX ...\nnote: Rerunning TeX because \"main.aux\" changed ...\nnote: Running xdvipdfmx ...\nnote: Writing `D:\\latex\\artifacts\\multipage_real\\trailing_blank_4_5\\main.pdf` (20.6474609375 KiB)\nnote: Skipped writing 1 intermediate files (use --keep-intermediates to keep them)\nFontconfig error: Cannot load default config file: No such file: (null)\nwarning: accessing absolute path `C:/windows/fonts\\simsun.ttc`; build may not be reproducible in other environments\nwarning: accessing absolute path `C:/windows/fonts\\simkai.ttf`; build may not be reproducible in other environments\nwarning: accessing absolute path `C:/windows/fonts\\simhei.ttf`; build may not be reproducible in other environments\nwarning: main.tex:7: Missing character: There is no ��� (U+2208) in font [lmroman17-regular]:mapping=tex-text;!\nwarning: could not represent character \"∈\" (0x2208) in font \"[lmroman17-regular]:mapping=tex-text;\"\nwarning:   you may need to load the `fontspec` package and use (e.g.) \\setmainfont to\nwarning:   choose a different font that covers the unrepresentable character(s)\nwarning: main.tex:7: Missing character: There is no ��� (U+2208) in font [lmroman17-regular]:mapping=tex-text;!\nwarning: could not represent character \"∈\" (0x2208) in font \"[lmroman17-regular]:mapping=tex-text;\"\nwarning:   you may need to load the `fontspec` package and use (e.g.) \\setmainfont to\nwarning:   choose a different font that covers the unrepresentable character(s)\n",
+    "errors": [],
+    "returncode": 0
+  },
+  "pdf_page_count": 2,
+  "source_page_count": 2,
+  "pdf_page_count_note": "A source page may occupy multiple PDF pages when recognized content overflows."
+}

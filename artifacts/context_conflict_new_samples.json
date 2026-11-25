@@ -1,0 +1,41 @@
+{
+  "date": "2026-11-03",
+  "sample_type": "new_real_handwritten_ocr_and_constructed_conflicts",
+  "source": "artifacts/handwritten_new_samples.json",
+  "sample_count": 3,
+  "samples": [
+    {
+      "sample_id": "sample_4_polynomial",
+      "image_path": "data/handwritten/sample_4.png",
+      "ground_truth": "x^{3}-x^{2}+x^{2}+x-x+3x-3+4",
+      "expected_index": 0,
+      "construction_note": "Candidate 0 is the unchanged real OCR output confirmed by the user; candidate 1 changes the final constant from 4 to 1.",
+      "candidates": [
+        {"engine": "pp_formulanet_l", "latex": "x^{3}-x^{2}+x^{2}+x-x+3x-3+4", "score": null, "latency_ms": 16564.056, "error": null},
+        {"engine": "constructed_incorrect", "latex": "x^{3}-x^{2}+x^{2}+x-x+3x-3+1", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_5_second_derivative",
+      "image_path": "data/handwritten/sample_5.png",
+      "ground_truth": "y^{\\prime\\prime}=2+\\frac{8}{(x-1)^{3}}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 changes the denominator sign; candidate 1 is the unchanged real OCR output confirmed by the user.",
+      "candidates": [
+        {"engine": "constructed_incorrect", "latex": "y^{\\prime\\prime}=2+\\frac{8}{(x+1)^{3}}", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "pp_formulanet_l", "latex": "y^{\\prime\\prime}=2+\\frac{8}{(x-1)^{3}}", "score": null, "latency_ms": 13796.721, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_6_real_ocr_prefix_error",
+      "image_path": "data/handwritten/sample_6.png",
+      "ground_truth": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 is the unchanged real OCR output with an incorrect prefix; candidate 1 is the user-confirmed formula-only transcription.",
+      "candidates": [
+        {"engine": "pp_formulanet_l", "latex": "(3)\\sqrt{\\frac{1}{n}}+1=\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}", "score": null, "latency_ms": 14826.419, "error": null},
+        {"engine": "user_confirmed", "latex": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}", "score": null, "latency_ms": 0, "error": null}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "additional_api_calls": 0,
+  "sample_count": 3,
+  "previous_review_count": 0,
+  "new_review_count": 3,
+  "previous_missed_error_count": 1,
+  "new_missed_error_count": 0,
+  "all_final_latex_unchanged": true,
+  "all_changes_unchanged": true,
+  "results": [
+    {
+      "run": 1,
+      "selected_index": 1,
+      "final_latex_unchanged": true,
+      "changes_unchanged": true,
+      "previous_need_review": false,
+      "detected_conflict_count": 1,
+      "new_confidence": "low",
+      "new_need_review": true,
+      "final_correct": true
+    },
+    {
+      "run": 2,
+      "selected_index": 0,
+      "final_latex_unchanged": true,
+      "changes_unchanged": true,
+      "previous_need_review": false,
+      "detected_conflict_count": 1,
+      "new_confidence": "low",
+      "new_need_review": true,
+      "final_correct": false
+    },
+    {
+      "run": 3,
+      "selected_index": 1,
+      "final_latex_unchanged": true,
+      "changes_unchanged": true,
+      "previous_need_review": false,
+      "detected_conflict_count": 1,
+      "new_confidence": "low",
+      "new_need_review": true,
+      "final_correct": true
+    }
+  ],
+  "scope_note": "Offline replay of three saved real responses with the new deterministic 0/o conflict rule. The rule changed review behavior only; it did not improve or alter the selected LaTeX."
+}

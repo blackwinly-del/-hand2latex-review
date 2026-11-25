@@ -1,0 +1,161 @@
+{
+  "purpose": "用真实付费 API 验证多页并行识别的真实提速、真实 token 信号，以及同一批图重复识别的稳定性",
+  "date_local": "2026-11-24 21:40:35",
+  "model": "deepseek-flash",
+  "base_url": "https://api.deepseek.com/v1",
+  "max_tokens_budget": 24000,
+  "images": [
+    "data\\pdf_pages\\page_2.png",
+    "data\\pdf_pages\\page_3.png",
+    "data\\pdf_pages\\page_4.png"
+  ],
+  "runs": {
+    "parallel_concurrency_3": {
+      "concurrency": 3,
+      "wall_ms": 82721,
+      "run_elapsed_ms": 82658,
+      "page_latency_ms": [
+        65258,
+        71311,
+        77329
+      ],
+      "page_start_offset_ms": [
+        8,
+        12,
+        13
+      ],
+      "max_concurrent_pages_observed_by_client": 3,
+      "human_review": [
+        "required",
+        "required",
+        "required"
+      ]
+    },
+    "serial_concurrency_1": {
+      "concurrency": 1,
+      "wall_ms": 232729,
+      "run_elapsed_ms": 232688,
+      "page_latency_ms": [
+        77596,
+        122447,
+        28862
+      ],
+      "page_start_offset_ms": [
+        3,
+        77600,
+        200047
+      ],
+      "max_concurrent_pages_observed_by_client": 1,
+      "human_review": [
+        "required",
+        "required",
+        "required"
+      ]
+    }
+  },
+  "speedup": {
+    "wall_ms_parallel": 82721,
+    "wall_ms_serial": 232729,
+    "ratio": 2.81,
+    "note": "同样 3 张图、同一模型；并行一轮与串行一轮各跑一次，wall 为客户端从发出请求到拿到完整响应的实测时间"
+  },
+  "stability_finding": {
+    "same_images_two_runs": true,
+    "tex_chars": {
+      "parallel_run": 2799,
+      "serial_run": 3052
+    },
+    "block_stats": {
+      "parallel_run": [
+        {
+          "paragraph": 5,
+          "display_formula": 17,
+          "figure": 0,
+          "blank_page": 0,
+          "other": 0
+        },
+        {
+          "paragraph": 0,
+          "display_formula": 16,
+          "figure": 0,
+          "blank_page": 0,
+          "other": 0
+        },
+        {
+          "paragraph": 2,
+          "display_formula": 7,
+          "figure": 0,
+          "blank_page": 0,
+          "other": 0
+        }
+      ],
+      "serial_run": [
+        {
+          "paragraph": 3,
+          "display_formula": 19,
+          "figure": 0,
+          "blank_page": 0,
+          "other": 0
+        },
+        {
+          "paragraph": 0,
+          "display_formula": 8,
+          "figure": 0,
+          "blank_page": 0,
+          "other": 0
+        },
+        {
+          "paragraph": 2,
+          "display_formula": 7,
+          "figure": 0,
+          "blank_page": 0,
+          "other": 0
+        }
+      ]
+    },
+    "conclusion": "同一批手写页跑两次，块数量与 TeX 长度都不同（例如第 2 页 display_formula 一次 16 个、一次 8 个），说明远端整页识别不是确定性的；没有真值集，无法判断哪一次更接近原文，因此每页都标 human_review=required 是必要的，重试同一页也会得到不同结果。"
+  },
+  "token_usage": {
+    "parallel_run_completion": [
+      16354,
+      18211,
+      10892
+    ],
+    "serial_run_completion": [
+      18959,
+      20232,
+      6754
+    ],
+    "prompt_tokens_per_page": [
+      920,
+      920,
+      920
+    ],
+    "both_runs_completion_total": 91402,
+    "near_token_budget_any": false,
+    "max_budget_used_ratio": 0.843,
+    "attempts_all_one": true,
+    "finish_reasons": [
+      "stop"
+    ]
+  },
+  "compile": {
+    "parallel_run_success": true,
+    "serial_run_success": true,
+    "recompile_reused_both": true,
+    "pdf_pages": {
+      "parallel_run": 4,
+      "serial_run": 4
+    },
+    "newpage_count_in_tex": {
+      "parallel_run": 2,
+      "serial_run": 2
+    },
+    "note": "3 张原图 → TeX 里 2 个 \newpage（正确），PDF 却是 4 页：第三页内容在 LaTeX 里自然溢出到第 4 个 PDF 页。所以 PDF 页数与原图页数不相等是正常现象，不能当作复核信号。"
+  },
+  "environment_finding": "本机 NO_PROXY=[::1],::1 会让 httpx 抛 InvalidURL（它把该值当 URL 解析）；测试脚本需 trust_env=False。产品里的 OpenAI 调用未受影响，本次真实识别即为证据。",
+  "job_ids": {
+    "parallel_run": "1ba16d725fc74dbab41d4e8c646435f1",
+    "serial_run": "a94781454db842ea987212fae72421b3"
+  }
+}

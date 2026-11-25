@@ -1,0 +1,79 @@
+{
+  "page_id": "page_3",
+  "source_image": "data\\pdf_pages\\page_3.png",
+  "source_sha256": "d48f8f80aca6705bd4af2b01c1a5b20d9594ed639e74b5a0ca4c552706f7f0f8",
+  "model": "deepseek-flash",
+  "human_review": "required",
+  "status": "success",
+  "document": {
+    "title": "手写笔记：泰勒展开与极限",
+    "blocks": [
+      {
+        "type": "display_formula",
+        "latex": "\\ln(\\cos x)=-\\frac{1}{2}x^2-\\frac{1}{12}x^4-\\frac{1}{45}x^6+\\cdots"
+      },
+      {
+        "type": "display_formula",
+        "latex": "+\\frac{1}{3}\\left(-\\frac{1}{2}x^2+\\cdots\\right)^3=-\\frac{1}{2}x^2-\\frac{1}{12}x^4-\\frac{1}{45}x^6"
+      },
+      {
+        "type": "display_formula",
+        "latex": "+O(x^6)"
+      },
+      {
+        "type": "display_formula",
+        "latex": "3.6.5.\\ (2)\\quad y=-1-(x+1)-(x+1)^2-(x+1)^3-(x+1)^4-\\cdots-(x+1)^n-(x+1)^{n+1}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "3.6.6\\ (1)\\quad \\text{原式}=\\lim_{x\\to0}\\frac{1-\\frac{1}{2}x^2+\\frac{1}{24}x^4-\\left(1+\\left(-\\frac{1}{2}x^2\\right)+\\frac{1}{2}\\left(-\\frac{1}{2}x^2\\right)^2+o(x^4)\\right)}{x^4}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "=\\lim_{x\\to0}\\frac{\\frac{1}{24}x^4-\\frac{1}{8}x^4}{x^4}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "=-\\frac{1}{12}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "(2)\\quad \\lim_{x\\to0}\\frac{1+\\frac{1}{4}x^2+o(x^2)-\\left(1-\\frac{1}{4}x^2+o(x^2)\\right)}{x^2}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "=\\frac{1}{2}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "(3)\\quad \\text{原式}=\\lim_{t\\to0}\\frac{t-\\ln(1+t)}{t^2}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "=\\lim_{x\\to0}\\frac{t-\\left(t-\\frac{1}{2}t^2\\right)}{t^2}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "=\\frac{1}{2}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "(4)\\quad \\lim_{x\\to0}\\frac{1-\\frac{1}{2}\\sin^2x+\\frac{1}{24}\\sin^4x-\\left(1-\\frac{1}{2}x^2+\\frac{1}{24}x^4\\right)}{x^4}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "=\\lim_{x\\to0}\\frac{1-\\frac{1}{2}\\left(x-\\frac{1}{3}x^3\\right)^2+\\frac{1}{24}\\left(x-\\frac{1}{3}x^3\\right)^4-\\left(1-\\frac{1}{2}x^2+\\frac{1}{24}x^4\\right)+o(x^4)}{x^4}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "=\\lim_{x\\to0}\\frac{\\frac{1}{3}x^4+\\frac{1}{24}x^4-\\frac{1}{6}x^4}{x^4}"
+      },
+      {
+        "type": "display_formula",
+        "latex": "=\\frac{1}{8}"
+      }
+    ]
+  },
+  "latency_ms": 79399.054,
+  "tex": "\\documentclass[UTF8,fontset=windows]{ctexart}\n\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage[margin=2.2cm]{geometry}\n\\title{手写笔记：泰勒展开与极限}\n\\begin{document}\n\\maketitle\n\\[\n\\ln(\\cos x)=-\\frac{1}{2}x^2-\\frac{1}{12}x^4-\\frac{1}{45}x^6+\\cdots\n\\]\n\n\\[\n+\\frac{1}{3}\\left(-\\frac{1}{2}x^2+\\cdots\\right)^3=-\\frac{1}{2}x^2-\\frac{1}{12}x^4-\\frac{1}{45}x^6\n\\]\n\n\\[\n+O(x^6)\n\\]\n\n\\[\n3.6.5.\\ (2)\\quad y=-1-(x+1)-(x+1)^2-(x+1)^3-(x+1)^4-\\cdots-(x+1)^n-(x+1)^{n+1}\n\\]\n\n\\[\n3.6.6\\ (1)\\quad \\text{原式}=\\lim_{x\\to0}\\frac{1-\\frac{1}{2}x^2+\\frac{1}{24}x^4-\\left(1+\\left(-\\frac{1}{2}x^2\\right)+\\frac{1}{2}\\left(-\\frac{1}{2}x^2\\right)^2+o(x^4)\\right)}{x^4}\n\\]\n\n\\[\n=\\lim_{x\\to0}\\frac{\\frac{1}{24}x^4-\\frac{1}{8}x^4}{x^4}\n\\]\n\n\\[\n=-\\frac{1}{12}\n\\]\n\n\\[\n(2)\\quad \\lim_{x\\to0}\\frac{1+\\frac{1}{4}x^2+o(x^2)-\\left(1-\\frac{1}{4}x^2+o(x^2)\\right)}{x^2}\n\\]\n\n\\[\n=\\frac{1}{2}\n\\]\n\n\\[\n(3)\\quad \\text{原式}=\\lim_{t\\to0}\\frac{t-\\ln(1+t)}{t^2}\n\\]\n\n\\[\n=\\lim_{x\\to0}\\frac{t-\\left(t-\\frac{1}{2}t^2\\right)}{t^2}\n\\]\n\n\\[\n=\\frac{1}{2}\n\\]\n\n\\[\n(4)\\quad \\lim_{x\\to0}\\frac{1-\\frac{1}{2}\\sin^2x+\\frac{1}{24}\\sin^4x-\\left(1-\\frac{1}{2}x^2+\\frac{1}{24}x^4\\right)}{x^4}\n\\]\n\n\\[\n=\\lim_{x\\to0}\\frac{1-\\frac{1}{2}\\left(x-\\frac{1}{3}x^3\\right)^2+\\frac{1}{24}\\left(x-\\frac{1}{3}x^3\\right)^4-\\left(1-\\frac{1}{2}x^2+\\frac{1}{24}x^4\\right)+o(x^4)}{x^4}\n\\]\n\n\\[\n=\\lim_{x\\to0}\\frac{\\frac{1}{3}x^4+\\frac{1}{24}x^4-\\frac{1}{6}x^4}{x^4}\n\\]\n\n\\[\n=\\frac{1}{8}\n\\]\n\n\\end{document}\n"
+}

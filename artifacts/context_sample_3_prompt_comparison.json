@@ -1,0 +1,153 @@
+{
+  "date": "2026-11-03",
+  "model": "deepseek-flash",
+  "sample_id": "sample_3_faithful_not_structural_repair",
+  "image_path": "data/handwritten/sample_3.png",
+  "expected_index": 1,
+  "design": "Three alternating real requests per prompt version with identical model, candidates, and configuration; no extra request for refine replay.",
+  "summary": {
+    "old": {
+      "run_count": 3,
+      "correct_selection_count": 0,
+      "fallback_count": 0,
+      "review_count": 3,
+      "selected_indices": [0, 0, 0],
+      "latency_median_ms": 2996.302
+    },
+    "new": {
+      "run_count": 3,
+      "correct_selection_count": 2,
+      "fallback_count": 0,
+      "review_count": 3,
+      "selected_indices": [1, 0, 1],
+      "latency_median_ms": 7460.756
+    }
+  },
+  "results": [
+    {
+      "run": 1,
+      "prompt_version": "old",
+      "context_result": {
+        "selected_index": 0,
+        "reason": "It matches the handwritten formula and includes the closing parenthesis after o(x^2), whereas candidate 1 is missing the closing parenthesis for the subtracted parentheses.",
+        "error": null
+      },
+      "latency_ms": 2996.302,
+      "refine_result": {
+        "raw_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+        "final_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+        "confidence": "low",
+        "changes": [],
+        "need_review": true,
+        "risk_score": null
+      }
+    },
+    {
+      "run": 1,
+      "prompt_version": "new",
+      "context_result": {
+        "selected_index": 1,
+        "reason": "The image shows only the closing parenthesis of o(x^2) at the end of the numerator, without an additional closing parenthesis for the larger grouped term; candidate 1 matches that visible notation.",
+        "error": null
+      },
+      "latency_ms": 7460.756,
+      "refine_result": {
+        "raw_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+        "final_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+        "confidence": "low",
+        "changes": [
+          {
+            "rule": "context_candidate_selection",
+            "before": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+            "after": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+            "selected_index": 1,
+            "reason": "The image shows only the closing parenthesis of o(x^2) at the end of the numerator, without an additional closing parenthesis for the larger grouped term; candidate 1 matches that visible notation."
+          }
+        ],
+        "need_review": true,
+        "risk_score": null
+      }
+    },
+    {
+      "run": 2,
+      "prompt_version": "old",
+      "context_result": {
+        "selected_index": 0,
+        "reason": "Candidate 0 matches the handwritten formula, including the closing parenthesis after o(x^2) in the numerator, while candidate 1 omits that closing parenthesis and is therefore unbalanced.",
+        "error": null
+      },
+      "latency_ms": 3240.388,
+      "refine_result": {
+        "raw_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+        "final_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+        "confidence": "low",
+        "changes": [],
+        "need_review": true,
+        "risk_score": null
+      }
+    },
+    {
+      "run": 2,
+      "prompt_version": "new",
+      "context_result": {
+        "selected_index": 0,
+        "reason": "Candidate 0 includes the closing parenthesis after the final o(x^2), matching the grouped expression visible in the image; candidate 1 omits it.",
+        "error": null
+      },
+      "latency_ms": 4579.901,
+      "refine_result": {
+        "raw_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+        "final_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+        "confidence": "low",
+        "changes": [],
+        "need_review": true,
+        "risk_score": null
+      }
+    },
+    {
+      "run": 3,
+      "prompt_version": "old",
+      "context_result": {
+        "selected_index": 0,
+        "reason": "Candidate 0 includes the full parenthesized expression, matching the image with the closing parenthesis after o(x^2); candidate 1 is missing the closing parenthesis for the (1 - ... ) group.",
+        "error": null
+      },
+      "latency_ms": 2811.006,
+      "refine_result": {
+        "raw_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+        "final_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+        "confidence": "low",
+        "changes": [],
+        "need_review": true,
+        "risk_score": null
+      }
+    },
+    {
+      "run": 3,
+      "prompt_version": "new",
+      "context_result": {
+        "selected_index": 1,
+        "reason": "The handwritten numerator ends after o(x^2) without an extra closing parenthesis for the (1 - ... group, matching candidate 1's structurally incomplete transcription.",
+        "error": null
+      },
+      "latency_ms": 12676.991,
+      "refine_result": {
+        "raw_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+        "final_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+        "confidence": "low",
+        "changes": [
+          {
+            "rule": "context_candidate_selection",
+            "before": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}",
+            "after": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+            "selected_index": 1,
+            "reason": "The handwritten numerator ends after o(x^2) without an extra closing parenthesis for the (1 - ... group, matching candidate 1's structurally incomplete transcription."
+          }
+        ],
+        "need_review": true,
+        "risk_score": null
+      }
+    }
+  ],
+  "scope_note": "Three repetitions on one constructed sample offer a small stability check only, not a general accuracy estimate. The new prompt remains nondeterministic and no further same-sample tuning was performed."
+}

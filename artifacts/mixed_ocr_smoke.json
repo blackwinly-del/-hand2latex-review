@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-03",
+  "scope": "C-side multimodal experiment only; OCR configuration and public interfaces unchanged",
+  "model": "deepseek-flash",
+  "image_path": "data/handwritten/sample_6.png",
+  "reference_pending_user_confirmation": {
+    "text": "原式",
+    "latex": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt_language": "English",
+      "latency_ms": 2617.012,
+      "result": {
+        "text": "ԭʽ",
+        "latex": "\\lim_{t\\to0}\\frac{t-\\ln(1+t)}{t^2}"
+      },
+      "formula_matches_pending_reference": true,
+      "text_matches_pending_reference": false
+    },
+    {
+      "attempt": 2,
+      "prompt_language": "Chinese with explicit prohibition of pinyin, mojibake, and guessed characters",
+      "latency_ms": 2561.92,
+      "result": {
+        "text": "ԭʽ",
+        "latex": "\\lim_{t\\to 0}\\frac{t-\\ln(1+t)}{t^2}"
+      },
+      "formula_matches_pending_reference": true,
+      "text_matches_pending_reference": false
+    }
+  ],
+  "conclusion": "The formula was transcribed successfully in both experiments, but the Chinese text was garbled identically. Mixed Chinese-formula recognition is not considered supported or validated.",
+  "human_review": "pending"
+}

@@ -1,0 +1,84 @@
+{
+  "case_id": "contiguous_2_3_4",
+  "description": "Three consecutive handwritten content pages.",
+  "page_ids": [
+    "page_2",
+    "page_3",
+    "page_4"
+  ],
+  "additional_api_calls": 1,
+  "cache_hits": 2,
+  "pages": [
+    {
+      "page_id": "page_2",
+      "source_image": "data\\pdf_pages\\page_2.png",
+      "model": "deepseek-flash",
+      "human_review": "required",
+      "status": "success",
+      "latency_ms": 52389.941,
+      "cache_hit": true,
+      "normalized_empty_blank": false,
+      "marker": "10月26号",
+      "expected_blank": false,
+      "blank_page_has_content": null
+    },
+    {
+      "page_id": "page_3",
+      "source_image": "data\\pdf_pages\\page_3.png",
+      "model": "deepseek-flash",
+      "human_review": "required",
+      "status": "success",
+      "latency_ms": 79399.054,
+      "cache_hit": false,
+      "normalized_empty_blank": false,
+      "marker": "3.6.6",
+      "expected_blank": false,
+      "blank_page_has_content": null
+    },
+    {
+      "page_id": "page_4",
+      "source_image": "data\\pdf_pages\\page_4.png",
+      "model": "deepseek-flash",
+      "human_review": "required",
+      "status": "success",
+      "latency_ms": 28766.162,
+      "cache_hit": true,
+      "normalized_empty_blank": false,
+      "marker": "3.6.8",
+      "expected_blank": false,
+      "blank_page_has_content": null
+    }
+  ],
+  "transcription_accuracy": null,
+  "human_review": "required",
+  "status": "compiled",
+  "structural_pass": true,
+  "page_break_count": 2,
+  "expected_page_break_count": 2,
+  "markers": [
+    {
+      "marker": "10月26号",
+      "found_in_expected_segment": true
+    },
+    {
+      "marker": "3.6.6",
+      "found_in_expected_segment": true
+    },
+    {
+      "marker": "3.6.8",
+      "found_in_expected_segment": true
+    }
+  ],
+  "blank_pages_faithful": true,
+  "trailing_blank_pdf_is_blank": null,
+  "compile": {
+    "success": true,
+    "pdf_path": "D:\\latex\\artifacts\\multipage_real\\contiguous_2_3_4\\main.pdf",
+    "log": "note: Running TeX ...\nnote: Rerunning TeX because \"main.aux\" changed ...\nnote: Running xdvipdfmx ...\nnote: Writing `D:\\latex\\artifacts\\multipage_real\\contiguous_2_3_4\\main.pdf` (33.125 KiB)\nnote: Skipped writing 1 intermediate files (use --keep-intermediates to keep them)\nFontconfig error: Cannot load default config file: No such file: (null)\nwarning: accessing absolute path `C:/windows/fonts\\simsun.ttc`; build may not be reproducible in other environments\nwarning: accessing absolute path `C:/windows/fonts\\simkai.ttf`; build may not be reproducible in other environments\nwarning: accessing absolute path `C:/windows/fonts\\simhei.ttf`; build may not be reproducible in other environments\n",
+    "errors": [],
+    "returncode": 0
+  },
+  "pdf_page_count": 4,
+  "source_page_count": 3,
+  "pdf_page_count_note": "A source page may occupy multiple PDF pages when recognized content overflows."
+}

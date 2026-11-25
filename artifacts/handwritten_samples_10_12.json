@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-03",
+  "model": "PP-FormulaNet-L",
+  "sample_count": 3,
+  "review_status": "ground_truth_user_confirmed",
+  "results": [
+    {
+      "sample_id": "sample_10",
+      "image_path": "data/handwritten/sample_10.png",
+      "source_page": "data/pdf_pages/page_2.png",
+      "crop": [165, 275, 430, 335],
+      "ground_truth": "y^{\\prime\\prime\\prime}=\\frac{-24}{(x-1)^{4}}",
+      "human_review": "confirmed_correct",
+      "review_note": "User corrected the transcription on 2026-11-03 by adding the numerator minus sign.",
+      "candidates": [
+        {"engine": "pp_formulanet_l", "latex": "y^{n+1}=\\frac{-3-16}{(x-1)^{4}}", "score": null, "latency_ms": 22684.214, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_11",
+      "image_path": "data/handwritten/sample_11.png",
+      "source_page": "data/pdf_pages/page_2.png",
+      "crop": [170, 600, 540, 655],
+      "ground_truth": "y^{\\prime\\prime}=2^{2}\\sin(2x+\\pi)",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "candidates": [
+        {"engine": "pp_formulanet_l", "latex": "y^{n}=2^{2}\\sin(2x+\\pi)", "score": null, "latency_ms": 13928.959, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_12",
+      "image_path": "data/handwritten/sample_12.png",
+      "source_page": "data/pdf_pages/page_2.png",
+      "crop": [350, 745, 790, 845],
+      "ground_truth": "y=1+\\sin x+\\frac{\\sin^{2}x}{2!}+\\frac{\\sin^{3}x}{3!}+\\cdots",
+      "human_review": "confirmed_correct",
+      "review_note": "User confirmed the transcription on 2026-11-03.",
+      "candidates": [
+        {"engine": "pp_formulanet_l", "latex": "y=1+\\sin x+\\frac{\\sin^{2}x}{21}+\\frac{\\sin^{3}x}{31}+\\cdots-", "score": null, "latency_ms": 14783.762, "error": null}
+      ]
+    }
+  ]
+}

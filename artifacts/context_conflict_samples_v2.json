@@ -1,0 +1,119 @@
+{
+  "date": "2026-11-03",
+  "version": 2,
+  "sample_type": "expanded_constructed_conflicts_from_human_confirmed_transcriptions",
+  "source": "artifacts/handwritten_validation.json",
+  "sample_count": 10,
+  "samples": [
+    {
+      "sample_id": "sample_1_denominator_sign",
+      "image_path": "data/handwritten/sample_1.png",
+      "ground_truth": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 changes the denominator sign.",
+      "candidates": [
+        {"engine": "constructed_incorrect", "latex": "y=x^{2}+x+3+\\frac{4}{(x+1)}", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "human_confirmed", "latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_1_missing_exponent",
+      "image_path": "data/handwritten/sample_1.png",
+      "ground_truth": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "expected_index": 0,
+      "construction_note": "Candidate 1 omits the visible square exponent.",
+      "candidates": [
+        {"engine": "human_confirmed", "latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "constructed_incorrect", "latex": "y=x+x+3+\\frac{4}{(x-1)}", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_1_constant_term",
+      "image_path": "data/handwritten/sample_1.png",
+      "ground_truth": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 changes the constant term from 3 to 8.",
+      "candidates": [
+        {"engine": "constructed_incorrect", "latex": "y=x^{2}+x+8+\\frac{4}{(x-1)}", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "human_confirmed", "latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_1_numerator_coefficient",
+      "image_path": "data/handwritten/sample_1.png",
+      "ground_truth": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "expected_index": 0,
+      "construction_note": "Candidate 1 changes the numerator from 4 to 1.",
+      "candidates": [
+        {"engine": "human_confirmed", "latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "constructed_incorrect", "latex": "y=x^{2}+x+3+\\frac{1}{(x-1)}", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_2_faithful_not_conventional",
+      "image_path": "data/handwritten/sample_2.png",
+      "ground_truth": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+      "expected_index": 0,
+      "construction_note": "Candidate 1 inserts a conventional x after sin but is not the confirmed transcription.",
+      "candidates": [
+        {"engine": "human_confirmed", "latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "constructed_incorrect", "latex": "y^{\\prime}=2\\sin x\\cos x=\\sin2x", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_2_missing_prime",
+      "image_path": "data/handwritten/sample_2.png",
+      "ground_truth": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 omits the prime on y.",
+      "candidates": [
+        {"engine": "constructed_incorrect", "latex": "y=2\\sin\\cos x=\\sin2x", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "human_confirmed", "latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_2_sin_squared",
+      "image_path": "data/handwritten/sample_2.png",
+      "ground_truth": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+      "expected_index": 0,
+      "construction_note": "Candidate 1 changes sin2x into sin squared x.",
+      "candidates": [
+        {"engine": "human_confirmed", "latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "constructed_incorrect", "latex": "y^{\\prime}=2\\sin\\cos x=\\sin^{2}x", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_3_faithful_not_structural_repair",
+      "image_path": "data/handwritten/sample_3.png",
+      "ground_truth": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 adds an outer parenthesis absent from the confirmed transcription; the faithful candidate must still trigger structural review.",
+      "candidates": [
+        {"engine": "constructed_incorrect", "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2}))}{x^{2}}", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "human_confirmed", "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_3_limit_target",
+      "image_path": "data/handwritten/sample_3.png",
+      "ground_truth": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+      "expected_index": 0,
+      "construction_note": "Candidate 1 changes the limit target from 0 to 1.",
+      "candidates": [
+        {"engine": "human_confirmed", "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "constructed_incorrect", "latex": "(2)\\lim\\limits_{x\\rightarrow1}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}", "score": null, "latency_ms": 0, "error": null}
+      ]
+    },
+    {
+      "sample_id": "sample_3_coefficient",
+      "image_path": "data/handwritten/sample_3.png",
+      "ground_truth": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+      "expected_index": 1,
+      "construction_note": "Candidate 0 changes the first coefficient from 1/4 to 1/2.",
+      "candidates": [
+        {"engine": "constructed_incorrect", "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{2}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}", "score": null, "latency_ms": 0, "error": null},
+        {"engine": "human_confirmed", "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}", "score": null, "latency_ms": 0, "error": null}
+      ]
+    }
+  ]
+}

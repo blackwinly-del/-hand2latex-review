@@ -1,0 +1,286 @@
+{
+  "sample_count": 12,
+  "environment": {
+    "python": "3.12.7",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "recognizer_backend": "paddle",
+    "recognizer_device": "gpu:0",
+    "recognizer_model": "PP-FormulaNet-L"
+  },
+  "summary": {
+    "sample_count": 12,
+    "raw_correct_count": 5,
+    "final_correct_count": 5,
+    "erroneous_rewrite_count": 0,
+    "review_count": 1,
+    "intercepted_error_count": 0,
+    "missed_error_count": 7,
+    "correct_final_review_count": 1,
+    "raw_exact_accuracy": 0.4166666666666667,
+    "final_exact_accuracy": 0.4166666666666667,
+    "erroneous_rewrite_rate": 0.0,
+    "error_interception_rate": 0.0,
+    "correct_final_review_rate": 0.2,
+    "renderable_rate": null,
+    "human_review_rate": 0.08333333333333333,
+    "refine_latency_ms": {
+      "median": 427.8,
+      "p95": 19643.8
+    }
+  },
+  "results": [
+    {
+      "sample_id": "sample_1",
+      "image_path": "data/handwritten/sample_1.png",
+      "ground_truth": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+          "score": null,
+          "latency_ms": 19643.8,
+          "error": null
+        }
+      ],
+      "raw_latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "final_latex": "y=x^{2}+x+3+\\frac{4}{(x-1)}",
+      "raw_correct": true,
+      "final_correct": true,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    },
+    {
+      "sample_id": "sample_2",
+      "image_path": "data/handwritten/sample_2.png",
+      "ground_truth": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+          "score": null,
+          "latency_ms": 309.4,
+          "error": null
+        }
+      ],
+      "raw_latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+      "final_latex": "y^{\\prime}=2\\sin\\cos x=\\sin2x",
+      "raw_correct": true,
+      "final_correct": true,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    },
+    {
+      "sample_id": "sample_3",
+      "image_path": "data/handwritten/sample_3.png",
+      "ground_truth": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+          "score": null,
+          "latency_ms": 922.1,
+          "error": null
+        }
+      ],
+      "raw_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+      "final_latex": "(2)\\lim\\limits_{x\\rightarrow0}\\frac{1+\\frac{1}{4}x^{2}+o(x^{2})-(1-\\frac{1}{4}x^{2}+o(x^{2})}{x^{2}}",
+      "raw_correct": true,
+      "final_correct": true,
+      "confidence": "low",
+      "need_review": true,
+      "error": null
+    },
+    {
+      "sample_id": "sample_4",
+      "image_path": "data/handwritten/sample_4.png",
+      "ground_truth": "x^{3}-x^{2}+x^{2}+x-x+3x-3+4",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "x^{3}-x^{2}+x^{2}+x-x+3x-3+4",
+          "score": null,
+          "latency_ms": 429.3,
+          "error": null
+        }
+      ],
+      "raw_latex": "x^{3}-x^{2}+x^{2}+x-x+3x-3+4",
+      "final_latex": "x^{3}-x^{2}+x^{2}+x-x+3x-3+4",
+      "raw_correct": true,
+      "final_correct": true,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    },
+    {
+      "sample_id": "sample_5",
+      "image_path": "data/handwritten/sample_5.png",
+      "ground_truth": "y^{\\prime\\prime}=2+\\frac{8}{(x-1)^{3}}",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y^{\\prime\\prime}=2+\\frac{8}{(x-1)^{3}}",
+          "score": null,
+          "latency_ms": 413.7,
+          "error": null
+        }
+      ],
+      "raw_latex": "y^{\\prime\\prime}=2+\\frac{8}{(x-1)^{3}}",
+      "final_latex": "y^{\\prime\\prime}=2+\\frac{8}{(x-1)^{3}}",
+      "raw_correct": true,
+      "final_correct": true,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    },
+    {
+      "sample_id": "sample_6",
+      "image_path": "data/handwritten/sample_6.png",
+      "ground_truth": "\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "(3)\\sqrt{\\frac{1}{n}}+1=\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+          "score": null,
+          "latency_ms": 620.1,
+          "error": null
+        }
+      ],
+      "raw_latex": "(3)\\sqrt{\\frac{1}{n}}+1=\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+      "final_latex": "(3)\\sqrt{\\frac{1}{n}}+1=\\lim\\limits_{t\\rightarrow0}\\frac{t-\\ln(1+t)}{t^{2}}",
+      "raw_correct": false,
+      "final_correct": false,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    },
+    {
+      "sample_id": "sample_7",
+      "image_path": "data/handwritten/sample_7.png",
+      "ground_truth": "y^{(n)}=\\frac{4(-1)^{n}\\cdot n!}{(x-1)^{n+1}}",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y^{(n)}=\\frac{(x-1)^{n}\\cdot n!}{(x-1)^{n+1}}",
+          "score": null,
+          "latency_ms": 511.1,
+          "error": null
+        }
+      ],
+      "raw_latex": "y^{(n)}=\\frac{(x-1)^{n}\\cdot n!}{(x-1)^{n+1}}",
+      "final_latex": "y^{(n)}=\\frac{(x-1)^{n}\\cdot n!}{(x-1)^{n+1}}",
+      "raw_correct": false,
+      "final_correct": false,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    },
+    {
+      "sample_id": "sample_8",
+      "image_path": "data/handwritten/sample_8.png",
+      "ground_truth": "y^{\\prime\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y^{\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+          "score": null,
+          "latency_ms": 401.5,
+          "error": null
+        }
+      ],
+      "raw_latex": "y^{\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+      "final_latex": "y^{\\prime}=2\\cdot\\sin(2x+\\frac{\\pi}{2})",
+      "raw_correct": false,
+      "final_correct": false,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    },
+    {
+      "sample_id": "sample_9",
+      "image_path": "data/handwritten/sample_9.png",
+      "ground_truth": "=1+x+\\frac{1}{2}x^{2}+o(x^{3})",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "=1+x+\\frac{1}{2}x^{2}+0(x^{3})",
+          "score": null,
+          "latency_ms": 413.1,
+          "error": null
+        }
+      ],
+      "raw_latex": "=1+x+\\frac{1}{2}x^{2}+0(x^{3})",
+      "final_latex": "=1+x+\\frac{1}{2}x^{2}+0(x^{3})",
+      "raw_correct": false,
+      "final_correct": false,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    },
+    {
+      "sample_id": "sample_10",
+      "image_path": "data/handwritten/sample_10.png",
+      "ground_truth": "y^{\\prime\\prime\\prime}=\\frac{-24}{(x-1)^{4}}",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y^{n+1}=\\frac{-3-16}{(x-1)^{4}}",
+          "score": null,
+          "latency_ms": 426.3,
+          "error": null
+        }
+      ],
+      "raw_latex": "y^{n+1}=\\frac{-3-16}{(x-1)^{4}}",
+      "final_latex": "y^{n+1}=\\frac{-3-16}{(x-1)^{4}}",
+      "raw_correct": false,
+      "final_correct": false,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    },
+    {
+      "sample_id": "sample_11",
+      "image_path": "data/handwritten/sample_11.png",
+      "ground_truth": "y^{\\prime\\prime}=2^{2}\\sin(2x+\\pi)",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y^{n}=2^{2}\\sin(2x+\\pi)",
+          "score": null,
+          "latency_ms": 334.5,
+          "error": null
+        }
+      ],
+      "raw_latex": "y^{n}=2^{2}\\sin(2x+\\pi)",
+      "final_latex": "y^{n}=2^{2}\\sin(2x+\\pi)",
+      "raw_correct": false,
+      "final_correct": false,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    },
+    {
+      "sample_id": "sample_12",
+      "image_path": "data/handwritten/sample_12.png",
+      "ground_truth": "y=1+\\sin x+\\frac{\\sin^{2}x}{2!}+\\frac{\\sin^{3}x}{3!}+\\cdots",
+      "candidates": [
+        {
+          "engine": "pp_formulanet_l",
+          "latex": "y=1+\\sin x+\\frac{\\sin^{2}x}{21}+\\frac{\\sin^{3}x}{31}+\\cdots-",
+          "score": null,
+          "latency_ms": 575.2,
+          "error": null
+        }
+      ],
+      "raw_latex": "y=1+\\sin x+\\frac{\\sin^{2}x}{21}+\\frac{\\sin^{3}x}{31}+\\cdots-",
+      "final_latex": "y=1+\\sin x+\\frac{\\sin^{2}x}{21}+\\frac{\\sin^{3}x}{31}+\\cdots-",
+      "raw_correct": false,
+      "final_correct": false,
+      "confidence": "medium",
+      "need_review": false,
+      "error": null
+    }
+  ],
+  "elapsed_seconds": 25.114
+}
