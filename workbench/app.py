@@ -440,6 +440,16 @@ class ApplyFixRequest(BaseModel):
     summary: str = ""
 
 
+class ReviewRequest(BaseModel):
+    """复核状态：page -> 是否已核对。
+
+    page 用字符串键（JSON 对象的键本来就是字符串），值只接受布尔。
+    允许一次提交多页，因为前端是整份状态一起存的；也允许只传一页。
+    """
+
+    pages: dict[str, bool]
+
+
 def _write_main_tex(directory: Path, tex: str) -> None:
     if len(tex) > _MAX_TEX_CHARS:
         raise HTTPException(status_code=400, detail="tex 内容过长")
@@ -468,6 +478,10 @@ def _public_compile(result: dict, job_id: str) -> dict:
         "log": result["log"],
         "errors": result["errors"],
         "returncode": result["returncode"],
+        # 结构化诊断：带行号、上下文片段、缺字码位。
+        # errors 保持原样不动（老前端、老测试都按 line/message 两键断言过），
+        # 新字段只做增量，前端读到就用、读不到就回退到扫 log。
+        "diagnostics": result.get("diagnostics", []),
         "pdf_url": f"/api/jobs/{job_id}/pdf" if result["success"] else None,
     }
 
@@ -491,6 +505,18 @@ def _has_figure_blocks(directory: Path) -> bool:
     return False
 
 
+def _read_job_json(directory: Path) -> dict:
+    """读 job.json 原始内容；不存在或坏了都返回空 dict（不抛异常）。"""
+    path = directory / "job.json"
+    if not path.is_file():
+        return {}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
 def _store_job_metadata(
     directory: Path,
     title: str,
@@ -508,6 +534,15 @@ def _store_job_metadata(
     }
     if failures:
         metadata["failed_pages"] = failures
+    # 复核进度必须原地保留。这个函数是"整份重写 job.json"，而重试单页
+    # （/retry）、图形页换原图（/figures/use-source）都会再调一次。如果不
+    # 把用户已经标过的页面搬回来，用户核对到第 8 页、去重试一个失败页，
+    # 回来发现 8 个对勾全没了——这是比"没保存"更让人恼火的行为。
+    previous = _read_job_json(directory)
+    if previous and isinstance(previous.get("reviewed_pages"), dict):
+        metadata["reviewed_pages"] = previous["reviewed_pages"]
+        if previous.get("reviewed_updated_at"):
+            metadata["reviewed_updated_at"] = previous["reviewed_updated_at"]
     (directory / "job.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -596,6 +631,7 @@ def _stored_compile(directory: Path, job_id: str) -> dict:
             "log": "该任务早于编译记录保存，未重新编译；需要最新警告请点“重新排版”。",
             "errors": [],
             "returncode": 0,
+            "diagnostics": [],
             "pdf_url": f"/api/jobs/{job_id}/pdf",
         }
     result = compile_tex(directory / "main.tex")
@@ -627,6 +663,15 @@ def _job_payload(
     }
     if failures:
         payload["failed_pages"] = failures
+    # 复核进度跟任务一起返回，前端打开任务就能恢复对勾，不必等额外一次请求。
+    # 没有这个字段时返回空对象（不是 null），前端可以直接展开而不用判空。
+    stored = _read_job_json(directory)
+    reviewed = stored.get("reviewed_pages")
+    if isinstance(reviewed, dict):
+        payload["reviewed_pages"] = {str(page): True for page in reviewed if str(page).strip()}
+        payload["reviewed_updated_at"] = stored.get("reviewed_updated_at")
+    else:
+        payload["reviewed_pages"] = {}
     return payload
 
 
@@ -969,6 +1014,71 @@ def get_job(job_id: str) -> dict:
         failures=metadata.get("failed_pages"),
         has_figures=metadata.get("has_figures", False),
     )
+
+
+@app.post("/api/jobs/{job_id}/review")
+def save_review_state(job_id: str, request: ReviewRequest) -> dict:
+    """保存"哪几页已经对照原图核对过"。
+
+    为什么必须存在服务端：原先这份状态只写在浏览器 localStorage 里
+    （前端 `hand2latex:reviewed:<id>`）。做多页笔记的人是"今天核对 8 页、
+    明天接着核剩下 2 页"，但换一台机器、换一个浏览器、或者清一次缓存，
+    对勾就全没了，而且没有任何提示。任务本身在服务端，进度却在浏览器，
+    这个状态的寿命比它描述的东西还短，是不合理的。
+
+    写入仍然保留 localStorage：断网或后端是旧版时，前端还能退回到本机记录，
+    不会因为接口 404 就把界面卡住。
+    """
+    directory = _job_dir(job_id)
+    # 与 apply-fix / restore-history / retry 等写接口共用同一把每任务锁：
+    # 它们都会整份重写 job.json，不串起来的话，复核提交可能把刚写好的
+    # pages 列表顶掉，或者反过来被顶掉。
+    with _job_write_lock(job_id):
+        metadata = _read_job_json(directory)
+        reviewed = metadata.get("reviewed_pages")
+        if not isinstance(reviewed, dict):
+            reviewed = {}
+        page_count = metadata.get("page_count")
+        changed = 0
+        for raw_page, raw_value in request.pages.items():
+            try:
+                page = int(str(raw_page).strip())
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail=f"页号不合法：{raw_page}") from None
+            if page < 1:
+                raise HTTPException(status_code=400, detail=f"页号不合法：{raw_page}")
+            # 页号落在任务实际页数之外说明前端状态串了（比如换了任务没清干净）。
+            # 直接拒掉，避免 job.json 里积累一堆不存在的页号。
+            if isinstance(page_count, int) and page_count >= 1 and page > page_count:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"页号超出范围：第 {page} 页，本任务共 {page_count} 页",
+                )
+            key = str(page)
+            # 只存 True。没核对的页直接删掉键，而不是存 false——这样 job.json
+            # 里只留真正核对过的页，看文件就知道进度，也不会随页数无限增长。
+            if raw_value:
+                if reviewed.get(key) is not True:
+                    reviewed[key] = True
+                    changed += 1
+            elif key in reviewed:
+                del reviewed[key]
+                changed += 1
+        metadata["reviewed_pages"] = reviewed
+        if changed:
+            metadata["reviewed_updated_at"] = datetime.now(tz=timezone.utc).isoformat()
+            (directory / "job.json").write_text(
+                json.dumps(metadata, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+    pages = sorted(int(key) for key in reviewed)
+    return {
+        "job_id": job_id,
+        "reviewed_pages": {str(page): True for page in pages},
+        "reviewed_count": len(pages),
+        "changed": changed,
+        "updated_at": metadata.get("reviewed_updated_at"),
+    }
 
 
 def _source_paths(directory: Path) -> list[Path]:

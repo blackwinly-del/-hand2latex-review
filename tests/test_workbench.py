@@ -7,7 +7,12 @@ from unittest.mock import patch
 
 import pymupdf
 
-from workbench.compiler import _find_tectonic, compile_tex, parse_compile_errors
+from workbench.compiler import (
+    _find_tectonic,
+    compile_tex,
+    parse_compile_diagnostics,
+    parse_compile_errors,
+)
 from workbench.full_page import (
     _PageResponseError,
     _call_page_model,
@@ -396,6 +401,132 @@ class TectonicCompilerTests(unittest.TestCase):
     def test_parse_compile_error_formats(self):
         log = "main.tex:7: Undefined control sequence\nerror: at line 9: missing brace"
         self.assertEqual(parse_compile_errors(log)[0], {"line": 7, "message": "Undefined control sequence"})
+
+
+# 下面这些日志片段是从真实 Tectonic 输出里原样摘出来的（Windows, tectonic 0.17.0），
+# 不是手写的"应该是这样"。手写夹具很容易把格式写成自己以为的样子，
+# 然后解析器测过了、真实编译还是解析不出东西。
+_REAL_UNDEFINED_LOG = """note: Running TeX ...
+Fontconfig error: Cannot load default config file: No such file: (null)
+error: a.tex:4: Undefined control sequence
+error: something bad happened inside XeTeX; its output follows:
+
+===============================================================================
+(a.tex
+LaTeX2e <2021-11-15> patch level 1
+(article.cls
+Document Class: article 2021/10/04 v1.4n Standard LaTeX document class
+(size10.clo))
+No file a.aux.
+(ts1cmr.fd)
+! Undefined control sequence.
+l.4 This line has \\undefinedcmd
+                                here.
+No pages of output.
+===============================================================================
+error: the XeTeX engine had an unrecoverable error
+"""
+
+# 缺字警告：注意 "warning: b.tex:4: " 冒号后面**是空的**，真正原因在下一行；
+# 而且由于 rerun，同一条警告会出现两遍。
+_REAL_MISSING_CHAR_LOG = """warning: b.tex:4: 
+Missing character: There is no \ufffd\ufffd (U+20BB7) in font [lmroman10-regular]:mapping=tex-text;!
+warning: could not represent character "\u5c71" (0x20bb7) in font "[lmroman10-regular]:mapping=tex-text;"
+warning:   you may need to load the `fontspec` package and use (e.g.) \\setmainfont to
+warning:   choose a different font that covers the unrepresentable character(s)
+note: Rerunning TeX because "b.aux" changed ...
+warning: b.tex:4: 
+Missing character: There is no \ufffd\ufffd (U+20BB7) in font [lmroman10-regular]:mapping=tex-text;!
+warning: could not represent character "\u5c71" (0x20bb7) in font "[lmroman10-regular]:mapping=tex-text;"
+"""
+
+
+class CompileDiagnosticsTests(unittest.TestCase):
+    def test_error_carries_source_snippet_and_context(self):
+        tex = "\\documentclass{article}\n\\begin{document}\nHello.\nThis has \\undefinedcmd here.\n\\end{document}"
+        diags = parse_compile_diagnostics(_REAL_UNDEFINED_LOG, tex, main_name="a.tex")
+        errors = [d for d in diags if d["severity"] == "error"]
+        self.assertTrue(errors, diags)
+        first = errors[0]
+        self.assertEqual(first["message"], "Undefined control sequence")
+        self.assertEqual(first["line"], 4)
+        self.assertEqual(first["snippet"], "This line has \\undefinedcmd")
+        # 上下文要把目标行和前后行都带上，前端才能直接显示"错在哪一行"
+        self.assertEqual([c["line"] for c in first["context"]], [2, 3, 4, 5])
+        self.assertEqual([c["line"] for c in first["context"] if c["is_target"]], [4])
+
+    def test_bang_block_is_not_reported_twice(self):
+        """引擎的 "! Undefined control sequence." 与 error: 行是同一件事。"""
+        tex = "\\begin{document}\nx\nl4\nThis has \\undefinedcmd here.\n\\end{document}"
+        diags = parse_compile_diagnostics(_REAL_UNDEFINED_LOG, tex, main_name="a.tex")
+        undefined = [d for d in diags if "Undefined control sequence" in d["message"]]
+        self.assertEqual(len(undefined), 1, undefined)
+
+    def test_missing_character_warning_is_structured(self):
+        """warning 类问题进不了 errors，但必须能被结构化拿到。
+
+        这正是原来的缺口：PDF 生成成功（rc=0），符号却悄悄变成空白，
+        parse_compile_errors 返回空列表，用户完全不知道哪里少了字。
+        """
+        self.assertEqual(parse_compile_errors(_REAL_MISSING_CHAR_LOG), [])
+        tex = "\\begin{document}\nok\nx\nSymbol here: 山 and more.\n\\end{document}"
+        diags = parse_compile_diagnostics(_REAL_MISSING_CHAR_LOG, tex)
+        glyphs = [d for d in diags if "Missing character" in d["message"]]
+        # rerun 打了两遍，必须去重成一条
+        self.assertEqual(len(glyphs), 1, glyphs)
+        self.assertEqual(glyphs[0]["severity"], "warning")
+        self.assertEqual(glyphs[0]["line"], 4)
+        self.assertEqual(glyphs[0]["code"], "20BB7")
+
+    def test_unprintable_character_is_replaced_with_readable_text(self):
+        """日志里那个字符本身是 U+FFFD，原样透出去用户没法读。"""
+        diags = parse_compile_diagnostics(_REAL_MISSING_CHAR_LOG, "a\nb\nc\nd\ne")
+        message = diags[0]["message"]
+        self.assertNotIn("\ufffd", message)
+        self.assertIn("20BB7", message)
+
+    def test_subfile_line_is_not_offered_as_main_tex_line(self):
+        """子文件的行号是相对的，直接拿去跳 main.tex 会跳错位置。"""
+        log = "warning: page_1:1: Missing character: There is no x (U+4E00) in font f;!"
+        tex = "\\documentclass{article}\n\\begin{document}\n\\input{page_1}\n\\end{document}"
+        diags = parse_compile_diagnostics(log, tex, main_name="main.tex")
+        self.assertEqual(diags[0]["file"], "page_1")
+        self.assertEqual(diags[0]["located_by"], "subfile")
+
+    def test_errors_are_returned_before_a_flood_of_warnings(self):
+        """缺字警告是逐字符一条的，不能把真正的语法错误挤掉。"""
+        warnings = "".join(
+            f"warning: main.tex:{n}: Missing character: There is no x (U+{0x4E00 + n:04X}) in font f;!\n"
+            for n in range(1, 120)
+        )
+        log = warnings + "error: main.tex:99: Undefined control sequence\n"
+        diags = parse_compile_diagnostics(log, None, main_name="main.tex")
+        self.assertEqual(diags[0]["severity"], "error")
+        self.assertEqual(diags[0]["line"], 99)
+
+    def test_empty_log_yields_no_diagnostics(self):
+        self.assertEqual(parse_compile_diagnostics("", "\\begin{document}\\end{document}"), [])
+
+    def test_compile_tex_attaches_diagnostics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tex_path = Path(directory) / "main.tex"
+            tex_path.write_text("\\documentclass{article}\n\\begin{document}\n\\undefinedcmd\n\\end{document}", encoding="utf-8")
+            if _find_tectonic() is None:
+                self.skipTest("本机没有 tectonic，跳过真实编译")
+            result = compile_tex(tex_path)
+            self.assertIn("diagnostics", result)
+            self.assertTrue(result["diagnostics"], result["log"])
+            self.assertEqual(result["diagnostics"][0]["severity"], "error")
+
+    def test_include_diagnostics_can_be_turned_off(self):
+        """不需要诊断时不该为了它多读一遍 tex、多跑一遍解析。"""
+        with tempfile.TemporaryDirectory() as directory:
+            tex_path = Path(directory) / "main.tex"
+            tex_path.write_text("\\documentclass{article}\n\\begin{document}\nok\n\\end{document}", encoding="utf-8")
+            if _find_tectonic() is None:
+                self.skipTest("本机没有 tectonic，跳过真实编译")
+            result = compile_tex(tex_path, include_diagnostics=False)
+            self.assertNotIn("diagnostics", result)
 
 
 class TectonicLocatorTests(unittest.TestCase):

@@ -12,7 +12,16 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from workbench.app import _JOBS_ROOT, _PROJECT_ROOT, _build_info, _job_metadata, _python_runtime, _tectonic_status, app
+from workbench.app import (
+    _JOBS_ROOT,
+    _PROJECT_ROOT,
+    _build_info,
+    _job_metadata,
+    _python_runtime,
+    _store_job_metadata,
+    _tectonic_status,
+    app,
+)
 from workbench.version import VERSION
 
 
@@ -563,6 +572,99 @@ class WorkbenchAppTests(unittest.TestCase):
             self.assertTrue(metadata["has_figures"])
         finally:
             shutil.rmtree(directory, ignore_errors=True)
+
+    def test_review_state_is_persisted_to_job_json(self):
+        """核对进度必须存在服务端，不能只活在浏览器里。
+
+        原先只有 localStorage：换机器、换浏览器、清缓存就全没了，而且没有提示。
+        做多页笔记的人是"今天核 8 页、明天续"，进度的寿命不该比任务还短。
+        """
+        job_id = uuid.uuid4().hex
+        directory = _JOBS_ROOT / job_id
+        directory.mkdir(parents=True)
+        (directory / "main.tex").write_text("\\documentclass{article}\n\\begin{document}\nx\n\\end{document}", encoding="utf-8")
+        (directory / "job.json").write_text(
+            json.dumps({"title": "多页笔记", "page_count": 3, "pages": [], "has_figures": False}),
+            encoding="utf-8",
+        )
+
+        response = self.client.post(f"/api/jobs/{job_id}/review", json={"pages": {"1": True, "2": True}})
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["reviewed_count"], 2)
+        self.assertEqual(body["changed"], 2)
+
+        stored = json.loads((directory / "job.json").read_text(encoding="utf-8"))
+        self.assertEqual(stored["reviewed_pages"], {"1": True, "2": True})
+        self.assertIn("reviewed_updated_at", stored)
+
+        # 取消勾选要把键删掉，而不是留一个 false——
+        # 这样 job.json 里只看键就知道核到第几页，也不会随页数无限增长。
+        response = self.client.post(f"/api/jobs/{job_id}/review", json={"pages": {"2": False}})
+        self.assertEqual(response.status_code, 200, response.text)
+        stored = json.loads((directory / "job.json").read_text(encoding="utf-8"))
+        self.assertEqual(stored["reviewed_pages"], {"1": True})
+
+        # 打开任务时要把进度一起带回来，前端才不用额外发请求
+        detail = self.client.get(f"/api/jobs/{job_id}")
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()["reviewed_pages"], {"1": True})
+
+    def test_review_rejects_page_out_of_range(self):
+        """页号超出实际页数说明前端状态串了，不能悄悄写进 job.json。"""
+        job_id = uuid.uuid4().hex
+        directory = _JOBS_ROOT / job_id
+        directory.mkdir(parents=True)
+        (directory / "main.tex").write_text("\\documentclass{article}\n\\begin{document}\nx\n\\end{document}", encoding="utf-8")
+        (directory / "job.json").write_text(
+            json.dumps({"title": "两页", "page_count": 2, "pages": [], "has_figures": False}),
+            encoding="utf-8",
+        )
+        response = self.client.post(f"/api/jobs/{job_id}/review", json={"pages": {"9": True}})
+        self.assertEqual(response.status_code, 400)
+        stored = json.loads((directory / "job.json").read_text(encoding="utf-8"))
+        self.assertEqual(stored.get("reviewed_pages"), None)
+
+    def test_review_survives_metadata_rewrite(self):
+        """重试单页 / 图形页换原图会整份重写 job.json，进度不能被抹掉。
+
+        用户核对到第 8 页、去重试一个失败页，回来发现对勾全没了——
+        这比"没保存"更让人恼火。
+        """
+        job_id = uuid.uuid4().hex
+        directory = _JOBS_ROOT / job_id
+        directory.mkdir(parents=True)
+        (directory / "main.tex").write_text("\\documentclass{article}\n\\begin{document}\nx\n\\end{document}", encoding="utf-8")
+        (directory / "job.json").write_text(
+            json.dumps({
+                "title": "续核", "page_count": 3, "pages": [], "has_figures": False,
+                "reviewed_pages": {"1": True, "2": True},
+                "reviewed_updated_at": "2026-01-01T00:00:00+00:00",
+            }),
+            encoding="utf-8",
+        )
+        _store_job_metadata(directory, "续核", 3, [{"page": 1}], [], has_figures=False)
+        stored = json.loads((directory / "job.json").read_text(encoding="utf-8"))
+        self.assertEqual(stored["reviewed_pages"], {"1": True, "2": True})
+        self.assertEqual(stored["reviewed_updated_at"], "2026-01-01T00:00:00+00:00")
+
+    def test_review_on_missing_job_returns_404(self):
+        response = self.client.post(f"/api/jobs/{uuid.uuid4().hex}/review", json={"pages": {"1": True}})
+        self.assertEqual(response.status_code, 404)
+
+    def test_compile_payload_exposes_diagnostics(self):
+        """compile 接口要带上结构化诊断，前端才有行号和上下文可用。"""
+        job_id = uuid.uuid4().hex
+        directory = _JOBS_ROOT / job_id
+        directory.mkdir(parents=True)
+        (directory / "main.tex").write_text("\\documentclass{article}\n\\begin{document}\nx\n\\end{document}", encoding="utf-8")
+        (directory / "job.json").write_text(
+            json.dumps({"title": "诊断", "page_count": 1, "pages": [], "has_figures": False}),
+            encoding="utf-8",
+        )
+        detail = self.client.get(f"/api/jobs/{job_id}")
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertIn("diagnostics", detail.json()["compile"])
 
     def test_job_list_supports_search_and_pagination(self):
         directories = []

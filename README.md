@@ -340,6 +340,53 @@ PDF），红色是直接退出并给出修复命令。端口被占用时它会�
 | `POST /api/jobs/{job_id}/compile` | 手工改完 TeX 后重新编译 |
 | `POST /api/jobs/{job_id}/suggest-fix` | 让模型给出针对某个错误片段的修改建议 |
 | `POST /api/jobs/{job_id}/apply-fix` | 人工确认后应用建议（建议过期返回 HTTP 409） |
+| `POST /api/jobs/{job_id}/review` | 保存「哪几页已对照原图核对过」，写进 `job.json` 的 `reviewed_pages` |
+
+`/review` 这个接口是 2026-11-25 加的。此前核对进度只存在浏览器 localStorage
+（键名 `hand2latex:reviewed:<job_id>`），换机器、换浏览器、清一次缓存就全没了，
+而且不会有任何提示。任务在服务端、进度在浏览器，这个状态的寿命比它描述的东西
+还短——做多页笔记的人是"今天核 8 页、明天接着核剩下 2 页"，本来就不该受这个限制。
+
+接口细节：请求体 `{"pages": {"1": true, "2": false}}`；只存 `true` 的页，
+传 `false` 是删除该页的键（这样 `job.json` 里只看键就知道进度，不会随页数增长）；
+页号超出该任务实际页数返回 400（说明前端状态串了，不能悄悄写进去）；
+写操作与 `apply-fix`、`restore-history`、`retry` 共用每任务写锁，因为这些接口
+都会整份重写 `job.json`。`GET /api/jobs/{job_id}` 会一并返回 `reviewed_pages`。
+
+浏览器里的 localStorage 仍然保留：断网或后端是旧版时，界面还能用本机记录，
+不会因为接口不可用就卡住。打开任务时以服务端为准，服务端没有记录才退回本机缓存
+（不做并集——本机多出来的那几个对勾其实没保存，并进去会让用户以为续得上）。
+
+**编译诊断（`compile.diagnostics`）**：`POST /compile`、`GET /api/jobs/{id}` 的
+`compile` 里新增这个数组，每条含 `severity`、`line`、`message`、`file`、`snippet`、
+`code`、`codes`、`hint`、`located_by`、`context`（出错行前后各两行源码）。
+老的 `errors` 字段保持原样不动，前端读到 `diagnostics` 就用、读不到就退回扫日志。
+
+这个字段解决的是三件具体的事，都是实测出来的：
+
+1. **warning 类问题原来一条都进不了 `errors`**。`parse_compile_errors` 的正则带
+   `(?!warning:)`，而 `Missing character`（符号在当前字体里不存在）是 warning、
+   返回码 0、PDF 照常生成——页面看着正常，某个符号悄悄变成空白。这是最需要提示
+   用户去核对的一类问题，却完全不在返回结果里。
+2. **消息体经常在下一行**。实测日志长这样：
+
+   ```
+   warning: b.tex:4: 
+   Missing character: There is no ... (U+20BB7) in font ...;!
+   ```
+
+   冒号后面是空的，真正原因在下一行。只按行做正则会拿到空消息，用户看到一行
+   没有任何信息的红字。
+3. **同一条警告因 rerun 打两遍，同一行多个缺字各打一条**。前者按内容去重；
+   后者合并成一条「这一行有 N 个字符在当前字体里不存在：U+8FD9、U+91CC……」——
+   实测一页中文能出十几条几乎一样的信息，排成一列完全分不清哪条是哪条。
+   合并只对 warning 做，error 一条都不合并（每条的成因不同，合并会抹掉信息）。
+
+行号来源分三种，`located_by` 会标出来：`snippet`（用引擎回显的源码片段在
+`main.tex` 里唯一反查到的）、`reported`（编译器直接给的）、`subfile`（子文件
+里的相对行号）。第三种不能拿去跳转——多页任务会把每页写成 `page_N.tex` 再
+`\input` 进来，`page_1:2` 的 `2` 是子文件的第 2 行，按它跳 `main.tex` 会跳到
+完全无关的位置（通常是第 2 行的 `\documentclass`）。
 
 一次上传消耗的 API 量不小（每页一次整页识别），演示前先确认账户余额。
 
@@ -587,6 +634,32 @@ FULLPAGE_MAX_TOKENS=40000 FULLPAGE_TIMEOUT_SECONDS=300 \
 
 结构通过仍然**不等于转录正确**，本次 `transcription_accuracy` 依旧是
 `not_evaluated_without_full_page_truth`，识别出的中文与公式需要人工对原图核对。
+
+**整页真值（2026-11-25 新增，正在等人工核对）**：上面说的"没有整页真值"这件事
+已经动工了。`data/pdf_pages_ground_truth.json` 里放了 `page_2`–`page_5` 四页的
+逐行转录草稿，评估器是 `workbench/full_page_eval.py`：
+
+```bash
+python -m workbench.full_page_eval            # 只看门禁状态，不算准确率
+```
+
+**现在跑它只会告诉你"还不能算"，不会给你一个数字——这是故意的。**
+
+草稿是模型读图写出来的。手写整页转录的错误往往成体系（同一个字总被认错、
+`\frac` 的分子分母总对调），而模型读图时会和它自己的转录犯**同样的错**。
+拿这种草稿当真值去评，两边一起错，准确率会显示 100%，而实际是错的。
+这比没有指标更危险：它给的是一个看起来很好的假数字。
+
+所以评估器里有一条硬门禁：`review_status` 不是 `user_confirmed` 就直接抛
+`GroundTruthNotConfirmed`，退出码 2。要让它开始工作，需要有人对着原图
+把 `page_2`–`page_5` 的 `lines` 逐行核对、清空 `uncertainty`、把
+`human_review` 改成 `confirmed`，最后把顶层 `review_status` 改成
+`user_confirmed`。草稿里已经标出了每页读不准的位置（每页 2–4 处），
+核对时优先看那些。
+
+补这张真值表之后要改的地方：`tests/test_full_page_eval.py` 里
+`test_real_manifest_is_currently_unconfirmed` 会失败——那时不要改测试迁就现状，
+把它改成断言 `confirmed`，并同步更新本节文字。
 
 ### 9.2 单张手写公式真值与实测准确率（2026-11-20）
 

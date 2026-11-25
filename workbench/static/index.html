@@ -366,6 +366,23 @@
     .issue .where { font-size: 11.5px; font-weight: 800; color: var(--danger); margin-bottom: 3px; }
     .issue.warn .where { color: var(--warn); }
     .issue .plain { font-size: 12.5px; line-height: 1.65; color: var(--ink-2); }
+    /* 出错行前后几行源码：让用户不用翻回编辑器就能看出是哪个字符、哪条命令。
+       目标行加左侧竖条和底色，和上下文区分开。 */
+    .issue .ctx {
+      margin-top: 6px; padding: 5px 0; border-radius: 6px;
+      background: rgba(255,255,255,.62); border: 1px solid rgba(0,0,0,.06);
+      font: 11px/1.6 Consolas, monospace; overflow-x: auto; white-space: pre;
+    }
+    .issue .ctx > div { padding: 0 8px 0 6px; color: var(--ink-2); }
+    .issue .ctx > div.hit {
+      background: var(--danger-soft); box-shadow: inset 3px 0 0 var(--danger);
+      color: var(--ink); font-weight: 700;
+    }
+    .issue.warn .ctx > div.hit { background: var(--warn-soft); box-shadow: inset 3px 0 0 #dfa012; }
+    .issue .ctx .ln {
+      display: inline-block; width: 30px; text-align: right; margin-right: 8px;
+      color: var(--muted); user-select: none;
+    }
     .issue .raw { font: 11px/1.5 Consolas, monospace; color: #7c6a6a; margin-top: 4px; word-break: break-all; }
     .note {
       margin: 0 10px 10px; padding: 10px 12px; border-radius: 9px; font-size: 12.5px; line-height: 1.7;
@@ -799,8 +816,12 @@
 
               <div class="issues">
                 <div class="issue" v-for="(item, index) in reviewItems" :key="'r' + index" @click="jumpToLine(item.line)">
-                  <div class="where">需复核 · {{ item.label }}<template v-if="item.line"> · 第 {{ item.line }} 行</template></div>
+                  <div class="where">需复核 · {{ item.label }}<template v-if="item.line"> · 第 {{ item.line }} 行</template><template v-else> · 位置未标出</template></div>
                   <div class="plain">{{ item.plain }}</div>
+                  <div class="ctx" v-if="item.context && item.context.length">
+                    <div v-for="ctxLine in item.context" :key="'rc' + index + '-' + ctxLine.line"
+                         :class="{ hit: ctxLine.is_target }"><span class="ln">{{ ctxLine.line }}</span>{{ ctxLine.text || ' ' }}</div>
+                  </div>
                   <div class="raw" v-if="item.message">{{ item.message }}</div>
                 </div>
 
@@ -808,6 +829,10 @@
                      :class="{ warn: item.kind === 'warn' }" @click="jumpToLine(item.line)">
                   <div class="where">{{ item.kind === 'warn' ? '警告' : '错误' }}<template v-if="item.line"> · 第 {{ item.line }} 行</template><template v-else> · 位置未标出</template></div>
                   <div class="plain">{{ item.plain }}</div>
+                  <div class="ctx" v-if="item.context && item.context.length">
+                    <div v-for="ctxLine in item.context" :key="'ic' + index + '-' + ctxLine.line"
+                         :class="{ hit: ctxLine.is_target }"><span class="ln">{{ ctxLine.line }}</span>{{ ctxLine.text || ' ' }}</div>
+                  </div>
                   <div class="raw">{{ item.message }}</div>
                 </div>
               </div>
@@ -897,14 +922,36 @@
       return out || '&#8203;';
     };
 
+    // 判断一条消息是不是"字体里缺这个字"。
+    // 单独抽出来是因为有三处要判：plainReason、reviewItems、issues 的排除。
+    // 抄三份正则的后果是改了一处忘了另两处，然后同一个问题既在"需复核"里
+    // 出现、又在"警告"里出现，用户以为有两个毛病。
+    // 还要认后端合并后的新写法："这一行有 N 个字符在当前字体里不存在"。
+    const isGlyphIssue = text =>
+      /Missing character|could not represent character|个字符在当前字体里不存在/i.test(text || '');
+
     // 把编译器术语翻译成人话；只解释，绝不替用户改内容。
-    const plainReason = (message, kind) => {
+    // 第二个参数是诊断对象（可能为空）：带上它就能把码位、行号写进解释，
+    // 比如"U+4E00 这个字当前字体里没有，在第 12 行"——只说"有个符号不存在"
+    // 用户还是得自己去日志里找是哪一个。
+    const plainReason = (message, kind, diag) => {
       const m = message || '';
-      if (/Missing character|could not represent character/i.test(m)) return '有个符号在当前字体里不存在（∈、≤ 这类手写数学符号最常见），PDF 里会变成空白或缺字。换成 LaTeX 写法（比如 $\\in$、$\\le$）就能正常显示。';
+      const at = diag && diag.line ? `第 ${diag.line} 行` : '这一行附近';
+      // 后端会把同一行的多个缺字合并成一条"这一行有 N 个字符……不存在"，
+      // 那时原文里已经没有 "Missing character" 字样了。只按那个关键词判断，
+      // 合并后的消息会掉进最后的 warn 兜底，告诉用户"一般不影响出 PDF"——
+      // 而缺字恰恰是会让 PDF 少字的问题，方向刚好相反。
+      if (isGlyphIssue(m)) {
+        const codes = (diag && diag.codes && diag.codes.length)
+          ? diag.codes.map(code => 'U+' + code).join('、')
+          : (diag && diag.code ? 'U+' + diag.code : '');
+        const which = codes ? `（${codes}）` : '';
+        return `这一行有字符在当前字体里不存在${which}，PDF 里会变成空白或缺字。对照原图，把符号换成 LaTeX 写法（比如 $\\in$、$\\le$），或者给文档换一个包含这些字的字体。`;
+      }
       if (/fontspec.*package|choose a different font/i.test(m)) return '这是上一条"符号缺字"的补充建议，不用单独处理。';
       if (/accessing absolute path/i.test(m)) return '这是在读取系统里的中文字体，属于正常提示，可以忽略。';
       if (/No \\author given/i.test(m)) return '没有填写作者，不影响使用，可以忽略。';
-      if (/Undefined control sequence/i.test(m)) return '有条命令 LaTeX 不认识，多半是拼写错了，或者识别时多写了一个反斜杠。';
+      if (/Undefined control sequence/i.test(m)) return `有条命令 LaTeX 不认识（在${at}），多半是拼写错了，或者识别时多写了一个反斜杠。`;
       if (/Missing \$|math mode/i.test(m)) return '公式没有用数学符号包起来。行内公式写成 $...$，单独一行的公式用 \\[ ... \\]。';
       if (/fontset.*unavailable|Font .*not found|font.*not found/i.test(m)) return '字体问题：中文或某个符号的字体没找到。本地编译需要中文字体；在线平台要把编译器改成 XeLaTeX。';
       if (/Runaway argument|Paragraph ended|Missing }|Missing {/i.test(m)) return '大括号没有成对关上，检查这一行附近的 { 和 }。';
@@ -913,7 +960,7 @@
       if (/Misplaced alignment tab|Extra alignment tab/i.test(m)) return '表格里的 & 用错了，或者该换行的地方没换行。';
       if (/^\s*$/.test(m)) return '编译器没有给出具体原因，看下面的完整日志。';
       if (kind === 'warn') return '这是排版警告，一般不影响出 PDF。具体含义看上面的原文。';
-      return '编译器在这一行附近看不懂。点这条跳过去，对照原图看看是不是识别写错了。';
+      return `编译器在${at}看不懂。点这条跳过去，对照原图看看是不是识别写错了。`;
     };
 
     // 窗口标题：桌面窗口的任务栏只认标题，加上任务名才能在多开时分清。
@@ -1033,27 +1080,59 @@
           const lines = sourceLines.value;
           const log = compileResult.value?.log || '';
           const glyphLines = new Set();
-          const glyphEntries = [];
           const seen = new Set();
-          for (const raw of log.split('\n')) {
-            if (!/Missing character|could not represent character/i.test(raw)) continue;
-            const text = raw.trim();
-            if (!text || seen.has(text)) continue;
-            seen.add(text);
-            const lineMatch = text.match(/main\.tex[:.](\d+)/) || text.match(/(?:line|l\.)\s*(\d+)/i);
-            const codeMatch = text.match(/\(U\+([0-9A-Fa-f]{4,6})\)/) || text.match(/\(0x([0-9A-Fa-f]+)\)/);
-            glyphEntries.push({ text, line: lineMatch ? Number(lineMatch[1]) : 0, code: codeMatch ? codeMatch[1].toUpperCase() : '' });
-          }
-          const locatedCodes = new Set(glyphEntries.filter(entry => entry.line && entry.code).map(entry => entry.code));
-          for (const entry of glyphEntries) {
-            if (!entry.line && entry.code && locatedCodes.has(entry.code)) continue;
-            if (entry.line) glyphLines.add(entry.line);
-            result.push({
-              kind: 'glyph', line: entry.line,
-              label: '缺字/编码',
-              message: entry.text,
-              plain: '编译器说这个符号在当前字体里不存在，PDF 里会缺字。请对照原图，把符号换成 LaTeX 写法（例如 $\\in$、$\\le$）。',
-            });
+
+          // 首选后端的结构化诊断：它已经把跨行消息合并、把打不出来的字符换成
+          // 可读文字、并在编译器没给行号时用源码片段反查过 main.tex 的行号。
+          // 前端自己扫 log 只能是兜底——同一个符号 Tectonic 会打三行，
+          // 只靠正则很容易把"补充说明"当成独立问题列出来。
+          const diagnostics = compileResult.value?.diagnostics || [];
+          if (diagnostics.length) {
+            for (const diag of diagnostics) {
+              // 这里只收缺失字符类的；语法错误在下面的 issues 里单独列，
+              // 两边都列会让同一件事出现两次。
+              if (!isGlyphIssue(diag.message)) continue;
+              const line = diag.line || 0;
+              // 子文件的相对行号不能拿去跳 main.tex，会跳到完全无关的位置。
+              const jumpable = diag.located_by !== 'subfile';
+              if (jumpable && line) glyphLines.add(line);
+              const key = (diag.code || '') + '@' + line;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              result.push({
+                kind: 'glyph', line: jumpable ? line : 0,
+                label: '缺字/编码',
+                message: diag.message,
+                code: diag.code || '',
+                context: diag.context || [],
+                plain: plainReason(diag.message, 'warn', diag),
+              });
+            }
+          } else {
+            // 旧版后端：只能退回扫日志。保持原逻辑不动，免得老包直接没提示。
+            const glyphEntries = [];
+            for (const raw of log.split('\n')) {
+              if (!isGlyphIssue(raw)) continue;
+              const text = raw.trim();
+              if (!text || seen.has(text)) continue;
+              seen.add(text);
+              const lineMatch = text.match(/main\.tex[:.](\d+)/) || text.match(/(?:line|l\.)\s*(\d+)/i);
+              const codeMatch = text.match(/\(U\+([0-9A-Fa-f]{4,6})\)/) || text.match(/\(0x([0-9A-Fa-f]+)\)/);
+              glyphEntries.push({ text, line: lineMatch ? Number(lineMatch[1]) : 0, code: codeMatch ? codeMatch[1].toUpperCase() : '' });
+            }
+            const locatedCodes = new Set(glyphEntries.filter(entry => entry.line && entry.code).map(entry => entry.code));
+            for (const entry of glyphEntries) {
+              if (!entry.line && entry.code && locatedCodes.has(entry.code)) continue;
+              if (entry.line) glyphLines.add(entry.line);
+              result.push({
+                kind: 'glyph', line: entry.line,
+                label: '缺字/编码',
+                message: entry.text,
+                code: entry.code,
+                context: [],
+                plain: '编译器说这个符号在当前字体里不存在，PDF 里会缺字。请对照原图，把符号换成 LaTeX 写法（例如 $\\in$、$\\le$）。',
+              });
+            }
           }
           lines.forEach((line, index) => {
             const n = index + 1;
@@ -1092,6 +1171,28 @@
 
         const issues = computed(() => {
           const result = [];
+          const diagnostics = compileResult.value?.diagnostics || [];
+          if (diagnostics.length) {
+            // 后端已经合并了跨行消息、去掉了 rerun 重复、补上了上下文片段。
+            // 直接用，不再自己扫一遍 log：那样同一个问题会出现两遍，
+            // 而且拿不到 code / located_by 这些判断所需的信息。
+            const seenDiag = new Set();
+            for (const diag of diagnostics) {
+              // 缺字类已在 reviewItems 里，避免重复计数。
+              if (isGlyphIssue(diag.message)) continue;
+              const key = diag.severity + '|' + (diag.line || 0) + '|' + diag.message;
+              if (seenDiag.has(key)) continue;
+              seenDiag.add(key);
+              result.push({
+                kind: diag.severity === 'error' ? 'error' : 'warn',
+                line: diag.line || 0,
+                message: diag.message,
+                context: diag.context || [],
+                plain: plainReason(diag.message, diag.severity === 'error' ? 'error' : 'warn', diag),
+              });
+            }
+            return result;
+          }
           for (const item of (compileResult.value?.errors || [])) {
             result.push({ kind: 'error', line: item.line || 0, message: item.message, plain: plainReason(item.message, 'error') });
           }
@@ -1133,7 +1234,11 @@
           return reviewItems.value.filter(item => item.line >= range.start && item.line <= range.end).length;
         };
 
-        // ---- 核对标记（存本机浏览器） ----
+        // ---- 核对标记（优先存服务端，本机 localStorage 作兜底） ----
+        // 原先只有 localStorage：换机器、换浏览器、清缓存，对勾就全没了，而且
+        // 没有任何提示。做多页笔记的人是"今天核 8 页、明天核剩下 2 页"，进度
+        // 的寿命不该比任务本身还短。现在写两份：服务端 JSON 是权威，本机缓存
+        // 保证接口不可用（旧版后端、断网）时界面仍然记得住。
         const reviewedStorageKey = id => 'hand2latex:reviewed:' + id;
         const loadReviewed = id => {
           if (!id) return {};
@@ -1142,11 +1247,25 @@
             return value && typeof value === 'object' ? value : {};
           } catch { return {}; }
         };
+        const saveReviewed = async (target, pages) => {
+          if (!target) return;
+          try { localStorage.setItem(reviewedStorageKey(target), JSON.stringify(pages)); } catch { /* 隐私模式：只保留内存状态 */ }
+          try {
+            const response = await fetch(`/api/jobs/${target}/review`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pages }),
+            });
+            // 服务端拒了（比如页号超范围）不能当成保存成功——那会让用户以为
+            // 明天还能续上，其实没有。只提示，不回滚界面上的对勾。
+            if (!response.ok) notify('核对进度没能存到服务端：' + await readError(response), 'bad', 8000);
+          } catch (err) {
+            notify('核对进度只存在本机（连不上服务端）。换设备后不会同步。', 'bad', 8000);
+          }
+        };
         const togglePage = page => {
           reviewedPages.value = { ...reviewedPages.value, [page]: !reviewedPages.value[page] };
-          if (jobId.value) {
-            try { localStorage.setItem(reviewedStorageKey(jobId.value), JSON.stringify(reviewedPages.value)); } catch { /* 隐私模式下只保留当页状态 */ }
-          }
+          saveReviewed(jobId.value, reviewedPages.value);
         };
 
         // ---- 编辑区交互 ----
@@ -1466,7 +1585,13 @@
           hasFigures.value = !!data.has_figures;
           activePage.value = pages.value.length ? 1 : 0;
           selectedJob.value = data.job_id;
-          reviewedPages.value = loadReviewed(data.job_id);
+          // 服务端有记录就以服务端为准；没有（老任务、旧版后端）才退回本机缓存。
+          // 两者取并集会更好看，但会在"本机多出几页、服务端已经清过"时让用户
+          // 看到一批其实没保存的对勾，所以这里宁可只信服务端。
+          const serverReviewed = data.reviewed_pages || {};
+          reviewedPages.value = Object.keys(serverReviewed).length
+            ? { ...serverReviewed }
+            : loadReviewed(data.job_id);
           draft.value = readDraft(data.job_id, data.tex);
           history.value = []; historyError.value = ''; reviewCursor.value = -1; reused.value = false;
           dirty.value = false;
