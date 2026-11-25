@@ -38,8 +38,8 @@
 | TeX 一字未改时复用上一次 PDF，不重跑 Tectonic | `workbench/app.py` | `tests/test_workbench_app.py` |
 | 改稿便捷性：`Ctrl+S` 编译、`F2` 跳下一处复核（带"第 N / M 处"计数）、浏览器草稿自动保存与恢复、历史版本回滚 | `workbench/static/index.html` | 2026-11-23 Playwright 实测 |
 | 随包 Python 运行时：目标机器不装 Python 也能跑（embeddable 3.12.10 + 预装 `requirements-app.txt`，官方 MD5 校验） | `scripts/build_python_runtime.ps1` | 运行时 111.5 MB；解压包与安装目录各起过一次服务，`/api/status` 报 `python_runtime.bundled=true`、解释器路径在包内、Python 3.12.10 |
-| 打包成绿色 zip（随包带 Python、Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描） | `scripts/package.ps1` | `dist/Hand2LaTeX-1.0.0-win64.zip`，64.9 MB，SHA256 `6989654F8454C0D7F951B37E98F75430A4076D93DAA57E98E3AAEDE81D3E53EA`；解压后用它自己的 `launch.ps1` 起服务并通过浏览器实测 |
-| 编译出 setup.exe 安装器（免管理员、装到用户目录、中文安装界面、卸载时问要不要删任务产物） | `scripts/package.ps1 -BuildInstaller` + `installer/hand2latex.iss` | `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，44.1 MB，SHA256 `01B84DE262091BFE005EE0CDE392542A3F2AFF95EED275DB2EDDA66C60B98CFB`；静默装机 + 起服务 + 静默卸载实测通过 |
+| 打包成绿色 zip（随包带 Python、Tectonic 与 `vue.global.js`，逐项核对 + 密钥泄漏扫描 + 文件名编码核对） | `scripts/package.ps1` + `scripts/make_package_zip.py` | `dist/Hand2LaTeX-1.0.0-win64.zip`，65 MB，SHA256 `954DD370B526DDD0EE7C0CE08058D42B13887BF3CA547EB579763C376BADDADE`；5645 个条目、7 个中文名全带 UTF-8 标志位、无反斜杠分隔符；解压后用它自己的 `launch.ps1` 起服务并通过浏览器实测 |
+| 编译出 setup.exe 安装器（免管理员、装到用户目录、中文安装界面、卸载时问要不要删任务产物） | `scripts/package.ps1 -BuildInstaller` + `installer/hand2latex.iss` | `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，44.2 MB，SHA256 `65CB7575D470E84BA66D47687236437D9F5E2D8559CA9D2292AEAF76699AE55B`；静默装机 + 起服务 + 静默卸载实测通过，四个快捷方式都指向真实存在的文件 |
 | 真实付费 API 下的并行提速与真实信号采集（3 页真实手写笔记，并发 3 与串行各跑一轮） | `workbench/app.py` + `workbench/full_page.py` | `artifacts/real_api_parallel/summary.json`：82.7 s vs 232.7 s，**实测提速 2.81 倍**；两轮 completion token 合计 91402，`finish_reason` 全为 `stop`，无重试 |
 
 ### 尚未实现或尚未证明（审阅时请重点看这里）
@@ -430,39 +430,53 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -KeepSta
 把 `node_modules/vue/dist/vue.global.js` 复制进包里（目标机器**不需要装 Node.js**）→
 构建随包 Python 运行时（目标机器**不需要装 Python**，加 `-NoPython` 可跳过）→ 写
 `BUILD_INFO.json`（无 BOM 的 UTF-8；网页状态里因此显示“来源：安装包”、打包时的提交号、有没有带运行时）→
-放入 `installer/安装说明.txt` → 逐项核对该在的在、不该带的没带 → 扫描我们自己打包的文本文件确认本机的
+放入 `installer/安装说明.txt`，再放 `start.bat` / `stop.bat` / `INSTALL.txt` 三个**英文名同内容入口**
+（给不认 zip UTF-8 文件名标志的解压工具兜底，见下面的缺陷 2）→ 逐项核对该在的在、不该带的没带 →
+扫描我们自己打包的文本文件确认本机的
 `OPENAI_API_KEY` 值没有混进包里（扫到就中止）→ 压成 zip 并打印 SHA256。zip 里是一个
 `Hand2LaTeX-<版本>-win64` 顶层文件夹，"解压到当前文件夹"也不会把文件撒得到处都是。
 
-2026-11-24 实测产出（在提交 `b9fae78` 的干净工作区上打的包，`BUILD_INFO.json` 里记的就是这个提交号）：
+2026-11-25 实测产出（在提交 `f7e1c53` 上打的包，`BUILD_INFO.json` 里记的就是这个提交号）：
 
-- `dist/Hand2LaTeX-1.0.0-win64.zip`，64.9 MB，SHA256 `6989654F8454C0D7F951B37E98F75430A4076D93DAA57E98E3AAEDE81D3E53EA`。
-  解压到临时目录后，**用它自己的 `scripts/launch.ps1` 起服务**（8022 端口）：启动器报告"使用随包 Python 运行时
-  （Python 3.12），不建虚拟环境、不装依赖""依赖齐全，无需安装""workbench.app 可以被随包运行时导入"，
-  日志与 PID 写在 `runtime\` 下；`/api/status` 报 `build.source = 安装包`、`commit = b9fae78`、
-  `python_runtime.bundled = true`、解释器路径在解压目录内、`in_virtualenv = false`、Python 3.12.10、
-  Tectonic 0.17.0 在包内可用、前端来自随包副本、任务目录在包内、`openai.configured = false`（不带 `.env`，如实报）。
-  无头浏览器首页检查 `PACKAGE PAGE CHECK OK`：Vue 正常挂载（10 个状态 chip、上传控件在、`pageErrors` 为空），
-  详情里显示“来源 安装包”“vue.global.js 来自随安装包携带的副本”“安装包随带的 Python 运行时”
-  “API 密钥 未配置：上传识别、修复建议都用不了”，页面上没有任何密钥长度数字。
-  再用它自己的 `launch.ps1 -Stop` 停服务：PID 1960 已停、端口关闭、`-Status` 报未运行。
-- `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，44.1 MB，SHA256 `01B84DE262091BFE005EE0CDE392542A3F2AFF95EED275DB2EDDA66C60B98CFB`。
-  用 ISCC 6.7.3 编译（`Successful compile`，约 69 s）。静默装到临时目录（退出码 0）后核对：
-  `runtime\python\python.exe`、`runtime\python\Lib\site-packages\uvicorn\__init__.py`、`requirements-app.txt`、
-  `BUILD_INFO.json`（含 `python_runtime.bundled = true`、`version = 3.12.10`）、启动脚本、`unins000.exe` 都在，
-  `.env`/`.venv`/`.cache`/`node_modules`/`models`/`artifacts`/`.git` 都没被带进去。
-  从安装目录用它自己的启动器起服务（8021 端口）实测：`python_runtime.bundled = true`、解释器在安装目录内、
-  Tectonic 与任务目录都在安装目录内、云端识别如实报未配置。
-  静默卸载（`/VERYSILENT`）退出码 0：程序文件、整个 `runtime\`（含日志）、各层 `__pycache__`、开始菜单组、
-  注册表卸载项全部清掉，事先放进去的 `artifacts\jobs\keepme.txt` **按设计保留**。
-- 打包核对环节自己抓到一个真问题：构建运行时的自检探针 `import workbench.app` 会在包根建出 `artifacts\jobs`
-  （`app.py` 导入时就 `mkdir`），于是"artifacts 不该出现在安装包里"这条核对失败；改成自检后只删空目录，
-  有文件就不动并如实告警。
-- 更早一轮验证中修掉的两个安装器缺陷：① 卸载阶段的弹框判断误用了 `WizardSilent`（安装阶段专用），
-  静默卸载直接以退出码 1 失败，日志写明 `Cannot call "WizardSilent" function during Uninstall`，改用 `UninstallSilent`；
-  ② `[UninstallDelete]` 只删了顶层 `__pycache__`，`workbench\` 和 `reasoning\` 下的没删，卸载后留垃圾。
+- `dist/Hand2LaTeX-1.0.0-win64.zip`，65 MB，SHA256 `954DD370B526DDD0EE7C0CE08058D42B13887BF3CA547EB579763C376BADDADE`。
+  打包时当场核对：5645 个条目、7 个非 ASCII 条目**全部带 UTF-8 标志位**、**没有一个条目名含反斜杠**、
+  六个入口文件名原样存在。用 `Expand-Archive` 解压后中文名与目录结构完全正确
+  （`启动工作台.bat`、`关闭工作台.bat`、`安装说明.txt`、`start.bat`、`stop.bat`、`INSTALL.txt`、`runtime\` 都在）。
+  再**用解压出来的那份 `scripts/launch.ps1`** 起服务：报告"使用随包 Python 运行时（Python 3.12），
+  不建虚拟环境、不装依赖""依赖齐全，无需安装""workbench.app 可以被随包运行时导入"，
+  `/api/status` 报 `build.commit = f7e1c53`、`python_runtime.bundled = true`、解释器在解压目录内、
+  Tectonic 与任务目录都在包内；无头浏览器 `PACKAGE PAGE CHECK OK`（`pageErrors` 为空）；
+  `-Stop` 停掉后端口关闭、无残留进程。
+- `dist/Hand2LaTeX-1.0.0-win64-setup.exe`，44.2 MB，SHA256 `65CB7575D470E84BA66D47687236437D9F5E2D8559CA9D2292AEAF76699AE55B`。
+  ISCC 6.7.3 编译（`Successful compile`，约 55 s）。静默装机退出码 0，中英文入口文件与 `runtime\python\python.exe` 都在；
+  开始菜单四个快捷方式的目标（`start.bat`、`stop.bat`、`INSTALL.txt`、`unins000.exe`）逐个用 `WScript.Shell`
+  解析并确认**文件真实存在**；静默卸载退出码 0，程序文件、整个 `runtime\`、`__pycache__`、开始菜单组、
+  注册表项全清，事先放进去的 `artifacts\jobs\keepme.txt` 按设计保留。
+- **在"环境里同时有 `HTTPS_PROXY` 和 `https_proxy`"的情况下重跑了上面全流程**（这是用户实测踩到的环境）：
+  体检、起服务、`/api/status`、浏览器检查、`-Stop` 全部通过，PID 文件里记的是 python 进程而不是 cmd 外壳。
+
+用户实测发现的两个真实缺陷，都已复现、修复并加了回归测试：
+
+1. **`Start-Process` 在环境有大小写重名变量时直接崩**（代理软件常这么设）。PowerShell 5.1 构造环境块时抛
+   `ArgumentException：已添加项。字典中的关键字:"https_proxy" 所添加的关键字:"HTTPS_PROXY"`，
+   **不带重定向也崩**，`Get-ChildItem Env:` 同样崩。后果比"体检误报"更严重：启动服务那一步也用它，
+   那种环境下工作台根本起不来，而脚本只会说"随包运行时无法执行/安装包不完整"，把人引向错误方向。
+   现在 `Invoke-Captured` 用 `&` 直接调用（临时放宽 `ErrorActionPreference`，因为子进程写 stderr 是正常的）；
+   服务进程改由 WMI 创建 cmd 外壳、用 **cmd 的文件重定向**写日志（文件句柄由 python 继承，
+   不需要父进程读管道——用 .NET 的 `RedirectStandardOutput` 是管道，没人读就会写满把服务卡死；
+   用 WMI 创建还能让进程彻底脱离控制台，否则外壳会继承启动器的输出句柄，调用方看着像"命令一直没结束"）；
+   再按 `ParentProcessId` + 命令行认出真正的 python 进程写进 PID 文件；开浏览器改用 .NET `Process.Start`。
+   `launch_demo.ps1` 同样处理。
+2. **zip 里的中文文件名**：`Compress-Archive` 走 .NET Framework，条目名用**反斜杠**分隔（zip 规范要求正斜杠），
+   实测旧包条目名就是 `Hand2LaTeX-1.0.0-win64\docs\assets\...`。现在改由 `scripts/make_package_zip.py`
+   用 Python `zipfile` 打包（正斜杠 + 非 ASCII 自动带 UTF-8 标志位），并当场核对，不通过就中止打包。
+   **但要说清楚**：Info-ZIP 的 `unzip` 在 Windows 上**无视** UTF-8 标志位，用它解任何中文名的 zip 都会乱码
+   （本机实测：同一个包 `Expand-Archive` 解出来名字全对，`unzip` 解出来是 `Õà¦Úù¡ÕÀÑõ¢£ÕŦ.bat`，
+   且这台 `unzip` 不支持 `-O UTF-8`）。这是那个工具的行为，不是包的问题；
+   **兜底办法是包里同时放了 `start.bat` / `stop.bat` / `INSTALL.txt` 三个英文名同内容入口**，
+   安装说明开头也写了这件事，所以即便名字全乱也还找得到启动脚本。
 - 没验证的：带界面的安装向导（选目录、勾桌面图标、卸载时问要不要删 `artifacts`）**没有人工点过**，只做了代码审阅；
-  上述所有验证都在**本机**（装了 Python 3.12 的开发机）上做，没在一台真没装 Python 的干净机器上跑过。
+  上述验证都在**本机**（装了 Python 3.12 的开发机）上做，没在一台真没装 Python 的干净机器上跑过。
 - 上面两个 SHA256 只对**那一次构建**有效：`README.md` 和 `reasoning/TEAM_LOG.md` 本身也在包里，
   所以改完文档再打一次包，哈希必然变（`BUILD_INFO.json` 里的构建时间也会变）。要核对就拿包里的
   `BUILD_INFO.json` 看提交号，别指望哈希长期不变。
