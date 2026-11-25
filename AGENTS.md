@@ -109,7 +109,7 @@ python -m uvicorn workbench.app:app --host 127.0.0.1 --port 8000
 powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -IncludeDemoJob c3d4e5f60718293a4b5c6d7e8f901234
 ```
 
-产物在 `dist\Hand2LaTeX-1.0.0-win64.zip`（约 57 MB）。对方解压后：
+产物在 `dist\Hand2LaTeX-1.0.0-win64.zip`（约 67 MB，随包带 Python 运行时所以偏大）。对方解压后：
 
 1. 双击 `启动工作台.bat` — 后台起服务并自动弹出独立桌面窗口
 2. 窗口关掉后服务还留着，双击 `关闭工作台.bat` 收尾
@@ -121,6 +121,37 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -IncludeDemoJob c3d
 > 打包用的是 `scripts/make_zip.py` 而不是 `Compress-Archive`。
 > 后者写中文文件名时不打 UTF-8 标记位，对方解压出来会看到
 > `Õà¦Úù¡ÕÀÑõ¢£ÕŦ.bat` 这种乱码文件名——这是真踩过的坑，别改回去。
+
+### 4.1 做完就往原仓库推，不要停在本地（2026-11-26 起）
+
+**默认动作：每完成一块可以交付的内容，直接推到原仓库，不用先问。**
+原仓库 `https://github.com/blackwinly-del/-hand2latex-review` 是**公开**的，
+队友打开首页就能看，所以"推上去"＝"队友真的能看到"，本地提交不等于交付。
+
+推之前必做两件事，顺序不能颠倒：
+
+```powershell
+# 1. 先提交（否则包里的 BUILD_INFO 记的 commit 跟内容对不上，别人查问题会被误导）
+git add -A; git commit
+
+# 2. 再打包，让 BUILD_INFO.commit 与包内容严格对应
+powershell -ExecutionPolicy Bypass -File scripts\package.ps1
+```
+
+推送目标：`hand2latex-review`（默认分支，队友看的就是这条）。
+`hand2latex-complete-2026-11-25` 与它内容相同、父提交不同，一起推以保持一致。
+
+**`github.com:443` 会间歇性 502（`CONNECT tunnel failed`），`api.github.com` 通常是通的。**
+先探测再选通道：
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" --max-time 12 https://github.com          # 000 = 不通
+curl -s -o /dev/null -w "%{http_code}" --max-time 12 https://api.github.com/rate_limit  # 200 = 可用
+```
+
+`git push` 走前者，不通就用 `scripts/push_via_api.py` 走后者（Git Data API 四步：
+blob → tree → commit → PATCH ref，5xx 自动重试）。别去改代理端口——端口每次会话都变，
+这个问题与代理无关，是上游偶发故障。
 
 ## 5. 文档在哪
 
