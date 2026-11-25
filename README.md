@@ -426,7 +426,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -BuildIn
 
 # 保留 dist/staging 里的解压态目录，方便自己先跑一遍看看
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -KeepStaging
+
+# 把某个已跑通的任务打进包，对方解压打开就有真实效果可看（推荐发给队友时用）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 `
+  -IncludeDemoJob c3d4e5f60718293a4b5c6d7e8f901234
 ```
+
+**发给队友时建议带 `-IncludeDemoJob`。** 否则对方打开是一个空工作台，得先自己有
+`OPENAI_API_KEY`、自己拍一张手写图上传，才能看到界面长什么样。带上演示任务后，
+解压双击就有完整的三栏内容（原图 / LaTeX / PDF 预览）。
+
+反过来，**不传这个参数时打包脚本会检查"包里的任务产物必须为空"**，
+避免把自己的实验数据一起发出去——这是一道保险，不是可有可无的核对。
+
+包里的任务 id 是 `artifacts/jobs/<id>` 的目录名，也可以直接在工作台左侧点开某个任务，
+从浏览器地址栏末尾的 `#job=<id>` 拿到那串 32 位十六进制。
 
 随包 Python 运行时由 [scripts/build_python_runtime.ps1](scripts/build_python_runtime.ps1) 构建，
 默认 Python 3.12.10 embeddable：从 python.org 下载（缓存在 `.cache/`，第二次不重下）、
@@ -659,8 +673,10 @@ sample_6/7/10 在已试模型的多视角候选里都没有正确答案；zoom2/
 界面与内核之间**只通过 HTTP 接口通信**（`workbench/app.py` 暴露的 JSON 接口），
 界面不 import 任何内核模块。这样内核怎么改，界面都不用跟着改。
 
-完整边界、可改文件清单、接口契约与内核文件指纹见仓库根目录的 **[AGENTS.md](AGENTS.md)**。
-改内核文件前请先核对指纹；对不上说明代码已经不是你以为的样子。
+完整边界、可改文件清单与接口契约见仓库根目录的 **[AGENTS.md](AGENTS.md)**。
+动手前跑一句 `python scripts/check_kernel.py`：全绿说明内核没被动过，可以放心只改前端。
+（不要直接 `sha256sum`——Windows 上 `core.autocrlf` 会让行尾在 CRLF/LF 之间变，
+直接算哈希会误报"代码被改了"；脚本会先统一行尾再比。）
 
 ### 11.1 通用约定
 

@@ -11,7 +11,7 @@
 | --- | --- |
 | `workbench/static/**`（整个前端） | `recognizer.py`（B 层识别引擎） |
 | `workbench/desktop.py` 及桌面启动相关脚本 | `reasoner.py`（C 层 refine） |
-| `scripts/launch*.ps1` 里**只涉及启动方式**的部分 | `schemas.py`（跨层数据结构） |
+| `scripts/launch*.ps1`、`package.ps1`、`make_zip.py`、`check_kernel.py` | `schemas.py`（跨层数据结构） |
 | `README.md` / `docs/` 里**只讲界面与用法**的章节 | `reasoning/**`（C 层规则、契约、校验） |
 | `tests/` 里**只测前端/接口契约**的新文件 | `workbench/full_page.py`、`workbench/fix.py`（识别编排与修复提示词） |
 
@@ -21,18 +21,25 @@
 ### 如果确实必须动内核
 
 不要直接改。先在对话里说明**为什么要改、改哪一行、影响谁**，等对方确认。
-内核文件的当前指纹（改动前后请核对，对不上说明这段代码已经不是你以为的样子）：
 
+### 怎么确认内核有没有被动过
+
+动手前先跑一遍：
+
+```powershell
+python scripts/check_kernel.py
 ```
-recognizer.py             d4fab5ffb65e5642e179894f5c1d93979d93b84f68dd663b9ad34a91ae96d321
-reasoner.py               47580f7e58fb1c7637993b9118e34bc8b3be55daf589a9b373ca6481d2846ea2
-schemas.py                cd3763eae4a5592c6d82017c4988eb8efec668ad2d1005a38aae0b2a04f1203b
-reasoning/validators.py   97a4371d5db05c3c5286d7963dc5f8bd01cfb8f0c7a23facc47a5af9f9f70e1e
-reasoning/context.py      9bcfc60bc29957490090ad0b604f67a5bd3e3800d6c9f66254dba68dd39d6468
-reasoning/render_check.py 8e4b4c9556e54c9d238371b5b37fd2a8dda099346c25b1d33f9eb45f63938a80
-workbench/full_page.py    d3f8d4f9269a63b93af2d5caefe5a44788e33eec7755704de166f748ced2509e
-workbench/fix.py          ed7610feadaab55470e5a9801daf0c66d9b50bf57564149f568f246898aa4c6e
-```
+
+全绿 = 内核跟基线一致，你只改前端就不会碰到别人的活。
+飘红 = 有内核文件跟基线不同，**先停下来问**，不要自己判断"应该是小事"。
+
+> **不要用 `sha256sum` / `Get-FileHash` 直接算。** Windows 上 Git 默认
+> `core.autocrlf=true`，同一个提交 checkout 出来可能是 CRLF 也可能是 LF，
+> 直接算哈希会有几个文件"永远对不上"，看着像代码被改了，其实一个字没动。
+> `check_kernel.py` 会先把行尾统一成 LF 再比，结论才可信。
+
+基线值写在脚本里的 `BASELINE` 字典。看到飘红时的正确反应是**问**，不是把文件改回基线——
+如果内核同事确实推进了一版，基线该由他更新，你改回去等于把他的工作抹掉。
 
 ## 1. 前端只许通过 HTTP 接口跟内核说话
 
@@ -82,9 +89,32 @@ python -m uvicorn workbench.app:app --host 127.0.0.1 --port 8000
 没有 `OPENAI_API_KEY` 时：界面能打开、能看已有任务、能改代码、能编译，
 但**上传识别和 AI 修复会如实报"未配置密钥"**——这是预期行为，不是 bug。
 
-## 4. 文档在哪
+## 4. 怎么把成果发给别人看
+
+**不要让对方装 Python、也不要让对方 clone 仓库。** 直接发 zip 安装包，对方解压双击就能跑。
+
+```powershell
+# 在自己机器上打包（首次会下载 Python 运行时，之后复用）
+powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -IncludeDemoJob c3d4e5f60718293a4b5c6d7e8f901234
+```
+
+产物在 `dist\Hand2LaTeX-1.0.0-win64.zip`（约 57 MB）。对方解压后：
+
+1. 双击 `启动工作台.bat` — 后台起服务并自动弹出独立桌面窗口
+2. 窗口关掉后服务还留着，双击 `关闭工作台.bat` 收尾
+
+`-IncludeDemoJob` 会把一个已经跑通的任务打进包里，对方打开就能看到真实效果，
+不用先配密钥、不用先等识别。**不传这个参数时打包脚本会检查"任务产物为空"**，
+避免把自己的实验数据一起发出去。
+
+> 打包用的是 `scripts/make_zip.py` 而不是 `Compress-Archive`。
+> 后者写中文文件名时不打 UTF-8 标记位，对方解压出来会看到
+> `Õà¦Úù¡ÕÀÑõ¢£ÕŦ.bat` 这种乱码文件名——这是真踩过的坑，别改回去。
+
+## 5. 文档在哪
 
 - `reasoning/CONTRACT.md` — C 层公共契约（**内核同事维护，别改**）
 - `reasoning/TEAM_LOG.md` — 团队实际做过什么、验证到哪一步（有证据边界说明）
+- `docs/UI_CHANGES_2026-11-25.md` — 这轮界面重做改了什么、为什么改
 - `README.md` — 用户视角的完整说明
 - `README_B.md` — B 层（本地识别）的说明
