@@ -128,6 +128,14 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -IncludeDemoJob c3d
 原仓库 `https://github.com/blackwinly-del/-hand2latex-review` 是**公开**的，
 队友打开首页就能看，所以"推上去"＝"队友真的能看到"，本地提交不等于交付。
 
+三种东西，三个去处：
+
+| 东西 | 去哪 | 为什么 |
+| --- | --- | --- |
+| 代码、文档、测试 | `git push` 到 `hand2latex-review` | 队友打开首页直接看，可 diff 可追溯 |
+| 交付包 `dist/*.zip`（67 MB） | **GitHub Release**（`scripts/upload_release.py`） | 二进制不进 git 历史，否则每次 clone 都背上它 |
+| 本机运行产物 `artifacts/` | **哪都不去** | 是跑出来的临时数据，`.gitignore` 已排除 |
+
 推之前必做两件事，顺序不能颠倒：
 
 ```powershell
@@ -149,9 +157,13 @@ curl -s -o /dev/null -w "%{http_code}" --max-time 12 https://github.com         
 curl -s -o /dev/null -w "%{http_code}" --max-time 12 https://api.github.com/rate_limit  # 200 = 可用
 ```
 
-`git push` 走前者，不通就用 `scripts/push_via_api.py` 走后者（Git Data API 四步：
-blob → tree → commit → PATCH ref，5xx 自动重试）。别去改代理端口——端口每次会话都变，
-这个问题与代理无关，是上游偶发故障。
+`git push` 走前者，不通就用备用脚本走后者：
+- 推代码：`scripts/push_via_api.py`（Git Data API 四步：blob → tree → commit → PATCH ref）
+- 传包：`scripts/upload_release.py`（走 `uploads.github.com`，与 git 不是同一条链路）
+
+两个脚本都带 5xx 自动重试——这条链路上 500/503 很常见，别看到第一次失败就放弃。
+
+**别去改代理端口。** 端口每次会话都变（49401→64242→39099），502 与代理无关，是上游偶发故障。
 
 ## 5. 文档在哪
 
