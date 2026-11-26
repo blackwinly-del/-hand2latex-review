@@ -605,7 +605,7 @@ RECOGNIZER_MODEL=UniMERNet RECOGNIZER_DEVICE=gpu:0 \
 
 ```bash
 # C + workbench 全量回归（含真实 Tectonic 编译，需要 tools/tectonic）
-# 2026-11-26 实测：20 个测试模块、244 项通过、11 项跳过
+# 2026-11-26 实测：20 个测试模块、266 项通过、11 项跳过
 ./.venv/Scripts/python.exe -m unittest discover -s tests -v
 
 # 单个模块

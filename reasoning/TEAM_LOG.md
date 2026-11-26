@@ -1011,3 +1011,54 @@
 - **一次 fetch 的教训（又一次"我这儿没有≠不存在"）**：本轮开头 `git fetch --all` 又是 `CONNECT tunnel failed, response 502`，本地 `origin/hand2latex-review` 还停在 `753797d`——如果就此下结论，就会重复上一轮的错误。这次先探通道：`https://github.com` 经代理 000、**绕过代理直连 200**，改用 `HTTPS_PROXY= https_proxy= HTTP_PROXY= http_proxy= git fetch --all --prune` 一次就拿到了全部引用（含 `fix/launcher-no-start-process` 与新 tag `v1.0.0-2026-11-26`）。**结论：502 不一定是上游故障，也可能是当前代理端口的问题；先试直连再下判断。**（这条与 4.1 节里"别去改代理端口"不冲突——那条说的是别去改端口号，这条说的是可以临时绕过。）
 - **回归与边界**：本地已快进到 `9df62c50`，全量 **255 项通过 / 11 跳过**（`check_kernel.py` 8 个文件全绿，基线来源 `992dd4e`）。本轮**没有改任何代码**，只改了这份日志。队友那三个文件（`AGENTS.md`、`launch.ps1`、`launch_demo.ps1`）我一行没动。
 - **一个环境坑（不属仓库缺陷，但会让人误判回归）**：批量跑测试时 `artifacts/jobs` 下累积了 6 个 `分页验收A/B` 夹具目录，导致 `test_job_list_supports_search_and_pagination` 断言 `total==2` 实际得 8。根因是上一次跑测试被沙箱的批量删除守卫打断（`SystemExit` 打在 `tearDown` 的 `shutil.rmtree` 上），`tearDown` 的"只删本次新增"没跑到。删掉这 6 个（`main.tex` 内容就是字面量 `content`，可确认是夹具）后全绿。**这说明 `tearDown` 的清理不是原子的**，被打断一次就会留下永久污染。
+
+## 2026-11-26（优化与证据收尾）两条证据真做了，顺手补了五处"一条坏数据打挂整条接口"
+
+**阶段状态：此前标注为"没做"的两条证据（并发推送撞 base 过期、推合并提交看多父拓扑）本轮真做了，都通过；做第二条时用真并发撞出一个真缺陷并修掉。另外按"先测再改"做了两处性能优化，补了 `.env.example`，修了五处把整条接口打成 500 的坏数据路径。本轮提交全部只推到自己的分支 `perf/job-list-lazy-metadata`，默认分支没碰。**
+
+### A. 两条证据（关闭 974/983/995 行留下的边界）
+
+- **证据一 · base 过期被拦住**：推送者 A 用 base=`9df62c5` 在临时分支上先推成功（远端 `2660208a`）；推送者 B 同样基于 `9df62c5`、带着自己的提交去推同一分支 → **退出码 3**，输出真正的 tip 与下一步。**关键是拦住了而不是"报错但还是写了"**：回读远端引用仍是 A 的 `2660208a`，B 的文件 `docs/_evidence_pusher_b.txt` 返回 **404**，A 的 `workbench/app.py` 仍在。
+- **证据二 · 多父拓扑**：真造了一个双亲合并提交（父 `da46429`、`2f61b71`）推上去。**不信脚本自己的输出**，从远端 API 读回提交对象核对 `len(parents)==2`，再用 `git fetch` + `git log --oneline --graph` 让 git 自己解析——图上是真正的两条轨道在 `9df62c5` 汇合。合并后树里 A 的优化与 B 的文件都在（`workbench/app.py` 的 blob 与本地一致），没有一边顶掉另一边。
+- **证据三 · 真并发撞出一个真缺陷**：两个进程同时用同一个 base 新建同名分支，都 GET 到"不存在"，都去 POST，后到者拿到 422 `Reference already exists` → **未捕获异常 + traceback + 退出码 1**。顺序模拟永远撞不出这个窗口。修法：POST 撞 422 时回读引用，指向别的提交就与"base 过期"走同一个出口（退出码 3，打印真 tip），恰好指向要的 base 就按已建好处理。修完重跑真并发：**A=0 / B=3**，远端没有被污染（A 的文件 200、B 的 404）。
+
+### B. 性能：先实测再改，不凭"看起来该更快"
+
+- **`/api/jobs` 只读当前页的元数据**：300 个合成任务实测 **146.3ms → 28.5ms（-80%）**。原来的问题是"列表只显示 20 条"却被当成"需要先处理全部 300 个"——逐个读 `job.json` 之后再切片，280 个读完就扔。改成先只 stat 出 mtime 排序，再只对当前页读元数据。**搜索路径仍然全量读**：判据是标题，不读就不知道命中没命中，这是它该付的代价，别为了"更快"改坏。`updated_at` 等字段一个没少。
+- **`/api/status` 的目录统计改 scandir**：同一份真实数据（72 任务）新旧实现结果**逐字节一致**，热态 **29.1ms → 10.3ms**。`Path.rglob` 会为每个命中路径构造 Path 再 stat；手写 `os.scandir` 直接拿 DirEntry 的缓存属性，并加了 `follow_symlinks=False`（避免链接成环、也避免把链接目标算进体积）。
+- **旧记录里那个 3442ms 要作废**：那是 `setdefault(key, 昂贵函数())` 的缺陷造成的（默认值参数先求值再传，键存在也照样算一遍），已经修掉了。别把那个数字当成"当前基线"。
+
+### C. `.env.example` 补齐 6 个运行时变量
+
+上一轮遗留的待办。补的是 `RECOGNIZER_BACKEND / ENGINES / VIEWS / MAX_CANDIDATES / LOG_JSONL`、`WORKBENCH_PORT`、`WORKBENCH_JOB_CLEANUP`。默认值逐个对着代码核过（`max_candidates=6`、`port=8760`、`backend=paddle`、cleanup 默认 on），不是照抄印象。`GITHUB_TOKEN` 与 `LOCALAPPDATA` **故意没写**：前者是开发者工具（`push_via_api.py`）用的，后者是系统变量，都不是运行时配置。
+
+### D. 一处坏数据不该打挂整张列表（五个点，全部先实测复现）
+
+同一类问题：读用户数据时假设"文件是我写的、一定是对的"，一处解析失败就 500。表现出来不是"某个任务坏了"，而是"所有任务都不见了"。**每个点都先实测确认能打挂，改完再实测一遍。**
+
+- **截断的 `job.json`** → `JSONDecodeError`。改走项目里本来就有的 `_read_job_json`（不存在／语法坏／顶层非对象一律返回 `{}`），读不出来就落到已有的"按目录结构重建"分支。
+- **非 UTF-8 的 `main.tex`** → `UnicodeDecodeError`（GBK 存的外来文件、被中断的写入）。`_read_job_title` 里原本裸调 `read_text`，改成 try/except：跳过该文件、试下一个候选、退回默认标题。
+- **`document.json` 顶层是数组** → `AttributeError`（`document.get` 对 `list` 无效）。`_has_figure_blocks` 原本只防了 `JSONDecodeError`，补 `isinstance` 判断；`blocks` 不是 list 也跳过。
+- **截断的 `compile.json`** → 打开任务（`GET /api/jobs/{id}`）直接 500。按"没有编译记录"处理：有 PDF 就照常打开（不为打开任务再跑一遍编译），没有就重编一次拿到真实错误。
+- **损坏的 `suggestion.json`** → 应用修复时 500。这个不用容错继续（坏掉的建议无法猜原意），改成 **409「修复建议已损坏，请重新生成」**；测试同时断言源码没被写坏——校验没过就动文件，用户会拿到一份"改了但没编译"的 `main.tex`。
+
+**故意没改的两处**：`_rebuild_from_documents` 与 `use_source_figures` 里读 `page_*/document.json` 的裸 `json.loads`。那里坏数据现在会抛异常并**中止**，行为上是对的（绝不能静默跳过某一页再生成一份缺页的 tex），把 500 换成 409 只是换个错误码，所以没动。写在这里免得下次被当成遗漏。
+
+**"重建成功"必须留痕**：前三处都补了 `logger.warning`，测试里用 `assertLogs` 同时锁住"必须打日志"。否则损坏会被"重建成功"静默盖住，下次只看到标题变成默认值，查不出原因。
+
+### E. 两处 404 友好提示是死代码
+
+`_request` 对 404 默认立刻抛 `RuntimeError`，只有 `allow_404=True` 才返回 `None`。可 base 提交探测与 `_tree_of` 都没传这个参数 —— 它们后面的 `if commit is None: print("传错了")` **永远执行不到**。提示写好了，用户看不到。
+
+**自己踩到的**：给 `--base` 传了 8 位短 sha（GitHub 的 git 接口只认 40 位），期望是"你给的 sha 不对"，实际是一屏 traceback。补上 `allow_404=True` 后同样的命令输出变成"远端仓库里没有提交 04052bc1，base 传错了"+ 两种可能（短 sha／提交只在本地），退出码 2，无 traceback。
+
+### F. 队友的修法比我的彻底，我 rebase 到他的分支上
+
+`artifacts/jobs` 的测试污染（`tearDown` 被沙箱删除守卫打断，残留 6 个夹具目录）我也碰到了。我的处理是**手工删掉残留**——治标；队友 `b2be235` 改成**每次运行唯一的标题标记**，让测试与残留彻底解耦——治本。所以把我的提交 rebase 到 `origin/fix/job-list-test-isolation` 上，两种修法共存，不另起一条平行实现。
+
+### G. 现状与边界
+
+- **`hand2latex-complete-2026-11-25` 已经被维护者追上** `9df62c50`，与 `hand2latex-review` 一致。此前"- 少两个提交"的偏差已不存在，不需要再问。
+- **本轮全部提交只推自己的分支**（按 4.1 新约定）：`perf/job-list-lazy-metadata`，默认分支 `hand2latex-review` 始终停在 `9df62c50`，我没有往它推过任何东西。
+- **验证**：全量 **266 项通过 / 11 跳过**；`check_kernel.py` 8 个文件全绿（基线来源 `992dd4e`）。内核 6 个路径一行未改。
+- **有一个坑值得记**：`python -c "...\\\\title{...}"` 里的反斜杠会被 shell 吃掉一层，`\\title` 会变成制表符 + `itle`，于是"标题提取失败"是**假的**。这一轮因此差点得出错误结论，改用 `.cache/` 下的脚本文件（不经过 shell 转义）才测准。**用 `-c` 测含反斜杠的逻辑，结论不可信。**
