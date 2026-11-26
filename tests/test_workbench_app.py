@@ -806,6 +806,103 @@ class WorkbenchAppTests(unittest.TestCase):
         count, total = workbench_app._directory_usage(Path(tempfile.gettempdir()) / "definitely-absent-xyz")
         self.assertEqual((count, total), (0, 0))
 
+    def test_job_list_survives_corrupt_job_json(self):
+        """一个写坏的 job.json 不能让整张任务列表 500。
+
+        这不是假想：写 job.json 时进程被杀、磁盘写满，都会留下截断的 JSON。
+        原来的 `_job_metadata` 直接 json.loads，一条坏数据抛 JSONDecodeError，
+        /api/jobs 整条接口 500 —— 用户看到的是"任务全没了"，而不是"某个任务坏了"。
+        现在走 `_read_job_json`：读不出来就按目录结构重建，标题从 main.tex 里取。
+        """
+        import workbench.app as workbench_app
+
+        root = Path(tempfile.mkdtemp(prefix="corrupt_"))
+        broken = root / (uuid.uuid4().hex)
+        healthy = root / (uuid.uuid4().hex)
+        original = workbench_app._JOBS_ROOT
+        try:
+            broken.mkdir()
+            (broken / "main.tex").write_text("\\title{坏掉的任务}\n", encoding="utf-8")
+            (broken / "job.json").write_text('{"title": "半截', encoding="utf-8")
+            (broken / "page_01").mkdir()
+            (broken / "page_01" / "source.png").write_bytes(png())
+
+            healthy.mkdir()
+            (healthy / "main.tex").write_text("x", encoding="utf-8")
+            (healthy / "job.json").write_text(
+                json.dumps({"title": "正常任务", "page_count": 1, "pages": [], "has_figures": False}),
+                encoding="utf-8",
+            )
+            (healthy / "page_01").mkdir()
+            (healthy / "page_01" / "source.png").write_bytes(png())
+
+            workbench_app._JOBS_ROOT = root
+            # 顺带把"留下痕迹"也锁住：重建成功不能把损坏掩盖得无声无息，
+            # 否则下次排查只会看到标题变成了默认值，找不到原因。
+            with self.assertLogs("workbench", level="WARNING") as captured:
+                result = workbench_app.list_jobs(limit=20)
+        finally:
+            workbench_app._JOBS_ROOT = original
+            shutil.rmtree(root, ignore_errors=True)
+
+        self.assertIn("job.json", "\n".join(captured.output), "job.json 损坏没有留下日志")
+        titles = sorted(job["title"] for job in result["jobs"])
+        self.assertEqual(titles, ["坏掉的任务", "正常任务"], "坏掉的 job.json 把正常任务也一起拖没了")
+        self.assertEqual(result["total"], 2)
+
+    def test_job_list_survives_non_utf8_title_file(self):
+        """main.tex 不是 UTF-8 也不能让列表 500。
+
+        外来文件（GBK 存的 .tex）和被中断的写入都会产生这种文件。原来
+        `_read_job_title` 里裸调 read_text，一个字节不对就是 UnicodeDecodeError，
+        同样是整条接口倒掉。现在跳过该文件、退回默认标题。
+        """
+        import workbench.app as workbench_app
+
+        root = Path(tempfile.mkdtemp(prefix="badenc_"))
+        job = root / uuid.uuid4().hex
+        original = workbench_app._JOBS_ROOT
+        try:
+            job.mkdir()
+            # 合法 UTF-8 的 title 行 + 一段非法字节：读的时候必然解码失败。
+            (job / "main.tex").write_bytes(b"\\title{\xd6\xd0\xce\xc4}\n")
+            (job / "page_01").mkdir()
+            (job / "page_01" / "source.png").write_bytes(png())
+
+            workbench_app._JOBS_ROOT = root
+            with self.assertLogs("workbench", level="WARNING") as captured:
+                result = workbench_app.list_jobs(limit=20)
+        finally:
+            workbench_app._JOBS_ROOT = original
+            shutil.rmtree(root, ignore_errors=True)
+
+        self.assertIn("标题文件", "\n".join(captured.output), "非 UTF-8 的 .tex 被静默跳过了")
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["jobs"][0]["title"], "手写笔记")
+
+    def test_has_figure_blocks_ignores_non_dict_document(self):
+        """document.json 顶层不是对象时，`document.get` 不能把列表接口打挂。
+
+        `_has_figure_blocks` 原本只防了 JSONDecodeError，没防"合法 JSON 但类型不对"：
+        顶层是数组时 `document.get("blocks")` 抛 AttributeError。
+        """
+        import workbench.app as workbench_app
+
+        root = Path(tempfile.mkdtemp(prefix="baddoc_"))
+        original = workbench_app._JOBS_ROOT
+        try:
+            for payload, expected in (("[]", False), ('{"blocks": "not-a-list"}', False), ('{"blocks": [{"type": "figure"}]}', True)):
+                job = root / uuid.uuid4().hex
+                (job / "page_01").mkdir(parents=True)
+                (job / "main.tex").write_text("x", encoding="utf-8")
+                (job / "page_01" / "document.json").write_text(payload, encoding="utf-8")
+                self.assertEqual(
+                    workbench_app._has_figure_blocks(job), expected, "document.json=%s 判定错了" % payload
+                )
+        finally:
+            workbench_app._JOBS_ROOT = original
+            shutil.rmtree(root, ignore_errors=True)
+
     @patch("workbench.app.compile_tex")
     def test_use_source_figures_rebuilds_without_recognition(self, compile_mock):
         directory = Path("artifacts/jobs") / uuid.uuid4().hex

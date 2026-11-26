@@ -538,7 +538,13 @@ def _has_figure_blocks(directory: Path) -> bool:
             document = json.loads(document_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        blocks = document.get("blocks", [])
+        # 顶层不是对象就没有 blocks 可谈。少了这句，`document.get` 会对 list/str
+        # 抛 AttributeError，又变成"一条坏数据让整张列表 500"。
+        if not isinstance(document, dict):
+            continue
+        blocks = document.get("blocks")
+        if not isinstance(blocks, list):
+            continue
         if any(isinstance(block, dict) and block.get("type") == "figure" for block in blocks):
             return True
     return False
@@ -593,17 +599,31 @@ def _read_job_title(directory: Path) -> str:
         path = directory / name
         if not path.is_file():
             continue
-        match = re.search(r"\\title\{(.*)\}", path.read_text(encoding="utf-8"))
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            # 非 UTF-8 的 .tex 不是"没标题"这么简单：它通常是外来文件（GBK 保存的）
+            # 或被中断的写入。以前这里直接 read_text，一个字节不对就让 /api/jobs
+            # 整个 500，一条坏文件把整张列表拖没。跳过并报一声，标题退到默认值。
+            logger.warning("标题文件不是可读的 UTF-8，跳过：%s", path)
+            continue
+        match = re.search(r"\\title\{(.*)\}", text)
         if match and match.group(1).strip():
             return match.group(1).strip()
     return "手写笔记"
 
 
 def _job_metadata(directory: Path) -> dict:
-    """读取 job 元数据；老任务没有 job.json 时按目录结构重建。"""
-    path = directory / "job.json"
-    if path.is_file():
-        metadata = json.loads(path.read_text(encoding="utf-8"))
+    """读取 job 元数据；没有 job.json、或 job.json 读不出来时按目录结构重建。
+
+    这里必须走 `_read_job_json`（项目里统一的容错读法：文件不存在、JSON 语法坏、
+    顶层不是对象，一律返回 {}），不能直接 json.loads。直接解析的话，一个被中断
+    写坏的 job.json 就能让整个 /api/jobs 抛 JSONDecodeError 直接 500 —— 一条坏
+    数据把整张任务列表拖没，用户看到的是"所有任务都不见了"，而不是"某个任务
+    有问题"。实测：`{"title": "半截` 这种截断内容足以复现。
+    """
+    metadata = _read_job_json(directory)
+    if metadata:
         # 这里不能用 d.setdefault(key, 昂贵函数())。setdefault 的默认值参数
         # 是**先求值再传进去**的，键已存在也照样算一遍：
         #   metadata.setdefault("has_figures", _has_figure_blocks(directory))
@@ -617,6 +637,14 @@ def _job_metadata(directory: Path) -> dict:
         if "has_figures" not in metadata:
             metadata["has_figures"] = _has_figure_blocks(directory)
         return metadata
+
+    # 走到这里有两种情况：本来就没有 job.json（老任务，正常），或者有但读不出来
+    # （坏数据，需要留下痕迹）。后者要报一声，否则损坏会被"重建成功"悄悄盖住。
+    if (directory / "job.json").is_file():
+        logger.warning(
+            "job.json 读不出来或顶层不是对象，按目录结构重建：%s",
+            directory / "job.json",
+        )
 
     pages = []
     failures = []
