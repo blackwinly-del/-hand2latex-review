@@ -98,7 +98,9 @@ $excludeDirs = @(
     '.ruff_cache',
     '.qoder-office-docx-locks'
 )
-$excludeFiles = @('.env', '*.pyc', '*.pyo', 'workbench.log', 'workbench.pid')
+# .git 也要进 /XF：在 linked worktree（git worktree add 出来的目录）里，.git 是一个
+# 文件而不是目录，只靠 /XD 排不掉，会被原样打进包里——2026-11-26 实测被核对闸门拦下。
+$excludeFiles = @('.git', '.env', '*.pyc', '*.pyo', 'workbench.log', 'workbench.pid')
 
 function Test-ExcludedPath {
     param([string]$RelativePath)
