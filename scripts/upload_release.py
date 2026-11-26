@@ -8,8 +8,9 @@ Release 资产的域名是 uploads.github.com，与 git 用的 github.com:443 �
 所以 github.com 502 的时候这个通常还能用。
 
 用法：
-    python scripts/upload_release.py --token TOKEN --repo owner/name \
-        --tag v1.0.0 --file dist/xxx.zip
+    # token 从环境变量读，不要写在命令行上（argv 会留在 shell 历史和进程列表里）
+    export GITHUB_TOKEN=...
+    python scripts/upload_release.py --repo owner/name --tag v1.0.0 --file dist/xxx.zip
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import argparse
 import hashlib
 import json
 import mimetypes
+import os
 import sys
 import time
 import urllib.error
@@ -69,7 +71,7 @@ def _sha256(path: Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--token", required=True)
+    parser.add_argument("--token", default=None, help="GitHub token；不传则读 GITHUB_TOKEN 环境变量")
     parser.add_argument("--repo", required=True)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--name", default=None)
@@ -77,6 +79,11 @@ def main() -> int:
     parser.add_argument("--file", action="append", default=[], help="要上传的文件，可重复")
     parser.add_argument("--draft", action="store_true")
     args = parser.parse_args()
+
+    token = args.token or os.environ.get("GITHUB_TOKEN", "").strip()
+    if not token:
+        print("缺少 token：请设置环境变量 GITHUB_TOKEN，或用 --token 传入（不推荐，会留在命令历史里）。", file=sys.stderr)
+        return 2
 
     body = args.body or ""
     for path_text in args.file:
@@ -89,7 +96,7 @@ def main() -> int:
     existing = None
     # 已存在同 tag 就复用，避免 422
     try:
-        release = _request("GET", f"{_API}/repos/{args.repo}/releases/tags/{args.tag}", args.token)
+        release = _request("GET", f"{_API}/repos/{args.repo}/releases/tags/{args.tag}", token)
         existing = release
         print(f"复用已有 Release：{args.tag}")
     except RuntimeError as error:
@@ -98,7 +105,7 @@ def main() -> int:
         release = _request(
             "POST",
             f"{_API}/repos/{args.repo}/releases",
-            args.token,
+            token,
             {
                 "tag_name": args.tag,
                 "name": args.name or args.tag,
@@ -117,7 +124,7 @@ def main() -> int:
         asset = _request(
             "POST",
             f"{upload_url}?name={urllib.parse.quote(path.name)}",
-            args.token,
+            token,
             raw=path.read_bytes(),
             content_type=content_type,
         )
