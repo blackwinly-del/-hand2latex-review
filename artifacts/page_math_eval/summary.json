@@ -1,0 +1,74 @@
+{
+  "dataset": {
+    "source": "page_math_dataset.zip（100 页，合成版式；笔迹取自 MathWriting，latex 为人标 normalizedLabel）",
+    "pages": 100,
+    "formula_entries": 1663,
+    "unique_latex": 370,
+    "crops": "原图 1240x1754 像素坐标直接裁切，2% 边距，未缩放",
+    "crop_height_px": {
+      "median": 62,
+      "min": 52,
+      "max": 75
+    }
+  },
+  "method": {
+    "engine": "UniMERNet",
+    "device": "gpu:0 (RTX 5070 Laptop, paddle 3.4.0)",
+    "path": "recognizer.recognize -> reasoner.refine -> normalize_latex(strip) 完全相等",
+    "strict": "strip 后字符串完全相等（与项目原 12 样本评估同一口径）",
+    "loose": "额外归并 \u000bert/|、\\left\right、空格、\\dfrac/\frac 等；只作诊断",
+    "runs_per_sample": 1
+  },
+  "results": {
+    "unique_370": {
+      "n": 370,
+      "strict_correct": 36,
+      "strict_accuracy": 0.0973,
+      "loose_correct": 48,
+      "loose_accuracy": 0.1297,
+      "errors": 0,
+      "latency_median_s": 0.72,
+      "wall_seconds": 381
+    },
+    "subset_latex_len_gt_7": {
+      "n": 353,
+      "strict_correct": 33,
+      "strict_accuracy": 0.0935,
+      "loose_accuracy": 0.1246
+    },
+    "by_latex_len": {
+      "0-7": {
+        "n": 17,
+        "strict": 3,
+        "loose": 4
+      },
+      "8-15": {
+        "n": 58,
+        "strict": 10,
+        "loose": 15
+      },
+      "16-30": {
+        "n": 151,
+        "strict": 20,
+        "loose": 24
+      },
+      "31-+": {
+        "n": 144,
+        "strict": 3,
+        "loose": 5
+      }
+    }
+  },
+  "control": {
+    "manifest": "data/handwritten_ground_truth.json（项目原有 12 样本）",
+    "strict_correct": 8,
+    "strict_accuracy": 0.6667,
+    "note": "同一装置同一模型复现了历史 8/12，说明本评估器可信"
+  },
+  "resolution_check": {
+    "sample_n": 40,
+    "original_strict_accuracy": 0.125,
+    "upscaled_x3_strict_accuracy": 0.15,
+    "conclusion": "12 样本高 55-100px、page_math 高 52-75px，同一量级；放大 3 倍无实质提升，差距不是分辨率造成的"
+  }
+}
