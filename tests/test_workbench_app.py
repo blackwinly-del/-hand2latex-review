@@ -904,6 +904,72 @@ class WorkbenchAppTests(unittest.TestCase):
             shutil.rmtree(root, ignore_errors=True)
 
     @patch("workbench.app.compile_tex")
+    def test_stored_compile_survives_corrupt_record(self, compile_mock):
+        """截断的 compile.json 不能让"打开任务"整条 500。
+
+        compile.json 用 write_text 写出，不是原子写：编译时进程被杀或磁盘写满会
+        留下半截 JSON。以前 GET /api/jobs/{id} 会直接抛 JSONDecodeError。
+        现在按"没有编译记录"处理 —— 有 PDF 就照常打开，没有就重编一次。
+        """
+        import workbench.app as workbench_app
+
+        compile_mock.return_value = {
+            "success": False,
+            "log": "重编后的日志",
+            "errors": ["boom"],
+            "returncode": 1,
+            "diagnostics": [],
+        }
+        root = Path(tempfile.mkdtemp(prefix="badcompile_"))
+        with_pdf = root / uuid.uuid4().hex
+        without_pdf = root / uuid.uuid4().hex
+        try:
+            for job in (with_pdf, without_pdf):
+                job.mkdir()
+                (job / "main.tex").write_text("x", encoding="utf-8")
+                (job / "compile.json").write_text('{"success": tr', encoding="utf-8")
+            (with_pdf / "main.pdf").write_bytes(b"%PDF-1.4")
+
+            with self.assertLogs("workbench", level="WARNING"):
+                stored = workbench_app._stored_compile(with_pdf, with_pdf.name)
+                recompiled = workbench_app._stored_compile(without_pdf, without_pdf.name)
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+        # 有 PDF：不为了打开任务再跑一遍编译，但要如实说明日志缺失。
+        self.assertTrue(stored["success"])
+        self.assertIn("未重新编译", stored["log"])
+        compile_mock.assert_called_once()
+        # 没有 PDF：必须真的重编，否则打开任务是一片空白且没有原因。
+        self.assertEqual(recompiled["log"], "重编后的日志")
+        self.assertEqual(recompiled["errors"], ["boom"])
+
+    def test_apply_fix_rejects_corrupt_suggestion_with_409(self):
+        """损坏的 suggestion.json 返回 409 而不是 500，且不能把源码写坏。
+
+        `suggestion.json` 也是 write_text 写出来的非原子写。以前直接 json.loads，
+        应用修复时会抛 JSONDecodeError 变 500，用户不知道该怎么办；而这一步本来
+        就有"重新生成建议"这个出口，用 409 说清楚才有用。
+        """
+        directory = Path("artifacts/jobs") / uuid.uuid4().hex
+        directory.mkdir(parents=True)
+        try:
+            (directory / "main.tex").write_text("原始内容", encoding="utf-8")
+            (directory / "suggestion.json").write_text('{"summary": "半截', encoding="utf-8")
+
+            response = TestClient(app).post(
+                f"/api/jobs/{directory.name}/apply-fix",
+                json={"tex": "新内容", "summary": "改动"},
+            )
+
+            self.assertEqual(response.status_code, 409, response.text)
+            self.assertIn("损坏", response.json()["detail"])
+            # 校验没过就不能动源码——否则用户会拿到一份"改了但没编译"的文件。
+            self.assertEqual((directory / "main.tex").read_text(encoding="utf-8"), "原始内容")
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
+    @patch("workbench.app.compile_tex")
     def test_use_source_figures_rebuilds_without_recognition(self, compile_mock):
         directory = Path("artifacts/jobs") / uuid.uuid4().hex
         page_directory = directory / "page_01"

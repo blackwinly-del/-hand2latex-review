@@ -689,7 +689,19 @@ def _job_metadata(directory: Path) -> dict:
 def _stored_compile(directory: Path, job_id: str) -> dict:
     path = directory / "compile.json"
     if path.is_file():
-        return json.loads(path.read_text(encoding="utf-8"))
+        try:
+            stored = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            # compile.json 是 write_text 写出来的，不是原子写：打包/编译时进程被杀
+            # 或磁盘写满会留下截断的 JSON。以前这里直接返回 json.loads 的结果，
+            # 一条坏记录让 GET /api/jobs/{id} 整条 500 —— 打开任务直接报服务器错误，
+            # 用户既不知道是编译记录坏了，也没有出路。现在按"没有编译记录"处理：
+            # 有 PDF 就照常打开、没有就重编一次拿到真实错误。
+            logger.warning("compile.json 读不出来，按无记录处理：%s", path)
+        else:
+            if isinstance(stored, dict):
+                return stored
+            logger.warning("compile.json 顶层不是对象，按无记录处理：%s", path)
     # 老任务没有 compile.json。已有 PDF 时如实说明没有保存日志，避免为了
     # 打开任务又强制跑一遍编译；没有 PDF 时才重新编译以取得真实错误。
     if (directory / "main.pdf").is_file():
@@ -1573,7 +1585,14 @@ def apply_document_fix(job_id: str, request: ApplyFixRequest) -> dict:
         suggestion_path = directory / "suggestion.json"
         if not suggestion_path.is_file():
             raise HTTPException(status_code=409, detail="没有可应用的修复建议")
-        suggestion = json.loads(suggestion_path.read_text(encoding="utf-8"))
+        try:
+            suggestion = json.loads(suggestion_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            # 坏掉的建议文件只能让人重新生成，不能猜。给 409 而不是让它变成 500，
+            # 是因为这一步本来就有"重新生成"这个出口，用户看得懂该怎么处理。
+            raise HTTPException(status_code=409, detail="修复建议已损坏，请重新生成")
+        if not isinstance(suggestion, dict):
+            raise HTTPException(status_code=409, detail="修复建议已损坏，请重新生成")
         if suggestion.get("baseline_sha256") != _sha256_text(original_tex):
             raise HTTPException(status_code=409, detail="源码已变化，请重新生成修复建议")
         (directory / "fix_applied.json").write_text(
