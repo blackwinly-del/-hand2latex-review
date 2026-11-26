@@ -667,9 +667,15 @@ class WorkbenchAppTests(unittest.TestCase):
         self.assertIn("diagnostics", detail.json()["compile"])
 
     def test_job_list_supports_search_and_pagination(self):
+        # 标题里带本次运行唯一的标记。固定标题（"分页验收A/B"）有个坑：tearDown 的
+        # shutil.rmtree 一旦被打断（例如被批量删除守卫 SystemExit 掉），旧夹具就永久留在
+        # artifacts/jobs 里，下次运行的 total 会从 2 变成 4 或 8。按唯一标记查询，
+        # 测试就和被污染的 artifacts/jobs 彻底解耦，不依赖清理一定跑完。
+        marker = uuid.uuid4().hex[:8]
+        needle = f"分页验收-{marker}"
         directories = []
         try:
-            for index, title in enumerate(("分页验收A", "分页验收B", "其他任务")):
+            for index, title in enumerate((f"{needle}-A", f"{needle}-B", f"其他任务-{marker}")):
                 directory = Path("artifacts/jobs") / uuid.uuid4().hex
                 directory.mkdir(parents=True)
                 directories.append(directory)
@@ -681,8 +687,8 @@ class WorkbenchAppTests(unittest.TestCase):
                 timestamp = time.time() - index * 10
                 os.utime(directory, (timestamp, timestamp))
 
-            first = self.client.get("/api/jobs", params={"q": "分页验收", "limit": 1, "offset": 0})
-            second = self.client.get("/api/jobs", params={"q": "分页验收", "limit": 1, "offset": 1})
+            first = self.client.get("/api/jobs", params={"q": needle, "limit": 1, "offset": 0})
+            second = self.client.get("/api/jobs", params={"q": needle, "limit": 1, "offset": 1})
             self.assertEqual(first.status_code, 200, first.text)
             self.assertEqual(first.json()["total"], 2)
             self.assertEqual(second.json()["total"], 2)
