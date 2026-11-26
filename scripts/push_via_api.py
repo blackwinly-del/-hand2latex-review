@@ -233,9 +233,19 @@ def main() -> int:
     )
     base_sha = base_probe.stdout.decode("utf-8", "replace").strip() if base_probe.returncode == 0 else args.base
 
-    base_commit = _request("GET", f"{_API}/repos/{args.repo}/git/commits/{base_sha}", token)
+    # base 是远端对象，404 就是正常答案（传错了/没这个提交），不是故障。
+    # 必须显式 allow_404=True：不然 _request 会先把 404 抛成 RuntimeError，
+    # 下面那句给人看的提示永远执行不到，用户只看到一大段 traceback。
+    base_commit = _request(
+        "GET", f"{_API}/repos/{args.repo}/git/commits/{base_sha}", token, allow_404=True
+    )
     if base_commit is None:
-        print(f"远端没有提交 {base_sha[:8]}，base 传错了。", file=sys.stderr)
+        print(
+            f"远端仓库里没有提交 {base_sha}，base 传错了。\n"
+            f"  - 如果是短 sha：GitHub 的 git 接口只认完整 40 位，先 `git rev-parse {base_sha}` 取全；\n"
+            f"  - 如果这个提交只在本地：它还没推上去，远端当然查不到，先把 base 换成远端已有的提交。",
+            file=sys.stderr,
+        )
         return 2
     base_tree = base_commit["tree"]["sha"]
 
@@ -447,9 +457,11 @@ def _local_blob_map(ref: str) -> dict[str, str]:
 
 
 def _tree_of(repo: str, token: str, sha: str) -> str:
-    commit = _request("GET", f"{_API}/repos/{repo}/git/commits/{sha}", token)
+    # 同样要 allow_404：父提交不在远端时，下面那句才是该给用户看的话，
+    # 而不是一条带 URL 和 JSON 报文的 RuntimeError。
+    commit = _request("GET", f"{_API}/repos/{repo}/git/commits/{sha}", token, allow_404=True)
     if commit is None:
-        raise RuntimeError(f"取不到远端提交 {sha} 的树")
+        raise RuntimeError(f"取不到远端提交 {sha} 的树：远端没有这个提交（本地才有？先推父提交）")
     return commit["tree"]["sha"]
 
 

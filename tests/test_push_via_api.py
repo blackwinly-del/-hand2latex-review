@@ -232,6 +232,26 @@ class PushViaApiTests(unittest.TestCase):
             "PATCH 出现了多次，检查是否又被拿去建引用了（对不存在的引用 PATCH 只会 422）",
         )
 
+    def test_not_found_probes_do_not_raise_before_the_friendly_message(self):
+        """探测"提交在不在"必须带 allow_404=True，否则提示是死代码。
+
+        `_request` 的默认行为是：404 立刻抛 RuntimeError。于是
+            commit = _request(...)
+            if commit is None:
+                print("base 传错了")
+        这种写法里那行提示永远执行不到，用户只看到一大段 traceback。
+        这个坑真的踩到了：给 --base 传了 8 位短 sha，远端 API 只认 40 位，
+        结果是一屏 traceback 而不是"你给的 sha 不对"。
+        """
+        self.assertIn(
+            'git/commits/{base_sha}", token, allow_404=True', self.source,
+            "base 提交探测没带 allow_404，下面的友好提示会成为死代码",
+        )
+        self.assertIn(
+            'git/commits/{sha}", token, allow_404=True', self.source,
+            "_tree_of 的提交探测没带 allow_404，父提交缺失时的提示会成为死代码",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
