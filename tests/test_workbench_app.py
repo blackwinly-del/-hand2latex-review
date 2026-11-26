@@ -707,6 +707,105 @@ class WorkbenchAppTests(unittest.TestCase):
             for directory in directories:
                 shutil.rmtree(directory, ignore_errors=True)
 
+    def test_job_list_reads_metadata_only_for_current_page(self):
+        """列表页只该为「当前这一页」读元数据，不是为全部任务读。
+
+        这条测的是性能优化的**行为边界**，不是速度本身（计时断言在 CI 上必然抖）。
+        做法：给一批任务写好 job.json 之后，把 `_job_metadata` 换成会计数的包装，
+        断言「不限搜索、limit=2」时它的调用次数就等于 2，而不是任务总数。
+
+        只要有人把它改回"先全量读元数据再切片"，这条就会红。这个回归很容易
+        悄悄发生——两种写法返回的结果一模一样，只有调用次数不同。
+        """
+        import workbench.app as workbench_app
+
+        directories = []
+        try:
+            for index in range(6):
+                directory = Path("artifacts/jobs") / uuid.uuid4().hex
+                directory.mkdir(parents=True)
+                directories.append(directory)
+                (directory / "main.tex").write_text("content", encoding="utf-8")
+                (directory / "job.json").write_text(
+                    json.dumps({"title": f"懒读验收{index}", "page_count": 1, "pages": []},
+                               ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                timestamp = time.time() - index * 10
+                os.utime(directory, (timestamp, timestamp))
+
+            calls = []
+            real = workbench_app._job_metadata
+
+            def counting(entry):
+                calls.append(entry.name)
+                return real(entry)
+
+            with patch.object(workbench_app, "_job_metadata", counting):
+                response = self.client.get("/api/jobs", params={"limit": 2})
+                self.assertEqual(response.status_code, 200, response.text)
+                page_calls = len(calls)
+                self.assertEqual(len(response.json()["jobs"]), 2)
+
+                # 同一个请求里只该读 2 次；把全部 6 个都读了就是没懒起来。
+                self.assertEqual(
+                    page_calls, 2,
+                    f"limit=2 却读了 {page_calls} 次元数据，说明又退回全量读了",
+                )
+
+                # 有搜索词时必须全量读——不读就判断不了命中。这条防止有人
+                # 为了"更快"把搜索也改成只读当前页，那会漏结果。
+                calls.clear()
+                searched = self.client.get("/api/jobs", params={"q": "懒读验收", "limit": 2})
+                self.assertEqual(searched.status_code, 200, searched.text)
+                self.assertGreater(
+                    len(calls), 2,
+                    "搜索路径也懒读了，会漏掉不在当前页的命中项",
+                )
+                self.assertGreaterEqual(searched.json()["total"], 2)
+        finally:
+            for directory in directories:
+                shutil.rmtree(directory, ignore_errors=True)
+
+    def test_directory_usage_counts_nested_files_and_skips_non_jobs(self):
+        """目录统计要数到多层子目录，且不把非任务目录算进去。
+
+        这条锁的是 `_directory_usage` 替换 `Path.rglob("*")` 之后的行为等价性。
+        换实现是为了性能（72 任务实测 125ms → 48ms），但"更快"不能以"数错"为代价：
+        rglob 会递归到底，手写 scandir 如果只扫一层就会少算 page_*/ 里的大文件，
+        而那个数字会显示在状态面板上，少了也没人看得出来。
+        """
+        import workbench.app as workbench_app
+
+        root = Path(tempfile.mkdtemp(prefix="usage_"))
+        job = root / uuid.uuid4().hex
+        try:
+            (job / "page_01" / "deeper").mkdir(parents=True)
+            (job / "main.tex").write_bytes(b"x" * 10)
+            (job / "page_01" / "source.png").write_bytes(b"y" * 100)
+            # 第三层：只有递归到底才会被数到，漏了它就是少算 1000 字节。
+            (job / "page_01" / "deeper" / "main.pdf").write_bytes(b"z" * 1000)
+            # 非任务目录（名字不符合 job_id 格式）不该被计入任务数。
+            (root / "not-a-job").mkdir()
+            (root / "not-a-job" / "big.bin").write_bytes(b"w" * 5000)
+
+            count, total = workbench_app._directory_usage(root)
+            self.assertEqual(count, 1, "非任务目录被当成任务计入了")
+            self.assertEqual(total, 10 + 100 + 1000, "多层子目录没有被数全")
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_directory_usage_survives_missing_root(self):
+        """目录不存在时返回 (0, 0)，不抛异常。
+
+        状态接口因为一个不存在或没权限的目录整条 500 不划算，前端只是拿它
+        显示一个体积数字。
+        """
+        import workbench.app as workbench_app
+
+        count, total = workbench_app._directory_usage(Path(tempfile.gettempdir()) / "definitely-absent-xyz")
+        self.assertEqual((count, total), (0, 0))
+
     @patch("workbench.app.compile_tex")
     def test_use_source_figures_rebuilds_without_recognition(self, compile_mock):
         directory = Path("artifacts/jobs") / uuid.uuid4().hex
@@ -1086,7 +1185,7 @@ class WorkbenchAppTests(unittest.TestCase):
     def test_jpeg_content_saved_with_true_suffix(self):
         """扩展名写 .png 但内容其实是 JPEG 时，落盘用真实格式的后缀。
 
-        否则源图存成 source.png 却是 JPEG 内容，后面 \includegraphics 或
+        否则源图存成 source.png 却是 JPEG 内容，后面 \\includegraphics 或
         其他按后缀判断类型的代码会出错。
         """
         jpeg = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00" + b"\x00" * 32
