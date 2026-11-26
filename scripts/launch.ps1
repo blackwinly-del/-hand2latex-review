@@ -138,6 +138,22 @@ function Invoke-Captured {
     }
 }
 
+# 用默认浏览器打开地址。同样不用 Start-Process（原因见 Invoke-Captured 的注释）；
+# .NET 的 Process.Start 走 ShellExecute，实测在大小写重名代理变量下正常。
+# 返回 $true/$false，让调用方决定要不要打印"已打开"，避免失败时还报成功。
+function Open-Url {
+    param([string]$TargetUrl)
+    try {
+        $opened = [System.Diagnostics.Process]::Start($TargetUrl)
+        if ($opened) { $opened.Dispose() }
+        return $true
+    } catch {
+        Write-Line "没能自动打开浏览器：$($_.Exception.Message)" 'warn'
+        Write-Line "请自己复制这个地址：$TargetUrl" 'info'
+        return $false
+    }
+}
+
 # 用 python --version 判断版本；只接受 3.10 - 3.12（PaddlePaddle 不支持 3.13）。
 function Get-PythonVersionText {
     param([string]$Command, [string[]]$Prefix = @())
@@ -690,7 +706,7 @@ if ($existing -and (Test-HttpOk $Url)) {
         Start-Sleep -Seconds 1
     } else {
         Write-Line "工作台已在运行：PID $($existing.Id)，$Url（需要重启请用 -Restart）" 'ok'
-        if (-not $NoBrowser) { Start-Process $Url }
+        if (-not $NoBrowser) { $null = Open-Url $Url }
         exit 0
     }
 } elseif ($existing) {
@@ -703,12 +719,47 @@ if (-not (Test-PortFree $Port)) {
     Stop-WithHint "端口 $Port 已被其它程序占用。" "换端口重试：.\scripts\launch.ps1 -Port 8010"
 }
 
-$server = Start-Process -FilePath $VenvPython `
-    -ArgumentList @('-m', 'uvicorn', 'workbench.app:app', '--host', '127.0.0.1', '--port', "$Port") `
-    -WorkingDirectory $Root -WindowStyle Hidden -PassThru `
-    -RedirectStandardOutput $LogFile -RedirectStandardError "$LogFile.err"
+# 服务进程的日志要写进文件，而且启动器退出之后还得继续写。
+# 不用 Start-Process：环境里有大小写重名变量时它会崩（见 Invoke-Captured 的注释）。
+# 也不用 .NET 的 RedirectStandardOutput：那是管道，没人一直读就会写满，把服务卡死。
+# 所以让 cmd 来做重定向——文件句柄由 python 自己继承，启动器走了也照常写；
+# 再用 WMI 创建进程，让它彻底脱离当前控制台（否则外壳会继承启动器的输出句柄，
+# 从脚本调用方看就像"命令一直没结束"）。
+# /S /C 加外层引号，是为了让带空格的路径（例如装在 C:\Users\某 用户\...）也能正确解析。
+$serverCommand = '"' + $VenvPython + '" -m uvicorn workbench.app:app --host 127.0.0.1 --port ' + $Port +
+    ' > "' + $LogFile + '" 2> "' + $LogFile + '.err"'
+$cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
+$serverCommandLine = '"' + $cmdExe + '" /S /C "' + $serverCommand + '"'
+$created = $null
+try {
+    $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+        CommandLine      = $serverCommandLine
+        CurrentDirectory = $Root
+    } -ErrorAction Stop
+} catch {
+    Stop-WithHint "服务进程启动失败：$($_.Exception.Message)" "完整日志可看 $LogFile"
+}
+if (-not $created -or $created.ReturnValue -ne 0) {
+    Stop-WithHint "服务进程启动失败（WMI 返回值 $(if ($created) { $created.ReturnValue } else { '无' })）" "完整日志可看 $LogFile"
+}
+$wrapperPid = $created.ProcessId
+
+# cmd 只是外壳，pid 文件必须记 python 那个进程，否则 -Stop 会杀错对象、把服务留下。
+$server = $null
+for ($attempt = 1; $attempt -le 40; $attempt++) {
+    $child = Get-CimInstance Win32_Process -Filter "ParentProcessId=$wrapperPid" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match 'workbench\.app' } |
+        Select-Object -First 1
+    if ($child) {
+        $server = Get-Process -Id $child.ProcessId -ErrorAction SilentlyContinue
+        if ($server) { break }
+    }
+    Start-Sleep -Milliseconds 250
+}
 if (-not $server) {
-    Stop-WithHint '服务进程启动失败' "完整日志可看 $LogFile"
+    Show-FailureLog $LogFile
+    Show-FailureLog "$LogFile.err"
+    Stop-WithHint '服务进程启动失败：10 秒内没找到 uvicorn 进程' "完整日志可看 $LogFile"
 }
 Set-Content -LiteralPath $PidFile -Value $server.Id -Encoding ASCII
 Write-Line "服务进程 PID $($server.Id)，日志 $LogFile" 'info'
@@ -723,8 +774,7 @@ if (-not (Wait-ForHttp -Process $server -TargetUrl $Url -Seconds 25)) {
 
 Write-Line "工作台已就绪：$Url" 'ok'
 if (-not $NoBrowser) {
-    Start-Process $Url
-    Write-Line '已在默认浏览器打开' 'info'
+    if (Open-Url $Url) { Write-Line '已在默认浏览器打开' 'info' }
 }
 Write-Step '完成'
 Write-Line '停止服务：双击 关闭工作台.bat，或运行 .\scripts\launch.ps1 -Stop' 'info'
