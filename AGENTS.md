@@ -128,17 +128,21 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -IncludeDemoJob c3d
 > 曾经有个 `make_zip.py` 只负责压缩，而 `tests/test_packaging.py` 锁的是 `make_package_zip.py`，
 > 于是"被测的从来不是被用的那个"，真实打包路径上无人把关。
 
-### 4.1 做完就往原仓库推，不要停在本地（2026-11-26 起）
+### 4.1 做完就推到自己的分支，不推默认分支（2026-11-26 修订）
 
-**默认动作：每完成一块可以交付的内容，直接推到原仓库，不用先问。**
-原仓库 `https://github.com/blackwinly-del/-hand2latex-review` 是**公开**的，
-队友打开首页就能看，所以"推上去"＝"队友真的能看到"，本地提交不等于交付。
+**默认动作：每完成一块可以交付的内容，推到自己的分支，然后开 PR 或把分支名告诉维护者。**
+**`hand2latex-review`（默认分支）与 `hand2latex-complete-2026-11-25` 只由维护者更新，
+任何人都不要直接往上推，也不用先问"我能不能推"——推自己的分支不需要许可。**
+
+理由：默认分支是共享状态。直接往上推等于让队友在自己的工作区里被动接受未经审阅的改动，
+推坏了要回滚，代价远高于开一条分支。自己的分支可以随便推、随便改，
+合不合、什么时候合，由维护者定。
 
 三种东西，三个去处：
 
 | 东西 | 去哪 | 为什么 |
 | --- | --- | --- |
-| 代码、文档、测试 | `git push` 到 `hand2latex-review` | 队友打开首页直接看，可 diff 可追溯 |
+| 代码、文档、测试 | `git push` 到**自己的分支**（`feat/…`、`fix/…`），再开 PR | 可 diff 可追溯，默认分支保持可回滚 |
 | 交付包 `dist/*.zip`（67 MB） | **GitHub Release**（`scripts/upload_release.py`） | 二进制不进 git 历史，否则每次 clone 都背上它 |
 | 本机运行产物 `artifacts/` | **哪都不去** | 是跑出来的临时数据，`.gitignore` 已排除 |
 
@@ -152,8 +156,14 @@ git add -A; git commit
 powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 ```
 
-推送目标：`hand2latex-review`（默认分支，队友看的就是这条）。
-`hand2latex-complete-2026-11-25` 与它内容相同、父提交不同，一起推以保持一致。
+推送目标：**你自己的分支**。
+
+```bash
+git push -u origin fix/你改的那件事
+```
+
+`hand2latex-review` 与 `hand2latex-complete-2026-11-25` **都不要直接推**：
+要进默认分支就开 PR，或把分支名告诉维护者，由他合并。
 
 **`github.com:443` 会间歇性 502（`CONNECT tunnel failed`），`api.github.com` 通常是通的。**
 先探测再选通道：
