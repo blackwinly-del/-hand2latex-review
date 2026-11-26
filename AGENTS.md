@@ -171,6 +171,7 @@ git push -u origin fix/你改的那件事
 ```bash
 curl -s -o /dev/null -w "%{http_code}" --max-time 12 https://github.com          # 000 = 不通
 curl -s -o /dev/null -w "%{http_code}" --max-time 12 https://api.github.com/rate_limit  # 200 = 可用
+curl -s -o /dev/null -w "%{http_code}" --max-time 12 --noproxy '*' https://github.com     # 绕过代理再试一次
 ```
 
 `git push` 走前者，不通就用备用脚本走后者：
@@ -179,7 +180,11 @@ curl -s -o /dev/null -w "%{http_code}" --max-time 12 https://api.github.com/rate
 
 两个脚本都带 5xx 自动重试——这条链路上 500/503 很常见，别看到第一次失败就放弃。
 
-**别去改代理端口。** 端口每次会话都变（49401→64242→39099），502 与代理无关，是上游偶发故障。
+**别去改代理端口号。** 端口每次会话都变（49401→64242→39099）。502 有两种成因，都实测见过：
+**上游间歇故障**，以及**当前代理端口本身不通**（走代理 000、绕过代理 200）。
+所以先做上面第三条探测再判断：绕过代理能通，就只在子进程里清掉 `HTTP_PROXY`/`HTTPS_PROXY`
+再推（`env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy git push …`），
+别改本机配置；两边都 000 才是上游问题，等一会儿或走 API 通道。
 
 ## 5. 文档在哪
 
