@@ -384,12 +384,44 @@ def main() -> int:
         )
     else:
         # 新建引用必须用 POST；PATCH 对不存在的引用只会给 422。
-        _request(
-            "POST",
-            f"{_API}/repos/{args.repo}/git/refs",
-            token,
-            {"ref": f"refs/heads/{args.branch}", "sha": last_remote},
-        )
+        try:
+            _request(
+                "POST",
+                f"{_API}/repos/{args.repo}/git/refs",
+                token,
+                {"ref": f"refs/heads/{args.branch}", "sha": last_remote},
+            )
+        except RuntimeError as error:
+            # 竞态窗口：「GET 探测到分支不存在」与「POST 建分支」之间，另一个推送者
+            # 可能已经把同名分支建好了。此时 GitHub 返回 422 Reference already exists。
+            # 这不是脚本用错了，是并发推送的正常结果，必须当成「base 过期」处理：
+            # 回读远端引用，把真正指向的提交告诉他，而不是抛一个带 traceback 的崩溃。
+            # 这个分支只有真并发才走得到，顺序模拟永远测不出来。
+            if "Reference already exists" not in str(error):
+                raise
+            print(
+                f"远端 {args.branch} 在本次推送期间被别人建好了，重新核对：",
+                file=sys.stderr,
+            )
+            raced = _request(
+                "GET", f"{_API}/repos/{args.repo}/git/ref/heads/{args.branch}", token, allow_404=True
+            )
+            if raced is not None:
+                race_tip = raced["object"]["sha"]
+                if race_tip != base_sha:
+                    print(
+                        f"远端分支已经移到 {race_tip[:8]}，与你给的 base {base_sha[:8]} 不一致。\n"
+                        f"先 `git fetch` 看看别人推了什么，把 --base 换成 {race_tip[:8]} 再来；\n"
+                        f"确实要覆盖就用 --force（会丢远端的 {race_tip[:8]}）。",
+                        file=sys.stderr,
+                    )
+                    return 3
+                # 极小概率：别人建的正好就是我们要的 base，说明只是慢了半拍，
+                # 引用已存在且指向同一处，直接当成功。
+                print(f"  远端分支已存在且正好指向 {race_tip[:8]}，按已建好处理。")
+            else:
+                print(f"  {args.branch} 报已存在却又查不到，请人工核对远端引用。", file=sys.stderr)
+                return 3
     print(f"  引用 {args.branch} -> {last_remote[:8]}")
 
     # ---- 推后自校验：不信自己刚发的请求，回头查一遍 ----

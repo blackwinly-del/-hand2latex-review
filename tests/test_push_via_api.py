@@ -89,10 +89,18 @@ class PushViaApiTests(unittest.TestCase):
     # ---- 后补的四个缺口 ----
 
     def test_can_create_branch_with_post(self):
-        """新建分支必须用 POST /git/refs；PATCH 对不存在的引用只会给 422。"""
+        """新建分支必须用 POST /git/refs；PATCH 对不存在的引用只会给 422。
+
+        断言不要写成 `'"POST",\\n            f"..."'` 这种带缩进的整串匹配：
+        只要把那行代码挪进 try 块（多一层缩进）就会误报，而它测的东西根本没变。
+        这里只认「方法」与「端点」两个事实本身。
+        """
         self.assertIn("--create-branch", self.source)
-        self.assertIn('"POST",\n            f"{_API}/repos/{args.repo}/git/refs"', self.source)
+        self.assertIn('f"{_API}/repos/{args.repo}/git/refs"', self.source)
         self.assertIn('"ref": f"refs/heads/{args.branch}"', self.source)
+        # POST 建引用与 PATCH 更新引用必须是两条不同路径。
+        self.assertIn('"POST",', self.source)
+        self.assertIn('"PATCH",', self.source)
 
     def test_replays_commit_chain_with_multi_parents(self):
         """逐提交重放并保留多父，否则合并提交会被压平成单亲（拓扑丢失）。"""
@@ -184,6 +192,45 @@ class PushViaApiTests(unittest.TestCase):
         self.assertIn("_resolve_local_equivalent", self.source)
         self.assertIn("stand_in_map", self.source)
         self.assertIn("dict(stand_in_map)", self.source)
+
+    def test_concurrent_create_branch_race_is_handled(self):
+        """两个推送者同时新建同名分支时，后到的那个不许崩。
+
+        这个场景只有真并发才走得到：`GET` 探测到分支不存在之后、`POST` 建分支之前，
+        另一个进程可能已经建好了同名分支，于是 GitHub 回 422 Reference already exists。
+        改动前这个 422 会一路抛到顶层，用户看到的是 traceback + 退出码 1——
+        既没说清发生了什么，也没给出该怎么办。
+
+        正确行为：识别出这是竞态而不是用错，回读远端引用，按"base 过期"处理
+        （退出码 3 + 明确的下一步）。这条测的是源码里的判据，不是跑真并发——
+        CI 里没法可靠地制造那个窗口。
+        """
+        self.assertIn("Reference already exists", self.source, "竞态判据被删了")
+        # 422 必须被接住，而不是直接抛出去。
+        self.assertIn("except RuntimeError as error:", self.source)
+        # 接住之后要回读远端引用，否则不知道别人推到了哪。
+        self.assertIn("race_tip", self.source)
+        # 竞态也要给出退出码 3（与"base 过期"同一个出口），不能返回 1 或抛异常。
+        race_block = self.source.split("Reference already exists", 1)[1]
+        self.assertIn("return 3", race_block[:2000], "竞态分支没有给出明确的退出码 3")
+
+    def test_ref_creation_and_update_use_different_methods(self):
+        """建引用必须 POST、更新必须 PATCH。
+
+        PATCH 对不存在的分支只会给 422，这是最初"建不了分支"的成因。
+        两条路径混用会退化成同样的失败。
+        """
+        # 不按缩进/换行去匹配（源码重排就会误报），只认「方法 + 端点」这个事实。
+        self.assertIn('f"{_API}/repos/{args.repo}/git/refs"', self.source, "建引用端点不见了")
+        self.assertIn('f"{_API}/repos/{args.repo}/git/refs/heads/{args.branch}"', self.source, "更新引用端点不见了")
+        post_at = self.source.find('"POST",')
+        self.assertNotEqual(post_at, -1, "POST 方法不见了")
+        # PATCH 只该出现在"更新已有引用"这一处，不该用来建分支。
+        self.assertIn('"PATCH",', self.source, "更新引用不再用 PATCH 了")
+        self.assertEqual(
+            self.source.count('"PATCH",'), 1,
+            "PATCH 出现了多次，检查是否又被拿去建引用了（对不存在的引用 PATCH 只会 422）",
+        )
 
 
 if __name__ == "__main__":
