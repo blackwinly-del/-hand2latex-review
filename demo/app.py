@@ -223,11 +223,10 @@ else:
     device = (os.environ.get("RECOGNIZER_DEVICE") or "cpu").strip()
     device_label = f"GPU（{device}）" if device.lower().startswith("gpu") else "CPU"
     model = (os.environ.get("RECOGNIZER_MODEL") or "PP-FormulaNet-L").strip()
-    st.caption(f"识别模型：{model} · 设备：{device_label}。首次识别要加载模型，GPU 约十几秒，CPU 更久。")
-
-# 预热模型（首次加载，mock 模式自动跳过）。放在列布局之前，避免渲染时再加载。
-if backend != "mock":
-    _get_model("pp_formulanet_l", _MODEL_CHOICES[_DEFAULT_MODEL_LABEL])
+    st.caption(
+        f"识别模型：{model} · 设备：{device_label}。画板可以立刻开始写；"
+        "模型在第一次识别时才加载（GPU 实测约 50 秒），届时右侧会显示加载进度。"
+    )
 
 left, right = st.columns([1, 1])
 
@@ -258,12 +257,8 @@ model_label = st.sidebar.radio(
 )
 model_name = _MODEL_CHOICES[model_label]
 
-if backend != "mock":
-    # 切档位时按新模型名加载（get_model 的缓存 key 含 model_name，各自缓存）。
-    if st.session_state.get("_loaded_model") != model_name:
-        with st.spinner(f"正在加载 {model_name}（首次约需数十秒）…"):
-            _get_model("pp_formulanet_l", model_name)
-        st.session_state["_loaded_model"] = model_name
+# 模型不在这里加载。放到画布之后、真正识别之前：GPU 首次加载实测约 50 秒，
+# 放在画布之前会让页面半分钟没有画板，看起来就是"画板加载不出来"。
 
 # ---------------------------------------------------------------------------
 # 停笔自动识别：内容稳定满 1 秒且尚未识别过该指纹时触发。
@@ -285,6 +280,11 @@ if fingerprint is not None and idle >= _IDLE_SECONDS:
         st.session_state.get("_recognized_model") != model_name
     ):
         started = time.perf_counter()
+        if backend != "mock" and st.session_state.get("_loaded_model") != model_name:
+            # 首次识别、或切了模型档位时才加载。画板此时早已画出来，用户看着进度等。
+            with st.spinner(f"首次识别要加载 {model_name}（GPU 约 50 秒，请稍候）…"):
+                _get_model("pp_formulanet_l", model_name)
+            st.session_state["_loaded_model"] = model_name
         with st.spinner("正在识别…"):
             try:
                 image_path = _canvas_to_png(canvas_result)
